@@ -1,0 +1,11 @@
+{
+  "data": {
+    "text": "Some text",
+    "count": 42
+  },
+  "errors": [
+    {
+      "message": "Error message"
+    }
+  ]
+}
