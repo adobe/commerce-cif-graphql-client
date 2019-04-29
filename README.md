@@ -24,3 +24,11 @@ To instantiate instances of this GraphQL client, simply go the AEM OSGi configur
 * `url`: the URL of the GraphQL server endpoint used by this client.
 
 The `identifier` is used by the adapter factory to resolve clients via the `cq:graphqlClient` property set on any JCR node. When this is set on a resource or the resource ancestors, one can write `GraphqlClient client = resource.adaptTo(GraphqlClient.class);`.
+
+### Contributing
+ 
+Contributions are welcomed! Read the [Contributing Guide](.github/CONTRIBUTING.md) for more information.
+ 
+### Licensing
+ 
+This project is licensed under the Apache V2 License. See [LICENSE](LICENSE) for more information.
