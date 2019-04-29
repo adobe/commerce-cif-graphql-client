@@ -218,7 +218,7 @@
         <dependency>
             <groupId>com.adobe.aem</groupId>
             <artifactId>uber-jar</artifactId>
-            <version>6.4.2</version>
+            <version>6.4.4</version>
             <classifier>apis</classifier>
             <scope>provided</scope>
         </dependency>
