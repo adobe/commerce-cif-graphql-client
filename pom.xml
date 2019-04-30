@@ -22,6 +22,7 @@
 
     <name>Generic GraphQL client</name>
     <description>Generic GraphQL client for AEM</description>
+    <url>https://github.com/adobe/commerce-cif-graphql-client</url>
 
     <scm>
         <connection>scm:git:https://github.com/adobe/commerce-cif-graphql-client</connection>
