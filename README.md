@@ -1,4 +1,5 @@
 [![CircleCI](https://circleci.com/gh/adobe/commerce-cif-graphql-client.svg?style=svg)](https://circleci.com/gh/adobe/commerce-cif-graphql-client)
+[![Maven Central](https://img.shields.io/maven-central/v/com.adobe.commerce.cif/graphql-client.svg)](https://search.maven.org/search?q=g:com.adobe.commerce.cif%20AND%20a:graphql-client)
 
 # GraphQL client
 
