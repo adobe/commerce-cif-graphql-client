@@ -57,4 +57,4 @@ workflows:
             branches:
               ignore: /.*/
             tags:
-              only: /^graphql-client-/
+              only: /^graphql-client-.*/
