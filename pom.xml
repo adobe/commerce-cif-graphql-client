@@ -97,6 +97,7 @@
                         <exclude>target/*</exclude>
                         <exclude>src/test/resources/**/*</exclude>
                         <exclude>**/*.md</exclude>
+                        <exclude>.circleci/*</exclude>
                     </excludes>
                 </configuration>
                 <executions>

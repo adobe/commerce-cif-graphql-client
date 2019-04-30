@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/adobe/commerce-cif-graphql-client.svg?style=svg)](https://circleci.com/gh/adobe/commerce-cif-graphql-client)
+
 # GraphQL client
 
 This project is a GraphQL client for AEM. It is an OSGi bundle that can be instantiated with an OSGi configuration in the AEM OSGi configuration console. It can also be instantiated directly with java code.
