@@ -28,6 +28,10 @@ To instantiate instances of this GraphQL client, simply go the AEM OSGi configur
 
 The `identifier` is used by the adapter factory to resolve clients via the `cq:graphqlClient` property set on any JCR node. When this is set on a resource or the resource ancestors, one can write `GraphqlClient client = resource.adaptTo(GraphqlClient.class);`.
 
+## Releases to Maven Central
+
+Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated `CircleCI` build that performs the deployment of the artifact to Maven Central.
+
 ### Contributing
  
 Contributions are welcomed! Read the [Contributing Guide](.github/CONTRIBUTING.md) for more information.
