@@ -72,7 +72,9 @@
                 <executions>
                     <execution>
                         <id>baseline</id>
-                        <phase>none</phase>
+                        <goals>
+                            <goal>baseline</goal>
+                        </goals>
                     </execution>
                     <!-- Configure extra execution of 'manifest' in process-classes phase to make sure SCR metadata is generated before unit test runs -->
                     <execution>
@@ -184,6 +186,7 @@
                     <encoding>${project.build.sourceEncoding}</encoding>
                     <!-- Fixes JavaDoc build error with Java 11 -->
                     <source>8</source>
+                    <quiet>true</quiet>
                 </configuration>
             </plugin>
 
