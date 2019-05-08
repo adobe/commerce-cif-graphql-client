@@ -341,6 +341,13 @@
             <version>2.2.12</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.jacoco</groupId>
+            <artifactId>org.jacoco.agent</artifactId>
+            <version>0.8.3</version>
+            <classifier>runtime</classifier>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
