@@ -23,6 +23,10 @@ jobs:
           path: target/surefire-reports
       - store_artifacts:
           path: target/surefire-reports
+      - run:
+          name: Upload Code Coverage
+          command: bash <(curl -s https://codecov.io/bash)
+          
   release:
     docker:
       - image: circleci/openjdk:8-jdk
