@@ -110,7 +110,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
             GraphqlResponse<T, U> response = gson.fromJson(json, type);
 
-            // We log GraphQL errors because they might otherwise be "silently" get unnoticed
+            // We log GraphQL errors because they might otherwise get "silently" unnoticed
             if (response.getErrors() != null) {
                 Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
                 String errors = gson.toJson(response.getErrors(), listErrorsType);
