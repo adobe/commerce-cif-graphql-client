@@ -17,6 +17,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
@@ -102,8 +103,21 @@ public class GraphqlClientImpl implements GraphqlClient {
             } catch (Exception e) {
                 throw new RuntimeException("Failed to parse GraphQL response", e);
             }
+
+            if (gson == null) {
+                gson = this.gson;
+            }
             Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
-            return gson != null ? gson.fromJson(json, type) : this.gson.fromJson(json, type);
+            GraphqlResponse<T, U> response = gson.fromJson(json, type);
+
+            // We log GraphQL errors because they might otherwise get "silently" unnoticed
+            if (response.getErrors() != null) {
+                Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
+                String errors = gson.toJson(response.getErrors(), listErrorsType);
+                LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
+            }
+
+            return response;
         } else {
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
