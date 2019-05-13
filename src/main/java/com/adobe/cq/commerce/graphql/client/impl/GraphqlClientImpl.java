@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
@@ -51,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
+import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -85,11 +87,16 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
-    public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, Gson gson) {
+    public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU) {
+        return execute(request, typeOfT, typeofU, null);
+    }
+
+    @Override
+    public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query: " + request.getQuery());
         HttpResponse httpResponse;
         try {
-            httpResponse = client.execute(buildRequest(request));
+            httpResponse = client.execute(buildRequest(request, options));
         } catch (Exception e) {
             throw new RuntimeException("Failed to send GraphQL request", e);
         }
@@ -104,9 +111,7 @@ public class GraphqlClientImpl implements GraphqlClient {
                 throw new RuntimeException("Failed to parse GraphQL response", e);
             }
 
-            if (gson == null) {
-                gson = this.gson;
-            }
+            Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
             Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
             GraphqlResponse<T, U> response = gson.fromJson(json, type);
 
@@ -142,10 +147,17 @@ public class GraphqlClientImpl implements GraphqlClient {
         return HttpClientBuilder.create().setConnectionManager(cm).disableCookieManagement().build();
     }
 
-    private HttpUriRequest buildRequest(GraphqlRequest request) throws UnsupportedEncodingException {
+    private HttpUriRequest buildRequest(GraphqlRequest request, RequestOptions options) throws UnsupportedEncodingException {
         RequestBuilder rb = RequestBuilder.create("POST").setUri(url);
         rb.setEntity(new StringEntity(gson.toJson(request)));
         rb.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+
+        if (options != null && options.getHeaders() != null) {
+            for (Header header : options.getHeaders()) {
+                rb.setHeader(header.getName(), header.getValue());
+            }
+        }
+
         return rb.build();
     }
 }
