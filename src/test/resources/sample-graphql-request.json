@@ -1,0 +1,1 @@
+{"query":"{dummy}","operationName":"customOperation","variables":{"variableName":"variableValue"}}
