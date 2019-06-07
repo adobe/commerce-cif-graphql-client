@@ -78,4 +78,25 @@ public class GraphqlClientAdapterFactoryTest {
         Assert.assertNull(client);
     }
 
+    @Test
+    public void testErrorCases() throws Exception {
+        GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
+        graphqlClient.activate(new MockGraphqlClientConfiguration());
+
+        GraphqlClientAdapterFactory factory = new GraphqlClientAdapterFactory();
+        factory.bindGraphqlClient(graphqlClient, null);
+
+        // Ensure that adapter returns null if not adapted from a resource
+        Object target = factory.getAdapter(factory, Object.class);
+        Assert.assertNull(target);
+
+        // Ensure that adapter returns null if not adapting to a GraphQL client
+        Resource res = context.resourceResolver().getResource("/content/test");
+        target = factory.getAdapter(res, Object.class);
+        Assert.assertNull(target);
+
+        // Ensure it works in the right case
+        target = factory.getAdapter(res, GraphqlClient.class);
+        Assert.assertNotNull(target);
+    }
 }
