@@ -5,7 +5,7 @@ coverage:
         # basic
         target: 80%
         threshold: null
-        base: pr 
+        base: auto
         # advanced
         branches: null
         if_no_uploads: error
