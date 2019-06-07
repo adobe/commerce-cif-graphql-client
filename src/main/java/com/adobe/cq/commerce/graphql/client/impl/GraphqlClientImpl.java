@@ -108,7 +108,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             try {
                 json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to parse GraphQL response", e);
+                throw new RuntimeException("Failed to read HTTP response content", e);
             }
 
             Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;

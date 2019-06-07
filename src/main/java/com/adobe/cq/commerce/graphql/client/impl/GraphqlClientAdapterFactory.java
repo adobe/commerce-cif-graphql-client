@@ -37,13 +37,13 @@ import com.day.cq.wcm.api.PageManager;
     service = { AdapterFactory.class },
     property = {
         AdapterFactory.ADAPTABLE_CLASSES + "=" + GraphqlClientAdapterFactory.RESOURCE_CLASS_NAME,
-        AdapterFactory.ADAPTER_CLASSES +  "=" + GraphqlClientAdapterFactory.GRAPHQLClIENT_CLASS_NAME
+        AdapterFactory.ADAPTER_CLASSES + "=" + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME
     }
 )
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
-    protected static final String GRAPHQLClIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
+    protected static final String GRAPHQLCLIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
