@@ -33,6 +33,12 @@ The `identifier` is used by the adapter factory to resolve clients via the `cq:g
 
 Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated `CircleCI` build that performs the deployment of the artifact to Maven Central.
 
+## Code Formatting
+You can find the code formatting rules in the `eclipse-formatter.xml` file. The code formatting is automatically checked for each build. To automatically format your code, please run:
+```bash
+mvn clean install -Pformat-code
+```
+
 ### Contributing
  
 Contributions are welcomed! Read the [Contributing Guide](.github/CONTRIBUTING.md) for more information.
