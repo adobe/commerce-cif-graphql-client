@@ -16,12 +16,10 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.lang.annotation.Annotation;
 
-import com.adobe.cq.commerce.graphql.client.impl.GraphqlClientConfiguration;
-
 public class MockGraphqlClientConfiguration implements Annotation, GraphqlClientConfiguration {
 
     public static final String URL = "https://hostname/graphql";
-    
+
     @Override
     public String identifier() {
         return GraphqlClientConfiguration.DEFAULT_IDENTIFIER;

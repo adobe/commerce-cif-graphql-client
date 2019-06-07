@@ -127,7 +127,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }
-    
+
     private HttpClient buildHttpClient() throws Exception {
         SSLConnectionSocketFactory sslsf = null;
         if (acceptSelfSignedCertificates) {

@@ -38,8 +38,7 @@ import com.day.cq.wcm.api.PageManager;
     property = {
         AdapterFactory.ADAPTABLE_CLASSES + "=" + GraphqlClientAdapterFactory.RESOURCE_CLASS_NAME,
         AdapterFactory.ADAPTER_CLASSES + "=" + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME
-    }
-)
+    })
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
@@ -87,7 +86,8 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
 
         String identifier = properties.getInherited(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
         if (identifier == null) {
-            LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res.getPath());
+            LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res
+                .getPath());
             return null;
         }
 

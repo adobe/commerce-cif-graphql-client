@@ -20,7 +20,7 @@ public class GraphqlResponse<T, U> {
 
     protected T data;
     protected List<U> errors;
-    
+
     public T getData() {
         return data;
     }
