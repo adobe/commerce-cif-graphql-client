@@ -17,7 +17,6 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import org.apache.sling.testing.mock.sling.ResourceResolverType;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
-import com.adobe.cq.commerce.graphql.client.impl.GraphqlClientAdapterFactory;
 import io.wcm.testing.mock.aem.junit.AemContext;
 import io.wcm.testing.mock.aem.junit.AemContextCallback;
 
@@ -47,8 +46,7 @@ public final class GraphqlAemContext {
                 // Load page structure
                 context.load().json(contentPath, "/content");
             },
-            ResourceResolverType.JCR_MOCK
-        );
+            ResourceResolverType.JCR_MOCK);
     }
 
 }

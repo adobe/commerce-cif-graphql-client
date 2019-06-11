@@ -47,5 +47,5 @@ public class GraphqlRequest {
     public void setVariables(Object variables) {
         this.variables = variables;
     }
-    
+
 }
