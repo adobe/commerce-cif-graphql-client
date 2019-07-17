@@ -6,6 +6,18 @@
 
 This project is a GraphQL client for AEM. It is an OSGi bundle that can be instantiated with an OSGi configuration in the AEM OSGi configuration console. It can also be instantiated directly with java code.
 
+## Installation
+
+To build and install the latest version in a running AEM instance, simply do
+
+```
+mvn clean install sling:install
+```
+This installs everything by default to `localhost:4502` without any context path. You can also configure the install location with the following maven properties:
+* `aem.host`: the name of the AEM instance
+* `aem.port`: the port number of the AEM instance
+* `aem.contextPath`: the context path (if any) of your AEM instance, starting with `/`
+
 ## Using the GraphQL client
 
 To use this library in your project, just add the following maven dependency to your project and install the bundle in your AEM instance:
