@@ -16,7 +16,6 @@ package com.adobe.cq.commerce.graphql.client;
 
 /**
  * Represents the allowed and supported HTTP methods to send GraphQL requests.
- *
  */
 public enum HttpMethod {
     POST, GET
