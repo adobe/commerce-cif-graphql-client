@@ -18,6 +18,8 @@ import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.AttributeType;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
+import com.adobe.cq.commerce.graphql.client.HttpMethod;
+
 @ObjectClassDefinition(name = "CIF GraphQL Client Configuration Factory")
 public @interface GraphqlClientConfiguration {
 
@@ -41,6 +43,12 @@ public @interface GraphqlClientConfiguration {
         type = AttributeType.STRING,
         required = true)
     String url();
+
+    @AttributeDefinition(
+        name = "Default HTTP method",
+        description = "The default HTTP method used to send GraphQL requests.",
+        required = true)
+    HttpMethod httpMethod() default HttpMethod.POST;
 
     @AttributeDefinition(
         name = "Accept self-signed SSL certificates",

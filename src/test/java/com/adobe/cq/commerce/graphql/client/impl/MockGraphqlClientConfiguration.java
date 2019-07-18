@@ -16,6 +16,8 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.lang.annotation.Annotation;
 
+import com.adobe.cq.commerce.graphql.client.HttpMethod;
+
 public class MockGraphqlClientConfiguration implements Annotation, GraphqlClientConfiguration {
 
     public static final String URL = "https://hostname/graphql";
@@ -28,6 +30,11 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     @Override
     public String url() {
         return URL;
+    }
+
+    @Override
+    public HttpMethod httpMethod() {
+        return HttpMethod.POST;
     }
 
     @Override

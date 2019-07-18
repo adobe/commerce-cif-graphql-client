@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
+import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -69,6 +70,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private String url;
     private boolean acceptSelfSignedCertificates;
     private int maxHttpConnections;
+    private HttpMethod httpMethod;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -76,6 +78,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         url = configuration.url();
         acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
         maxHttpConnections = configuration.maxHttpConnections();
+        httpMethod = configuration.httpMethod();
 
         client = buildHttpClient();
         gson = new Gson();
@@ -148,9 +151,26 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     private HttpUriRequest buildRequest(GraphqlRequest request, RequestOptions options) throws UnsupportedEncodingException {
-        RequestBuilder rb = RequestBuilder.create("POST").setUri(url);
-        rb.setEntity(new StringEntity(gson.toJson(request)));
+        HttpMethod httpMethod = this.httpMethod;
+        if (options != null && options.getHttpMethod() != null) {
+            httpMethod = options.getHttpMethod();
+        }
+
+        RequestBuilder rb = RequestBuilder.create(httpMethod.toString()).setUri(url);
         rb.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+
+        if (HttpMethod.GET.equals(httpMethod)) {
+            rb.addParameter("query", request.getQuery());
+            if (request.getOperationName() != null) {
+                rb.addParameter("operationName", request.getOperationName());
+            }
+            if (request.getVariables() != null) {
+                String json = gson.toJson(request.getVariables());
+                rb.addParameter("variables", json);
+            }
+        } else {
+            rb.setEntity(new StringEntity(gson.toJson(request)));
+        }
 
         if (options != null && options.getHeaders() != null) {
             for (Header header : options.getHeaders()) {
