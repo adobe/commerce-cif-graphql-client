@@ -38,6 +38,7 @@ You'll then have to setup and configure the client in your AEM instance.
 To instantiate instances of this GraphQL client, simply go the AEM OSGi configuration console and look for "GraphQL Client Configuration Factory". Add a configuration and set the following mandatory parameters:
 * `identifier`: must be unique among all GraphQL clients.
 * `url`: the URL of the GraphQL server endpoint used by this client.
+* `httpMethod`: the default HTTP method used to send requests, can be either GET or POST. This can be overriden on a request basis.
 
 The `identifier` is used by the adapter factory to resolve clients via the `cq:graphqlClient` property set on any JCR node. When this is set on a resource or the resource ancestors, one can write `GraphqlClient client = resource.adaptTo(GraphqlClient.class);`.
 

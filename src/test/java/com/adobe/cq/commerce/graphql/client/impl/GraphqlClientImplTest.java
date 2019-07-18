@@ -16,7 +16,9 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +40,7 @@ import org.mockito.Mockito;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
+import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -125,7 +128,7 @@ public class GraphqlClientImplTest {
         setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         Exception exception = null;
         try {
-            graphqlClient.execute(new GraphqlRequest("{dummy}"), String.class, String.class);
+            graphqlClient.execute(dummy, String.class, String.class);
         } catch (Exception e) {
             exception = e;
         }
@@ -137,7 +140,7 @@ public class GraphqlClientImplTest {
         setupNullResponse(graphqlClient.client);
         Exception exception = null;
         try {
-            graphqlClient.execute(new GraphqlRequest("{dummy}"), String.class, String.class);
+            graphqlClient.execute(dummy, String.class, String.class);
         } catch (Exception e) {
             exception = e;
         }
@@ -178,6 +181,31 @@ public class GraphqlClientImplTest {
         Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
     }
 
+    @Test
+    public void testGetHttpMethod() throws Exception {
+        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHttpMethod(HttpMethod.GET));
+
+        // Check that the GraphQL request is properly encoded in the URL
+        GetQueryMatcher matcher = new GetQueryMatcher(dummy);
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+    }
+
+    @Test
+    public void testGetHttpMethodWithVariables() throws Exception {
+        String query = "query MyQuery($arg: String) {something(arg: $arg) {field}}";
+        GraphqlRequest request = new GraphqlRequest(query);
+        request.setOperationName("MyQuery");
+        request.setVariables(Collections.singletonMap("arg", "something"));
+
+        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(request, Data.class, Error.class, new RequestOptions().withHttpMethod(HttpMethod.GET));
+
+        // Check that the GraphQL request is properly encoded in the URL
+        GetQueryMatcher matcher = new GetQueryMatcher(request);
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+    }
+
     /**
      * Matcher class used to check that the GraphQL request body is properly set.
      */
@@ -206,7 +234,7 @@ public class GraphqlClientImplTest {
     }
 
     /**
-     * Matcher class used to check that the headers are properl passed to the HTTP client.
+     * Matcher class used to check that the headers are properly passed to the HTTP client.
      */
     private static class HeadersMatcher extends ArgumentMatcher<HttpUriRequest> {
 
@@ -218,21 +246,55 @@ public class GraphqlClientImplTest {
 
         @Override
         public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest) && !(obj instanceof HttpEntityEnclosingRequest)) {
+            if (!(obj instanceof HttpUriRequest)) {
                 return false;
             }
-            HttpEntityEnclosingRequest req = (HttpEntityEnclosingRequest) obj;
-            try {
-                for (Header header : headers) {
-                    Header reqHeader = req.getFirstHeader(header.getName());
-                    if (reqHeader == null || !reqHeader.getValue().equals(header.getValue())) {
-                        return false;
-                    }
+            HttpUriRequest req = (HttpUriRequest) obj;
+            for (Header header : headers) {
+                Header reqHeader = req.getFirstHeader(header.getName());
+                if (reqHeader == null || !reqHeader.getValue().equals(header.getValue())) {
+                    return false;
                 }
-                return true;
-            } catch (Exception e) {
+            }
+            return true;
+        }
+    }
+
+    private static String encode(String str) throws UnsupportedEncodingException {
+        return URLEncoder.encode(str, StandardCharsets.UTF_8.name());
+    }
+
+    /**
+     * Matcher class used to check that the GraphQL query is properly set and encoded when sent with a GET request.
+     */
+    private static class GetQueryMatcher extends ArgumentMatcher<HttpUriRequest> {
+
+        GraphqlRequest request;
+
+        public GetQueryMatcher(GraphqlRequest request) {
+            this.request = request;
+        }
+
+        @Override
+        public boolean matches(Object obj) {
+            if (!(obj instanceof HttpUriRequest)) {
                 return false;
             }
+            HttpUriRequest req = (HttpUriRequest) obj;
+            String expectedEncodedQuery = MockGraphqlClientConfiguration.URL;
+            try {
+                expectedEncodedQuery += "?query=" + encode(request.getQuery());
+                if (request.getOperationName() != null) {
+                    expectedEncodedQuery += "&operationName=" + encode(request.getOperationName());
+                }
+                if (request.getVariables() != null) {
+                    String json = new Gson().toJson(request.getVariables());
+                    expectedEncodedQuery += "&variables=" + encode(json);
+                }
+            } catch (UnsupportedEncodingException e) {
+                return false;
+            }
+            return HttpMethod.GET.toString().equals(req.getMethod()) && expectedEncodedQuery.equals(req.getURI().toString());
         }
     }
 

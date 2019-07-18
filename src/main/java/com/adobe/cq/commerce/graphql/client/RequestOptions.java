@@ -28,6 +28,7 @@ public class RequestOptions {
 
     private Gson gson;
     private List<Header> headers;
+    private HttpMethod httpMethod;
 
     /**
      * Sets the {@link Gson} instance that will be used to deserialise the JSON response. This should only be used when the JSON
@@ -53,6 +54,19 @@ public class RequestOptions {
         return this;
     }
 
+    /**
+     * Sets the HTTP method used to send the request, only GET or POST are supported.
+     * By default, the client sends a POST request. If GET is used, the underlying HTTP client
+     * will automatically URL-Encode the GraphQL query, operation name, and variables.
+     * 
+     * @param httpMethod The HTTP method.
+     * @return This RequestOptions object.
+     */
+    public RequestOptions withHttpMethod(HttpMethod httpMethod) {
+        this.httpMethod = httpMethod;
+        return this;
+    }
+
     public Gson getGson() {
         return gson;
     }
@@ -61,4 +75,7 @@ public class RequestOptions {
         return headers;
     }
 
+    public HttpMethod getHttpMethod() {
+        return httpMethod;
+    }
 }
