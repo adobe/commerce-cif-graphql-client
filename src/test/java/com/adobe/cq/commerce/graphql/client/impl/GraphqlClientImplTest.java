@@ -49,9 +49,8 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class GraphqlClientImplTest {
 

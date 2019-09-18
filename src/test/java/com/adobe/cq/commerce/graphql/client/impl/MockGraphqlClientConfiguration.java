@@ -48,18 +48,18 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     }
 
     @Override
-    public int connTimeout() {
-        return GraphqlClientConfiguration.DEFAULT_CONN_TIMEOUT;
+    public int connectionTimeout() {
+        return GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT;
     }
 
     @Override
-    public int soTimeout() {
-        return GraphqlClientConfiguration.DEFAULT_SO_TIMEOUT;
+    public int socketTimeout() {
+        return GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT;
     }
 
     @Override
-    public int reqpoolTimeout() {
-        return GraphqlClientConfiguration.DEFAULT_REQPOOL_TIMEOUT;
+    public int requestPoolTimeout() {
+        return GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
     }
 
     @Override

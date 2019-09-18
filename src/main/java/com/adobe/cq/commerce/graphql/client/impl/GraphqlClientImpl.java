@@ -67,9 +67,9 @@ public class GraphqlClientImpl implements GraphqlClient {
     private boolean acceptSelfSignedCertificates;
     private int maxHttpConnections;
     private HttpMethod httpMethod;
-    private int connTimeout;
-    private int soTimeout;
-    private int reqpoolTimeout;
+    private int connectionTimeout;
+    private int socketTimeout;
+    private int requestPoolTimeout;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -78,9 +78,9 @@ public class GraphqlClientImpl implements GraphqlClient {
         acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
         maxHttpConnections = configuration.maxHttpConnections();
         httpMethod = configuration.httpMethod();
-        connTimeout = configuration.connTimeout();
-        soTimeout = configuration.soTimeout();
-        reqpoolTimeout = configuration.reqpoolTimeout();
+        connectionTimeout = configuration.connectionTimeout();
+        socketTimeout = configuration.socketTimeout();
+        requestPoolTimeout = configuration.requestPoolTimeout();
 
         client = buildHttpClient();
         gson = new Gson();
@@ -151,9 +151,9 @@ public class GraphqlClientImpl implements GraphqlClient {
         cm.setDefaultMaxPerRoute(maxHttpConnections); // we just have one route to the GraphQL endpoint
 
         RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(connTimeout)
-            .setSocketTimeout(soTimeout)
-            .setConnectionRequestTimeout(reqpoolTimeout)
+            .setConnectTimeout(connectionTimeout)
+            .setSocketTimeout(socketTimeout)
+            .setConnectionRequestTimeout(requestPoolTimeout)
             .build();
 
         return HttpClientBuilder.create()
