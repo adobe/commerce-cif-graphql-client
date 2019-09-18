@@ -49,8 +49,7 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
@@ -99,7 +98,7 @@ public class GraphqlClientImplTest {
         assertEquals("Error message", error.message);
 
         assertEquals(GraphqlClientConfiguration.DEFAULT_IDENTIFIER, graphqlClient.getIdentifier());
-        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
+        Mockito.verify(mockedHttpResponse.getEntity().getContent()).close();
     }
 
     @Test
@@ -112,7 +111,7 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertEquals("GraphQL query failed with response code 503", exception.getMessage());
-        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
+        Mockito.verify(mockedHttpResponse.getEntity().getContent()).close();
     }
 
     @Test
@@ -138,7 +137,7 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertNotNull(exception);
-        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
+        Mockito.verify(mockedHttpResponse.getEntity().getContent()).close();
     }
 
     @Test
@@ -151,7 +150,6 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertEquals("Failed to read HTTP response content", exception.getMessage());
-        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
     }
 
     @Test
@@ -164,8 +162,6 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertEquals("Failed to read HTTP response.", exception.getMessage());
-        Mockito.verify(mockedHttpResponse, times(1)).getEntity();
-
     }
 
     @Test
@@ -341,9 +337,12 @@ public class GraphqlClientImplTest {
         HttpEntity mockedHttpEntity = Mockito.mock(HttpEntity.class);
         mockedHttpResponse = Mockito.mock(HttpResponse.class);
         StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
-
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        Mockito.when(mockedHttpEntity.getContent()).thenReturn(new ByteArrayInputStream(bytes));
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+        ByteArrayInputStream proxyInputStream = Mockito.spy(byteArrayInputStream);
+
+        Mockito.when(mockedHttpEntity.getContent()).thenReturn(proxyInputStream);
+        Mockito.when(mockedHttpEntity.isStreaming()).thenReturn(true);
         Mockito.when(mockedHttpEntity.getContentLength()).thenReturn(new Long(bytes.length));
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
