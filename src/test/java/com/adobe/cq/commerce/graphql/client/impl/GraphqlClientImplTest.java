@@ -51,6 +51,8 @@ import com.google.gson.JsonParseException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
 
 public class GraphqlClientImplTest {
 
@@ -65,6 +67,7 @@ public class GraphqlClientImplTest {
 
     private GraphqlClientImpl graphqlClient;
     private GraphqlRequest dummy = new GraphqlRequest("{dummy}");
+    private static HttpResponse mockedHttpResponse;
 
     @Before
     public void setUp() throws Exception {
@@ -96,6 +99,7 @@ public class GraphqlClientImplTest {
         assertEquals("Error message", error.message);
 
         assertEquals(GraphqlClientConfiguration.DEFAULT_IDENTIFIER, graphqlClient.getIdentifier());
+        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
     }
 
     @Test
@@ -108,6 +112,7 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertEquals("GraphQL query failed with response code 503", exception.getMessage());
+        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
     }
 
     @Test
@@ -133,6 +138,7 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertNotNull(exception);
+        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
     }
 
     @Test
@@ -145,6 +151,21 @@ public class GraphqlClientImplTest {
             exception = e;
         }
         assertEquals("Failed to read HTTP response content", exception.getMessage());
+        Mockito.verify(mockedHttpResponse, Mockito.times(1)).getEntity();
+    }
+
+    @Test
+    public void testHttpErrorStatusResponseError() throws Exception {
+        setupNullErrorStatusResponse(graphqlClient.client);
+        Exception exception = null;
+        try {
+            graphqlClient.execute(dummy, String.class, String.class);
+        } catch (Exception e) {
+            exception = e;
+        }
+        assertEquals("Failed to read HTTP response.", exception.getMessage());
+        Mockito.verify(mockedHttpResponse, times(1)).getEntity();
+
     }
 
     @Test
@@ -318,7 +339,7 @@ public class GraphqlClientImplTest {
         String json = getResource(filename);
 
         HttpEntity mockedHttpEntity = Mockito.mock(HttpEntity.class);
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
+        mockedHttpResponse = Mockito.mock(HttpResponse.class);
         StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
 
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
@@ -335,13 +356,28 @@ public class GraphqlClientImplTest {
     }
 
     private static void setupNullResponse(HttpClient httpClient) throws IOException {
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
+        mockedHttpResponse = Mockito.mock(HttpResponse.class);
         StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(null);
         Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
 
         Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_OK);
+        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
+    }
+
+    private static void setupNullErrorStatusResponse(HttpClient httpClient) throws IOException {
+        mockedHttpResponse = Mockito.mock(HttpResponse.class);
+        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
+
+        HttpEntity httpEntity = Mockito.mock(HttpEntity.class);
+        Mockito.when(httpEntity.isStreaming()).thenReturn(true);
+        Mockito.when(httpEntity.getContent()).thenThrow(new IOException("Ioexception occured"));
+
+        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(httpEntity);
+        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+
+        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_SERVICE_UNAVAILABLE);
         Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
     }
 
