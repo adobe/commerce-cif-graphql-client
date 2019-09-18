@@ -29,7 +29,7 @@ public @interface GraphqlClientConfiguration {
     int MAX_HTTP_CONNECTIONS_DEFAULT = 20;
     boolean ACCEPT_SELF_SIGNED_CERTIFICATES = false;
 
-    int DEFAULT_CONN_TIMEOUT = 30000;
+    int DEFAULT_CONN_TIMEOUT = 5000;
     int DEFAULT_SO_TIMEOUT = 5000;
     int DEFAULT_REQPOOL_TIMEOUT = 2000;
 
@@ -68,19 +68,19 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "Http connection timeout",
-        description = "The timeout in milliseconds for the http request",
+        description = "The timeout in milliseconds until a connection is established. A timeout value of zero is interpreted as an infinite timeout.",
         type = AttributeType.INTEGER)
-    int conn_timeout() default DEFAULT_CONN_TIMEOUT;
+    int connTimeout() default DEFAULT_CONN_TIMEOUT;
 
     @AttributeDefinition(
         name = "Http socket timeout",
-        description = "The timeout in milliseconds for the socket",
+        description = "The socket timeout in milliseconds, which is the timeout for waiting for data or, put differently, a maximum period inactivity between two consecutive data packets. A timeout value of zero is interpreted as an infinite timeout.",
         type = AttributeType.INTEGER)
-    int so_timeout() default DEFAULT_SO_TIMEOUT;
+    int soTimeout() default DEFAULT_SO_TIMEOUT;
 
     @AttributeDefinition(
         name = "Request pool timeout",
-        description = "The timeout in milliseconds for the connectionpool to return a connection.",
+        description = "The timeout in milliseconds used when requesting a connection from the connection manager. A timeout value of zero is interpreted as an infinite timeout.",
         type = AttributeType.INTEGER)
-    int reqpool_timeout() default DEFAULT_REQPOOL_TIMEOUT;
+    int reqpoolTimeout() default DEFAULT_REQPOOL_TIMEOUT;
 }

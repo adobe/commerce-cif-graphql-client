@@ -14,7 +14,6 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +45,11 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.client.*;
+import com.adobe.cq.commerce.graphql.client.GraphqlClient;
+import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
+import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
+import com.adobe.cq.commerce.graphql.client.HttpMethod;
+import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -64,9 +67,9 @@ public class GraphqlClientImpl implements GraphqlClient {
     private boolean acceptSelfSignedCertificates;
     private int maxHttpConnections;
     private HttpMethod httpMethod;
-    private int conn_timeout;
-    private int so_timeout;
-    private int reqpool_timeout;
+    private int connTimeout;
+    private int soTimeout;
+    private int reqpoolTimeout;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -75,9 +78,9 @@ public class GraphqlClientImpl implements GraphqlClient {
         acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
         maxHttpConnections = configuration.maxHttpConnections();
         httpMethod = configuration.httpMethod();
-        conn_timeout = configuration.conn_timeout();
-        so_timeout = configuration.so_timeout();
-        reqpool_timeout = configuration.reqpool_timeout();
+        connTimeout = configuration.connTimeout();
+        soTimeout = configuration.soTimeout();
+        reqpoolTimeout = configuration.reqpoolTimeout();
 
         client = buildHttpClient();
         gson = new Gson();
@@ -126,11 +129,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
             return response;
         } else {
-            try {
-                EntityUtils.consume(httpResponse.getEntity());
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to read HTTP response.", e);
-            }
+            EntityUtils.consumeQuietly(httpResponse.getEntity());
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }
@@ -152,9 +151,9 @@ public class GraphqlClientImpl implements GraphqlClient {
         cm.setDefaultMaxPerRoute(maxHttpConnections); // we just have one route to the GraphQL endpoint
 
         RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(conn_timeout)
-            .setSocketTimeout(so_timeout)
-            .setConnectionRequestTimeout(reqpool_timeout)
+            .setConnectTimeout(connTimeout)
+            .setSocketTimeout(soTimeout)
+            .setConnectionRequestTimeout(reqpoolTimeout)
             .build();
 
         return HttpClientBuilder.create()
