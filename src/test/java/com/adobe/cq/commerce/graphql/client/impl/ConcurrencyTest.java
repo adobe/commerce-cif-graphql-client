@@ -126,7 +126,8 @@ public class ConcurrencyTest {
             .withStatusCode(INTERNAL_SERVER_ERROR_500.code())
             .withReasonPhrase(INTERNAL_SERVER_ERROR_500.reasonPhrase())
             .withHeader(HttpHeaders.CONNECTION, "keep-alive")
-            .withBody("Dummy content that MUST be consumed by the client");
+            .withBody("Dummy content that MUST be consumed by the client")
+            .withDelay(TimeUnit.MILLISECONDS, 50);
 
         mockServer.reset()
             .when(HttpRequest.request().withPath("/graphql"))
@@ -161,7 +162,7 @@ public class ConcurrencyTest {
             .withStatusCode(INTERNAL_SERVER_ERROR_500.code())
             .withReasonPhrase(INTERNAL_SERVER_ERROR_500.reasonPhrase())
             .withHeader(HttpHeaders.CONNECTION, "keep-alive")
-            .withDelay(TimeUnit.SECONDS, 60);
+            .withDelay(TimeUnit.SECONDS, 60); // Must be higher than test timeout
 
         mockServer.reset()
             .when(HttpRequest.request().withPath("/graphql"))
