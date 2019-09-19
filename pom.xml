@@ -259,7 +259,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.18.1</version>
+                <version>3.0.0-M3</version>
                 <configuration>
                     <useSystemClassLoader>false</useSystemClassLoader> <!-- Required for CircleCI -->
                     <systemPropertyVariables>
@@ -388,6 +388,12 @@
             <artifactId>org.jacoco.agent</artifactId>
             <version>0.8.3</version>
             <classifier>runtime</classifier>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mock-server</groupId>
+            <artifactId>mockserver-netty</artifactId>
+            <version>5.6.1</version>
             <scope>test</scope>
         </dependency>
 
