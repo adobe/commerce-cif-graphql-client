@@ -21,6 +21,8 @@ import com.adobe.cq.commerce.graphql.client.HttpMethod;
 public class MockGraphqlClientConfiguration implements Annotation, GraphqlClientConfiguration {
 
     public static final String URL = "https://hostname/graphql";
+    private String url;
+    private Boolean acceptSelfSignedCertificates;
 
     @Override
     public String identifier() {
@@ -29,7 +31,7 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
 
     @Override
     public String url() {
-        return URL;
+        return url != null ? url : URL;
     }
 
     @Override
@@ -39,7 +41,8 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
 
     @Override
     public boolean acceptSelfSignedCertificates() {
-        return GraphqlClientConfiguration.ACCEPT_SELF_SIGNED_CERTIFICATES;
+        return acceptSelfSignedCertificates != null ? acceptSelfSignedCertificates
+            : GraphqlClientConfiguration.ACCEPT_SELF_SIGNED_CERTIFICATES;
     }
 
     @Override
@@ -65,5 +68,13 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     @Override
     public Class<? extends Annotation> annotationType() {
         return GraphqlClientConfiguration.class;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public void setAcceptSelfSignedCertificates(boolean acceptSelfSignedCertificates) {
+        this.acceptSelfSignedCertificates = acceptSelfSignedCertificates;
     }
 }
