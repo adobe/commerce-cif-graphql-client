@@ -39,7 +39,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 
 import static org.junit.Assert.assertEquals;
-import static org.mockserver.model.HttpStatusCode.INTERNAL_SERVER_ERROR_500;;
+import static org.mockserver.model.HttpStatusCode.INTERNAL_SERVER_ERROR_500;
 
 public class ConcurrencyTest {
 
