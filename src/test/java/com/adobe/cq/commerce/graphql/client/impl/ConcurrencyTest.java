@@ -188,6 +188,6 @@ public class ConcurrencyTest {
     }
 
     private static String getResource(String filename) throws IOException {
-        return IOUtils.toString(GraphqlClientImplTest.class.getClassLoader().getResourceAsStream(filename), StandardCharsets.UTF_8);
+        return IOUtils.toString(ConcurrencyTest.class.getClassLoader().getResourceAsStream(filename), StandardCharsets.UTF_8);
     }
 }
