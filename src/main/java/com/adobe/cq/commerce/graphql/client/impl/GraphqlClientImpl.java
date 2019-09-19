@@ -28,6 +28,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.config.Registry;
@@ -71,6 +72,9 @@ public class GraphqlClientImpl implements GraphqlClient {
     private boolean acceptSelfSignedCertificates;
     private int maxHttpConnections;
     private HttpMethod httpMethod;
+    private int connectionTimeout;
+    private int socketTimeout;
+    private int requestPoolTimeout;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -79,6 +83,9 @@ public class GraphqlClientImpl implements GraphqlClient {
         acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
         maxHttpConnections = configuration.maxHttpConnections();
         httpMethod = configuration.httpMethod();
+        connectionTimeout = configuration.connectionTimeout();
+        socketTimeout = configuration.socketTimeout();
+        requestPoolTimeout = configuration.requestPoolTimeout();
 
         client = buildHttpClient();
         gson = new Gson();
@@ -127,6 +134,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
             return response;
         } else {
+            EntityUtils.consumeQuietly(httpResponse.getEntity());
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }
@@ -147,7 +155,17 @@ public class GraphqlClientImpl implements GraphqlClient {
         cm.setMaxTotal(maxHttpConnections);
         cm.setDefaultMaxPerRoute(maxHttpConnections); // we just have one route to the GraphQL endpoint
 
-        return HttpClientBuilder.create().setConnectionManager(cm).disableCookieManagement().build();
+        RequestConfig requestConfig = RequestConfig.custom()
+            .setConnectTimeout(connectionTimeout)
+            .setSocketTimeout(socketTimeout)
+            .setConnectionRequestTimeout(requestPoolTimeout)
+            .build();
+
+        return HttpClientBuilder.create()
+            .setDefaultRequestConfig(requestConfig)
+            .setConnectionManager(cm)
+            .disableCookieManagement()
+            .build();
     }
 
     private HttpUriRequest buildRequest(GraphqlRequest request, RequestOptions options) throws UnsupportedEncodingException {

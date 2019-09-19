@@ -23,11 +23,15 @@ import com.adobe.cq.commerce.graphql.client.HttpMethod;
 @ObjectClassDefinition(name = "CIF GraphQL Client Configuration Factory")
 public @interface GraphqlClientConfiguration {
 
-    public String CQ_GRAPHQL_CLIENT = "cq:graphqlClient";
-    public String DEFAULT_IDENTIFIER = "default";
+    String CQ_GRAPHQL_CLIENT = "cq:graphqlClient";
+    String DEFAULT_IDENTIFIER = "default";
 
-    public static final int MAX_HTTP_CONNECTIONS_DEFAULT = 20;
-    public static final boolean ACCEPT_SELF_SIGNED_CERTIFICATES = false;
+    int MAX_HTTP_CONNECTIONS_DEFAULT = 20;
+    boolean ACCEPT_SELF_SIGNED_CERTIFICATES = false;
+
+    int DEFAULT_CONNECTION_TIMEOUT = 5000;
+    int DEFAULT_SOCKET_TIMEOUT = 5000;
+    int DEFAULT_REQUESTPOOL_TIMEOUT = 2000;
 
     @AttributeDefinition(
         name = "GraphQL Service Identifier",
@@ -61,4 +65,22 @@ public @interface GraphqlClientConfiguration {
         description = "The maximum number of concurrent HTTP connections the connector can make",
         type = AttributeType.INTEGER)
     int maxHttpConnections() default MAX_HTTP_CONNECTIONS_DEFAULT;
+
+    @AttributeDefinition(
+        name = "Http connection timeout",
+        description = "The timeout in milliseconds until a connection is established. A timeout value of zero is interpreted as an infinite timeout.",
+        type = AttributeType.INTEGER)
+    int connectionTimeout() default DEFAULT_CONNECTION_TIMEOUT;
+
+    @AttributeDefinition(
+        name = "Http socket timeout",
+        description = "The socket timeout in milliseconds, which is the timeout for waiting for data or, put differently, a maximum period inactivity between two consecutive data packets. A timeout value of zero is interpreted as an infinite timeout.",
+        type = AttributeType.INTEGER)
+    int socketTimeout() default DEFAULT_SOCKET_TIMEOUT;
+
+    @AttributeDefinition(
+        name = "Request pool timeout",
+        description = "The timeout in milliseconds used when requesting a connection from the connection manager. A timeout value of zero is interpreted as an infinite timeout.",
+        type = AttributeType.INTEGER)
+    int requestPoolTimeout() default DEFAULT_REQUESTPOOL_TIMEOUT;
 }
