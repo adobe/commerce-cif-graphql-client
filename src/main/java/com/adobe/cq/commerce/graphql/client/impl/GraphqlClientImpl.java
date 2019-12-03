@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -194,6 +195,11 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         if (httpHeaders != null) {
             for (String httpHeader : httpHeaders) {
+                // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
+                if (StringUtils.isBlank(httpHeader)) {
+                    continue;
+                }
+
                 int idx = httpHeader.indexOf(":");
                 if (idx < 1 || httpHeader.length() <= (idx + 1)) {
                     throw new IllegalStateException("The HTTP header is not a name:value pair --> " + httpHeader);

@@ -76,8 +76,9 @@ public class GraphqlClientImplTest {
         graphqlClient = new GraphqlClientImpl();
 
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
-        // Add two test headers, one with extra white space around " : " to make sure we properly trim spaces
-        config.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE);
+        // Add three test headers, one with extra white space around " : " to make sure we properly trim spaces, and one empty header
+        config.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE,
+            "");
 
         graphqlClient.activate(config);
         graphqlClient.client = Mockito.mock(HttpClient.class);
