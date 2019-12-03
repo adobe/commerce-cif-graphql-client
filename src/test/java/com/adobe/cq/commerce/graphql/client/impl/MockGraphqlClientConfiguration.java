@@ -66,6 +66,11 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     }
 
     @Override
+    public String[] httpHeaders() {
+        return null;
+    }
+
+    @Override
     public Class<? extends Annotation> annotationType() {
         return GraphqlClientConfiguration.class;
     }

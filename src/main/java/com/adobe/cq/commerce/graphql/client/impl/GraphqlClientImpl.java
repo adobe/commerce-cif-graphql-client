@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -75,6 +76,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private int connectionTimeout;
     private int socketTimeout;
     private int requestPoolTimeout;
+    private String[] httpHeaders;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -86,6 +88,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         connectionTimeout = configuration.connectionTimeout();
         socketTimeout = configuration.socketTimeout();
         requestPoolTimeout = configuration.requestPoolTimeout();
+        httpHeaders = configuration.httpHeaders();
 
         client = buildHttpClient();
         gson = new Gson();
@@ -177,6 +180,16 @@ public class GraphqlClientImpl implements GraphqlClient {
         RequestBuilder rb = RequestBuilder.create(httpMethod.toString()).setUri(url);
         rb.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
 
+        if (httpHeaders != null) {
+            for (String httpHeader : httpHeaders) {
+                String[] tuple = StringUtils.split(httpHeader, "=");
+                if (tuple == null || tuple.length != 2) {
+                    throw new IllegalStateException("The HTTP header is not a key value pair (key=value): " + httpHeader);
+                }
+                rb.addHeader(tuple[0], tuple[1]);
+            }
+        }
+
         if (HttpMethod.GET.equals(httpMethod)) {
             rb.addParameter("query", request.getQuery());
             if (request.getOperationName() != null) {
@@ -192,7 +205,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         if (options != null && options.getHeaders() != null) {
             for (Header header : options.getHeaders()) {
-                rb.setHeader(header.getName(), header.getValue());
+                rb.addHeader(header.getName(), header.getValue());
             }
         }
 
