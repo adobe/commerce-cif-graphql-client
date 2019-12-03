@@ -86,7 +86,7 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "HTTP Headers",
-        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. Format: key=value",
+        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. Format is name:value",
         type = AttributeType.STRING)
     String[] httpHeaders();
 }

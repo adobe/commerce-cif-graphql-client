@@ -21,7 +21,6 @@ import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -180,16 +179,6 @@ public class GraphqlClientImpl implements GraphqlClient {
         RequestBuilder rb = RequestBuilder.create(httpMethod.toString()).setUri(url);
         rb.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
 
-        if (httpHeaders != null) {
-            for (String httpHeader : httpHeaders) {
-                String[] tuple = StringUtils.split(httpHeader, "=");
-                if (tuple == null || tuple.length != 2) {
-                    throw new IllegalStateException("The HTTP header is not a key value pair (key=value): " + httpHeader);
-                }
-                rb.addHeader(tuple[0], tuple[1]);
-            }
-        }
-
         if (HttpMethod.GET.equals(httpMethod)) {
             rb.addParameter("query", request.getQuery());
             if (request.getOperationName() != null) {
@@ -201,6 +190,16 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
         } else {
             rb.setEntity(new StringEntity(gson.toJson(request)));
+        }
+
+        if (httpHeaders != null) {
+            for (String httpHeader : httpHeaders) {
+                int idx = httpHeader.indexOf(":");
+                if (idx < 1 || httpHeader.length() <= (idx + 1)) {
+                    throw new IllegalStateException("The HTTP header is not a name:value pair --> " + httpHeader);
+                }
+                rb.addHeader(httpHeader.substring(0, idx).trim(), httpHeader.substring(idx + 1).trim());
+            }
         }
 
         if (options != null && options.getHeaders() != null) {

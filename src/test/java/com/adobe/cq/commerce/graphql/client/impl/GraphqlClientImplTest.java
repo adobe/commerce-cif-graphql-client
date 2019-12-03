@@ -20,6 +20,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -27,6 +28,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
@@ -54,6 +56,9 @@ import static org.junit.Assert.assertNotNull;
 
 public class GraphqlClientImplTest {
 
+    private static final String AUTH_HEADER_VALUE = "Basic 1234";
+    private static final String CACHE_HEADER_VALUE = "max-age=300";
+
     private static class Data {
         String text;
         Integer count;
@@ -69,7 +74,12 @@ public class GraphqlClientImplTest {
     @Before
     public void setUp() throws Exception {
         graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(new MockGraphqlClientConfiguration());
+
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        // Add two test headers, one with extra white space around " : " to make sure we properly trim spaces
+        config.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE);
+
+        graphqlClient.activate(config);
         graphqlClient.client = Mockito.mock(HttpClient.class);
     }
 
@@ -173,12 +183,40 @@ public class GraphqlClientImplTest {
     @Test
     public void testHeaders() throws Exception {
         setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
-        List<Header> headers = Collections.singletonList(new BasicHeader("customName", "customValue"));
-        graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHeaders(headers));
+        List<Header> requestHeaders = Collections.singletonList(new BasicHeader("customName", "customValue"));
+        graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHeaders(requestHeaders));
 
-        // Check that the HTTP client is sending the custom request headers
-        HeadersMatcher matcher = new HeadersMatcher(headers);
+        List<Header> expectedHeaders = new ArrayList<>();
+        expectedHeaders.addAll(requestHeaders);
+        expectedHeaders.add(new BasicHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER_VALUE));
+        expectedHeaders.add(new BasicHeader(HttpHeaders.CACHE_CONTROL, CACHE_HEADER_VALUE));
+
+        // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
+        HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
         Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+    }
+
+    private void testConfigureHeader(String header) throws Exception {
+        graphqlClient = new GraphqlClientImpl();
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setHttpHeaders(header);
+        graphqlClient.activate(config);
+        graphqlClient.execute(dummy, Data.class, Error.class);
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidHeaderSeparator() throws Exception {
+        testConfigureHeader(HttpHeaders.AUTHORIZATION + "=" + AUTH_HEADER_VALUE);
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidHeaderNoValue() throws Exception {
+        testConfigureHeader(HttpHeaders.AUTHORIZATION + ":");
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidHeaderNoName() throws Exception {
+        testConfigureHeader(":" + AUTH_HEADER_VALUE);
     }
 
     @Test
