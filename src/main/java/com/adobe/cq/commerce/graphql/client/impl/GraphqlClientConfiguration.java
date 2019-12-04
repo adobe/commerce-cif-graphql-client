@@ -85,8 +85,8 @@ public @interface GraphqlClientConfiguration {
     int requestPoolTimeout() default DEFAULT_REQUESTPOOL_TIMEOUT;
 
     @AttributeDefinition(
-        name = "HTTP Headers",
-        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. Format is name:value",
+        name = "Default HTTP Headers",
+        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. The format of each header is name:value",
         type = AttributeType.STRING)
     String[] httpHeaders();
 }
