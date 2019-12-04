@@ -83,4 +83,10 @@ public @interface GraphqlClientConfiguration {
         description = "The timeout in milliseconds used when requesting a connection from the connection manager. A timeout value of zero is interpreted as an infinite timeout.",
         type = AttributeType.INTEGER)
     int requestPoolTimeout() default DEFAULT_REQUESTPOOL_TIMEOUT;
+
+    @AttributeDefinition(
+        name = "Default HTTP Headers",
+        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. The format of each header is name:value",
+        type = AttributeType.STRING)
+    String[] httpHeaders();
 }

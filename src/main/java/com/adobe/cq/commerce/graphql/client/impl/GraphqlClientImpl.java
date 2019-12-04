@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -75,6 +76,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private int connectionTimeout;
     private int socketTimeout;
     private int requestPoolTimeout;
+    private String[] httpHeaders;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -86,6 +88,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         connectionTimeout = configuration.connectionTimeout();
         socketTimeout = configuration.socketTimeout();
         requestPoolTimeout = configuration.requestPoolTimeout();
+        httpHeaders = configuration.httpHeaders();
 
         client = buildHttpClient();
         gson = new Gson();
@@ -190,9 +193,24 @@ public class GraphqlClientImpl implements GraphqlClient {
             rb.setEntity(new StringEntity(gson.toJson(request)));
         }
 
+        if (httpHeaders != null) {
+            for (String httpHeader : httpHeaders) {
+                // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
+                if (StringUtils.isBlank(httpHeader)) {
+                    continue;
+                }
+
+                int idx = httpHeader.indexOf(":");
+                if (idx < 1 || httpHeader.length() <= (idx + 1)) {
+                    throw new IllegalStateException("The HTTP header is not a name:value pair --> " + httpHeader);
+                }
+                rb.addHeader(httpHeader.substring(0, idx).trim(), httpHeader.substring(idx + 1).trim());
+            }
+        }
+
         if (options != null && options.getHeaders() != null) {
             for (Header header : options.getHeaders()) {
-                rb.setHeader(header.getName(), header.getValue());
+                rb.addHeader(header.getName(), header.getValue());
             }
         }
 

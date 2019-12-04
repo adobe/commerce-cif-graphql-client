@@ -23,6 +23,7 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     public static final String URL = "https://hostname/graphql";
     private String url;
     private Boolean acceptSelfSignedCertificates;
+    private String[] httpHeaders;
 
     @Override
     public String identifier() {
@@ -70,11 +71,20 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
         return GraphqlClientConfiguration.class;
     }
 
+    @Override
+    public String[] httpHeaders() {
+        return httpHeaders;
+    }
+
     public void setUrl(String url) {
         this.url = url;
     }
 
     public void setAcceptSelfSignedCertificates(boolean acceptSelfSignedCertificates) {
         this.acceptSelfSignedCertificates = acceptSelfSignedCertificates;
+    }
+
+    public void setHttpHeaders(String... httpHeaders) {
+        this.httpHeaders = httpHeaders;
     }
 }
