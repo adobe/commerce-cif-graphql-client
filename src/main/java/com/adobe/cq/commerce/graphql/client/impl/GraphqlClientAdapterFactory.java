@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.ValueMap;
+import org.apache.sling.caconfig.resource.ConfigurationResourceResolver;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -27,9 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
-import com.day.cq.commons.inherit.ComponentInheritanceValueMap;
-import com.day.cq.commons.inherit.HierarchyNodeInheritanceValueMap;
-import com.day.cq.commons.inherit.InheritanceValueMap;
+import com.adobe.xfa.ut.StringUtils;
 import com.day.cq.wcm.api.Page;
 import com.day.cq.wcm.api.PageManager;
 
@@ -47,6 +47,9 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
     protected Map<String, GraphqlClient> clients = new ConcurrentHashMap<>();
+
+    @Reference
+    private ConfigurationResourceResolver configurationResourceResolver;
 
     @Reference(
         service = GraphqlClient.class,
@@ -76,16 +79,13 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         Resource res = (Resource) adaptable;
 
         // Get cq:graphqlClient property from ancestor pages
-        InheritanceValueMap properties;
         Page page = res.getResourceResolver().adaptTo(PageManager.class).getContainingPage(res);
-        if (page != null) {
-            properties = new HierarchyNodeInheritanceValueMap(page.getContentResource());
-        } else {
-            properties = new ComponentInheritanceValueMap(res);
-        }
+        Resource configs = configurationResourceResolver.getResource(page.getContentResource(), "settings", "commerce/default");
 
-        String identifier = properties.getInherited(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
-        if (identifier == null) {
+        ValueMap properties = configs.getValueMap();
+
+        String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, "");
+        if (StringUtils.isEmpty(identifier)) {
             LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res
                 .getPath());
             return null;
