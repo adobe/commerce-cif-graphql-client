@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
-import org.apache.sling.caconfig.resource.ConfigurationResourceResolver;
+import org.apache.sling.caconfig.ConfigurationBuilder;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -30,26 +30,28 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.xfa.ut.StringUtils;
+import com.day.cq.commons.inherit.ComponentInheritanceValueMap;
+import com.day.cq.commons.inherit.HierarchyNodeInheritanceValueMap;
+import com.day.cq.commons.inherit.InheritanceValueMap;
 import com.day.cq.wcm.api.Page;
 import com.day.cq.wcm.api.PageManager;
 
 @Component(
     service = { AdapterFactory.class },
     property = {
-        AdapterFactory.ADAPTABLE_CLASSES + "=" + GraphqlClientAdapterFactory.RESOURCE_CLASS_NAME,
-        AdapterFactory.ADAPTER_CLASSES + "=" + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME
-    })
+        AdapterFactory.ADAPTABLE_CLASSES + "=" + GraphqlClientAdapterFactory.RESOURCE_CLASS_NAME, AdapterFactory.ADAPTER_CLASSES + "="
+            + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME })
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
+
     protected static final String GRAPHQLCLIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
+
+    protected static final String CONFIG_NAME = "commerce/default";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
     protected Map<String, GraphqlClient> clients = new ConcurrentHashMap<>();
-
-    @Reference
-    private ConfigurationResourceResolver configurationResourceResolver;
 
     @Reference(
         service = GraphqlClient.class,
@@ -78,13 +80,10 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
 
         Resource res = (Resource) adaptable;
 
-        // Get cq:graphqlClient property from ancestor pages
-        Page page = res.getResourceResolver().adaptTo(PageManager.class).getContainingPage(res);
-        Resource configs = configurationResourceResolver.getResource(page.getContentResource(), "settings", "commerce/default");
+        ConfigurationBuilder configBuilder = res.adaptTo(ConfigurationBuilder.class);
+        ValueMap properties = configBuilder.name(CONFIG_NAME).asValueMap();
 
-        ValueMap properties = configs.getValueMap();
-
-        String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, "");
+        String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, readFallbackConfiguration(res));
         if (StringUtils.isEmpty(identifier)) {
             LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res
                 .getPath());
@@ -99,4 +98,18 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
 
         return (AdapterType) client;
     }
+
+    private String readFallbackConfiguration(Resource resource) {
+        InheritanceValueMap properties;
+        Page page = resource.getResourceResolver()
+            .adaptTo(PageManager.class)
+            .getContainingPage(resource);
+        if (page != null) {
+            properties = new HierarchyNodeInheritanceValueMap(page.getContentResource());
+        } else {
+            properties = new ComponentInheritanceValueMap(resource);
+        }
+        return properties.getInherited(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
+    }
+
 }
