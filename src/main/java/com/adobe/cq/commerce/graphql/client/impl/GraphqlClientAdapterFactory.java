@@ -17,6 +17,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
@@ -29,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
-import com.adobe.xfa.ut.StringUtils;
 import com.day.cq.commons.inherit.ComponentInheritanceValueMap;
 import com.day.cq.commons.inherit.HierarchyNodeInheritanceValueMap;
 import com.day.cq.commons.inherit.InheritanceValueMap;
@@ -39,8 +39,8 @@ import com.day.cq.wcm.api.PageManager;
 @Component(
     service = { AdapterFactory.class },
     property = {
-        AdapterFactory.ADAPTABLE_CLASSES + "=" + GraphqlClientAdapterFactory.RESOURCE_CLASS_NAME, AdapterFactory.ADAPTER_CLASSES + "="
-            + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME })
+        AdapterFactory.ADAPTABLE_CLASSES + "=" + GraphqlClientAdapterFactory.RESOURCE_CLASS_NAME,
+        AdapterFactory.ADAPTER_CLASSES + "=" + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME })
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
@@ -83,7 +83,11 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         ConfigurationBuilder configBuilder = res.adaptTo(ConfigurationBuilder.class);
         ValueMap properties = configBuilder.name(CONFIG_NAME).asValueMap();
 
-        String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, readFallbackConfiguration(res));
+        String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
+        if (identifier == null) {
+            identifier = readFallbackConfiguration(res);
+        }
+
         if (StringUtils.isEmpty(identifier)) {
             LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res
                 .getPath());

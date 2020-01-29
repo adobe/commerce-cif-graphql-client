@@ -15,43 +15,31 @@
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import org.apache.sling.api.resource.Resource;
-import org.apache.sling.testing.mock.sling.ResourceResolverType;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
+import com.google.common.collect.ImmutableMap;
 import io.wcm.testing.mock.aem.junit.AemContext;
-import io.wcm.testing.mock.aem.junit.AemContextBuilder;
 
-import static org.apache.sling.testing.mock.caconfig.ContextPlugins.CACONFIG;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class GraphqlClientAdapterFactoryTest {
 
-    public final static String CATALOG_IDENTIFIER = "my-catalog";
-
     @Rule
-    public final AemContext context = new AemContextBuilder(ResourceResolverType.JCR_MOCK).plugin(CACONFIG).build();
+    public final AemContext context = GraphqlAemContext.createContext(ImmutableMap.of(
+        "/content", "/context/graphql-client-adapter-factory-context.json",
+        "/conf/test-config", "/context/jcr-conf.json"));
 
-    Resource mockConfigurationResource;
-
-    @Before
-    public void setUp() {
-        GraphqlAemContext.adapterFactory = new GraphqlClientAdapterFactory();
-
-        GraphqlClient mockClient = mock(GraphqlClient.class);
-        when(mockClient.getIdentifier()).thenReturn(CATALOG_IDENTIFIER);
-        context.registerService(GraphqlClient.class, mockClient);
-
-        // Add AdapterFactory
-        context.registerInjectActivateService(GraphqlAemContext.adapterFactory);
-
-        // Load page structure
-        context.load()
-            .json("/context/graphql-client-adapter-factory-context.json", "/content");
+    @Test
+    public void testGetClientForPageWithContextConfiguration() {
+        Resource res = context.resourceResolver().getResource("/content/pageE");
+        // Adapt page to client, verify that correct client was returned
+        GraphqlClient client = res.adaptTo(GraphqlClient.class);
+        Assert.assertNotNull("Client is not null", client);
+        Assert.assertEquals("The identifier is read correctly", GraphqlAemContext.CATALOG_IDENTIFIER, client.getIdentifier());
     }
 
     @Test
