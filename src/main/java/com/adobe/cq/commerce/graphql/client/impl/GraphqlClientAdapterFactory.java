@@ -47,7 +47,7 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String GRAPHQLCLIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
 
-    protected static final String CONFIG_NAME = "commerce/default";
+    protected static final String CONFIG_NAME = "cloudconfigs/commerce";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
