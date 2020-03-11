@@ -25,6 +25,13 @@
       "jcr:primaryType":"cq:PageContent"
     }
   },
+    "pageE": {
+        "jcr:primaryType": "cq:Page",
+        "jcr:content": {
+            "jcr:primaryType": "cq:PageContent",
+            "cq:conf": "/conf/test-config"
+        }
+  },
   "test": {
     "jcr:primaryType": "nt:unstructured",
     "cq:graphqlClient": "default"

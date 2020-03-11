@@ -1,0 +1,11 @@
+{
+        "cloudconfigs": {
+            "jcr:primaryType": "sling:Folder",
+            "commerce": {
+                "jcr:primaryType": "cq:Page ",
+                "cq:graphqlClient": "my-catalog",
+                "magentoStore": "my-store",
+                "jcr:primaryType": "cq:Page"
+            }
+        }
+}

@@ -20,6 +20,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
+import com.google.common.collect.ImmutableMap;
 import io.wcm.testing.mock.aem.junit.AemContext;
 
 import static org.mockito.Mockito.mock;
@@ -28,7 +29,26 @@ import static org.mockito.Mockito.when;
 public class GraphqlClientAdapterFactoryTest {
 
     @Rule
-    public final AemContext context = GraphqlAemContext.createContext("/context/graphql-client-adapter-factory-context.json");
+    public final AemContext context = GraphqlAemContext.createContext(ImmutableMap.of(
+        "/content", "/context/graphql-client-adapter-factory-context.json",
+        "/conf/test-config/settings", "/context/jcr-conf.json"));
+
+    @Test
+    public void testGetClientForPageWithContextConfiguration() {
+        /*
+         * The content for this test looks slightly different than it does in AEM:
+         * In AEM there the tree structure is /conf/<config>/settings/cloudconfigs/commerce/jcr:content
+         * In our test content it's /conf/<config>/settings/cloudconfigs/commerce
+         * The reason is that AEM has a specific CaConfig API implementation that reads the configuration
+         * data from the jcr:content node of the configuration page, something which we cannot reproduce in
+         * a unit test scenario.
+         */
+        Resource res = context.resourceResolver().getResource("/content/pageE");
+        // Adapt page to client, verify that correct client was returned
+        GraphqlClient client = res.adaptTo(GraphqlClient.class);
+        Assert.assertNotNull("Client is not null", client);
+        Assert.assertEquals("The identifier is read correctly", GraphqlAemContext.CATALOG_IDENTIFIER, client.getIdentifier());
+    }
 
     @Test
     public void testGetClientForPageWithIdentifier() {

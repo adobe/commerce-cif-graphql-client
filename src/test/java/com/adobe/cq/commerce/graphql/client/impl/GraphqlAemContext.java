@@ -14,12 +14,19 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.Dictionary;
+import java.util.Hashtable;
+import java.util.Map;
+
 import org.apache.sling.testing.mock.sling.ResourceResolverType;
+import org.osgi.service.cm.Configuration;
+import org.osgi.service.cm.ConfigurationAdmin;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import io.wcm.testing.mock.aem.junit.AemContext;
-import io.wcm.testing.mock.aem.junit.AemContextCallback;
+import io.wcm.testing.mock.aem.junit.AemContextBuilder;
 
+import static org.apache.sling.testing.mock.caconfig.ContextPlugins.CACONFIG;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,22 +38,44 @@ public final class GraphqlAemContext {
 
     private GraphqlAemContext() {}
 
-    public static AemContext createContext(String contentPath) {
+    public static AemContext createContext(Map<String, String> contentPaths) {
         GraphqlAemContext.adapterFactory = new GraphqlClientAdapterFactory();
-        return new AemContext(
-            (AemContextCallback) context -> {
-                // Add mock GraphqlClient
-                GraphqlClient mockClient = mock(GraphqlClient.class);
-                when(mockClient.getIdentifier()).thenReturn(CATALOG_IDENTIFIER);
-                context.registerService(GraphqlClient.class, mockClient);
 
-                // Add AdapterFactory
-                context.registerInjectActivateService(GraphqlAemContext.adapterFactory);
+        AemContext ctx = new AemContextBuilder(ResourceResolverType.JCR_MOCK).plugin(CACONFIG)
+            .beforeSetUp(context -> {
+                ConfigurationAdmin configurationAdmin = context.getService(ConfigurationAdmin.class);
+                Configuration serviceConfiguration = configurationAdmin.getConfiguration(
+                    "org.apache.sling.caconfig.resource.impl.def.DefaultContextPathStrategy");
 
-                // Load page structure
-                context.load().json(contentPath, "/content");
-            },
-            ResourceResolverType.JCR_MOCK);
+                Dictionary<String, Object> props = new Hashtable<>();
+                props.put("configRefResourceNames", new String[] { ".", "jcr:content" });
+                props.put("configRefPropertyNames", "cq:conf");
+                serviceConfiguration.update(props);
+
+                serviceConfiguration = configurationAdmin.getConfiguration(
+                    "org.apache.sling.caconfig.resource.impl.def.DefaultConfigurationResourceResolvingStrategy");
+                props = new Hashtable<>();
+                props.put("configPath", "/conf");
+                serviceConfiguration.update(props);
+
+                serviceConfiguration = configurationAdmin.getConfiguration("org.apache.sling.caconfig.impl.ConfigurationResolverImpl");
+                props = new Hashtable<>();
+                props.put("configBucketNames", new String[] { "settings" });
+                serviceConfiguration.update(props);
+            }).build();
+        GraphqlClient mockClient = mock(GraphqlClient.class);
+        when(mockClient.getIdentifier()).thenReturn(CATALOG_IDENTIFIER);
+        ctx.registerService(GraphqlClient.class, mockClient);
+
+        // Add AdapterFactory
+        ctx.registerInjectActivateService(GraphqlAemContext.adapterFactory);
+
+        // Load page structure
+        contentPaths.entrySet().iterator().forEachRemaining(entry -> {
+            ctx.load().json(entry.getValue(), entry.getKey());
+        });
+
+        return ctx;
     }
 
 }
