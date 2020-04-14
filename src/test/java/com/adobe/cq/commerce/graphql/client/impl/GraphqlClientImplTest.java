@@ -14,36 +14,28 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpHeaders;
-import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.message.BasicHeader;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.adobe.cq.commerce.graphql.client.impl.TestUtils.GetQueryMatcher;
+import com.adobe.cq.commerce.graphql.client.impl.TestUtils.HeadersMatcher;
+import com.adobe.cq.commerce.graphql.client.impl.TestUtils.RequestBodyMatcher;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -86,14 +78,14 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testRequestResponse() throws Exception {
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
 
         dummy.setOperationName("customOperation");
         dummy.setVariables(Collections.singletonMap("variableName", "variableValue"));
         GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class);
 
         // Check that the query is what we expect
-        String body = getResource("sample-graphql-request.json");
+        String body = TestUtils.getResource("sample-graphql-request.json");
         RequestBodyMatcher matcher = new RequestBodyMatcher(body);
         Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
 
@@ -111,7 +103,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testHttpError() throws Exception {
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_SERVICE_UNAVAILABLE);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_SERVICE_UNAVAILABLE);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
@@ -136,7 +128,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testInvalidResponse() throws Exception {
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, String.class, String.class);
@@ -148,7 +140,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testHttpResponseError() throws Exception {
-        setupNullResponse(graphqlClient.client);
+        TestUtils.setupNullResponse(graphqlClient.client);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, String.class, String.class);
@@ -174,7 +166,7 @@ public class GraphqlClientImplTest {
         Gson gson = new GsonBuilder().registerTypeAdapter(Data.class, new CustomDeserializer()).create();
 
         // The response from the JSON data is overwritten by the custom deserializer
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
 
         GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withGson(gson));
         assertEquals("customText", response.getData().text);
@@ -183,7 +175,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testHeaders() throws Exception {
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         List<Header> requestHeaders = Collections.singletonList(new BasicHeader("customName", "customValue"));
         graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHeaders(requestHeaders));
 
@@ -222,7 +214,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testGetHttpMethod() throws Exception {
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHttpMethod(HttpMethod.GET));
 
         // Check that the GraphQL request is properly encoded in the URL
@@ -237,154 +229,11 @@ public class GraphqlClientImplTest {
         request.setOperationName("MyQuery");
         request.setVariables(Collections.singletonMap("arg", "something"));
 
-        setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         graphqlClient.execute(request, Data.class, Error.class, new RequestOptions().withHttpMethod(HttpMethod.GET));
 
         // Check that the GraphQL request is properly encoded in the URL
         GetQueryMatcher matcher = new GetQueryMatcher(request);
         Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
-    }
-
-    /**
-     * Matcher class used to check that the GraphQL request body is properly set.
-     */
-    private static class RequestBodyMatcher extends ArgumentMatcher<HttpUriRequest> {
-
-        private String body;
-
-        public RequestBodyMatcher(String body) {
-            this.body = body;
-        }
-
-        @Override
-        public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest) && !(obj instanceof HttpEntityEnclosingRequest)) {
-                return false;
-            }
-            HttpEntityEnclosingRequest req = (HttpEntityEnclosingRequest) obj;
-            try {
-                String body = IOUtils.toString(req.getEntity().getContent(), StandardCharsets.UTF_8);
-                return body.equals(this.body);
-            } catch (Exception e) {
-                return false;
-            }
-        }
-
-    }
-
-    /**
-     * Matcher class used to check that the headers are properly passed to the HTTP client.
-     */
-    private static class HeadersMatcher extends ArgumentMatcher<HttpUriRequest> {
-
-        private List<Header> headers;
-
-        public HeadersMatcher(List<Header> headers) {
-            this.headers = headers;
-        }
-
-        @Override
-        public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest)) {
-                return false;
-            }
-            HttpUriRequest req = (HttpUriRequest) obj;
-            for (Header header : headers) {
-                Header reqHeader = req.getFirstHeader(header.getName());
-                if (reqHeader == null || !reqHeader.getValue().equals(header.getValue())) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
-
-    private static String encode(String str) throws UnsupportedEncodingException {
-        return URLEncoder.encode(str, StandardCharsets.UTF_8.name());
-    }
-
-    /**
-     * Matcher class used to check that the GraphQL query is properly set and encoded when sent with a GET request.
-     */
-    private static class GetQueryMatcher extends ArgumentMatcher<HttpUriRequest> {
-
-        GraphqlRequest request;
-
-        public GetQueryMatcher(GraphqlRequest request) {
-            this.request = request;
-        }
-
-        @Override
-        public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest)) {
-                return false;
-            }
-            HttpUriRequest req = (HttpUriRequest) obj;
-            String expectedEncodedQuery = MockGraphqlClientConfiguration.URL;
-            try {
-                expectedEncodedQuery += "?query=" + encode(request.getQuery());
-                if (request.getOperationName() != null) {
-                    expectedEncodedQuery += "&operationName=" + encode(request.getOperationName());
-                }
-                if (request.getVariables() != null) {
-                    String json = new Gson().toJson(request.getVariables());
-                    expectedEncodedQuery += "&variables=" + encode(json);
-                }
-            } catch (UnsupportedEncodingException e) {
-                return false;
-            }
-            return HttpMethod.GET.toString().equals(req.getMethod()) && expectedEncodedQuery.equals(req.getURI().toString());
-        }
-    }
-
-    /**
-     * This method prepares the mock http response with either the content of the <code>filename</code>
-     * or the provided <code>content</code> String.<br>
-     * <br>
-     * <b>Important</b>: because of the way the content of an HTTP response is consumed, this method MUST be called each time
-     * the client is called.
-     *
-     * @param filename The file to use for the json response.
-     * @param httpClient The HTTP client for which we want to mock responses.
-     * @param httpCode The http code that the mocked response will return.
-     * @param startsWith When set, the body of the GraphQL POST request must start with that String.
-     * 
-     * @return The JSON content of that file.
-     * 
-     * @throws IOException
-     */
-    private static String setupHttpResponse(String filename, HttpClient httpClient, int httpCode) throws IOException {
-        String json = getResource(filename);
-
-        HttpEntity mockedHttpEntity = Mockito.mock(HttpEntity.class);
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
-        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
-
-        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        Mockito.when(mockedHttpEntity.getContent()).thenReturn(new ByteArrayInputStream(bytes));
-        Mockito.when(mockedHttpEntity.getContentLength()).thenReturn(new Long(bytes.length));
-
-        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
-
-        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
-        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
-
-        return json;
-    }
-
-    private static void setupNullResponse(HttpClient httpClient) throws IOException {
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
-        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
-
-        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(null);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
-
-        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_OK);
-        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
-    }
-
-    private static String getResource(String filename) throws IOException {
-        return IOUtils.toString(GraphqlClientImplTest.class.getClassLoader().getResourceAsStream(filename), StandardCharsets.UTF_8);
     }
 }
