@@ -179,6 +179,11 @@ public class GraphqlClientImplCachingTest {
     }
 
     @Test
+    public void testNoRequesOptions() throws Exception {
+        assertNoCaching(dummy, null);
+    }
+
+    @Test
     public void testNoCachingStrategy() throws Exception {
         RequestOptions requestOptions = new RequestOptions();
         assertNoCaching(dummy, requestOptions);

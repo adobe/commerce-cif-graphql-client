@@ -15,6 +15,7 @@
 package com.adobe.cq.commerce.graphql.client;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -110,6 +111,25 @@ public class RequestOptionsTest {
 
         Assert.assertNotEquals(opt1.hashCode(), opt2.hashCode());
         Assert.assertFalse(opt1.equals(opt2));
+        Assert.assertFalse(opt2.equals(opt1)); // test "reverse" XOR condition
+    }
+
+    @Test
+    public void testNotEqualsEmptyHeadersInOneRequestOptions() {
+        RequestOptions opt1 = new RequestOptions();
+        opt1.withHttpMethod(HttpMethod.GET);
+        List<Header> headers1 = new ArrayList<>();
+        headers1.add(new BasicHeader("Store", "default"));
+        headers1.add(new BasicHeader("Authentication", "Bearer 1234"));
+        opt1.withHeaders(headers1);
+
+        RequestOptions opt2 = new RequestOptions();
+        opt2.withHttpMethod(HttpMethod.GET);
+        opt2.withHeaders(Collections.emptyList()); // Empty headers
+
+        Assert.assertNotEquals(opt1.hashCode(), opt2.hashCode());
+        Assert.assertFalse(opt1.equals(opt2));
+        Assert.assertFalse(opt2.equals(opt1)); // test "reverse" OR condition
     }
 
     @Test

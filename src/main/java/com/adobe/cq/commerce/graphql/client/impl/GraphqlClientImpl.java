@@ -157,11 +157,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     private Cache<CacheKey, GraphqlResponse<Object, Object>> toActiveCache(GraphqlRequest request, RequestOptions options) {
-        if (caches == null || caches.isEmpty()) {
-            return null;
-        }
-
-        if (request.getQuery().trim().startsWith("mutation")) {
+        if (caches == null || request.getQuery().trim().startsWith("mutation")) {
             return null;
         }
 
