@@ -23,6 +23,7 @@ public class CacheKey {
 
     private GraphqlRequest request;
     private RequestOptions options;
+    private Integer hash;
 
     CacheKey(GraphqlRequest request, RequestOptions options) {
         this.request = request;
@@ -31,7 +32,10 @@ public class CacheKey {
 
     @Override
     public int hashCode() {
-        return Objects.hash(request, options);
+        if (hash == null) {
+            hash = Objects.hash(request, options);
+        }
+        return hash.intValue();
     }
 
     @Override

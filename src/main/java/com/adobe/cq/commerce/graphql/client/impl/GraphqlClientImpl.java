@@ -76,7 +76,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     protected HttpClient client;
     private Gson gson;
-    private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches = new HashMap<>();
+    private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
 
     private String identifier;
     private String url;
@@ -106,6 +106,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
+        caches = new HashMap<>();
         if (ArrayUtils.isNotEmpty(configuration.cacheConfigurations())) {
             for (String cacheConfiguration : configuration.cacheConfigurations()) {
                 // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
@@ -141,7 +142,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     @SuppressWarnings("unchecked")
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
-        Cache<CacheKey, GraphqlResponse<?, ?>> cache = toActiveCache(request, options);
+        Cache<CacheKey, GraphqlResponse<Object, Object>> cache = toActiveCache(request, options);
         if (cache != null) {
             CacheKey key = new CacheKey(request, options);
             try {
@@ -153,7 +154,11 @@ public class GraphqlClientImpl implements GraphqlClient {
         return executeImpl(request, typeOfT, typeofU, options);
     }
 
-    private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
+    private Cache<CacheKey, GraphqlResponse<Object, Object>> toActiveCache(GraphqlRequest request, RequestOptions options) {
+        if (caches == null || caches.isEmpty()) {
+            return null;
+        }
+
         if (request.getQuery().trim().startsWith("mutation")) {
             return null;
         }

@@ -42,6 +42,19 @@ To instantiate instances of this GraphQL client, simply go the AEM OSGi configur
 
 The `identifier` is used by the adapter factory to resolve clients via the `cq:graphqlClient` property set on any JCR node. When this is set on a resource or the resource ancestors, one can write `GraphqlClient client = resource.adaptTo(GraphqlClient.class);`.
 
+### Caching
+
+Starting with version `1.4.0`, the client can cache GraphQL `query` requests based on the `cacheConfigurations` parameter. This supports the configuration of multiple caches, each being identified by a name and having its own set of caching parameters. This ensures that multiple components and services  using cached data can have their own caching strategy and that those will not "collide", for example when one component/service starves a common cache with a a very large amount of requests. On the Java side, caching is controlled by the `CachingStrategy` class that can be set in the `RequestOptions` class.
+
+Because of the limitations of the AEM OSGi configuration console when defining multiple parameters with multiple values, each cache configuration entry must be specified with the following format:
+* `NAME:ENABLE:MAXSIZE:TIMEOUT` like for example `mycache:true:1000:60` where each attribute is defined as:
+  * NAME (String) : the name of the cache
+  * ENABLE (true|false) : enables or disables that cache entry (useful to temporarily disable a cache)
+  * MAXSIZE (Integer) : the maximum size of the cache in number of entries
+  * TIMEOUT (Integer) : the timeout for each cache entry, in minutes
+
+Note that even if it is enabled, a cache is only used if the `RequestOptions` set by the caller component/service defines the cache name and explicitly sets the `DataFetchingPolicy` to `CACHE_FIRST`. This ensures that the behavior of the client is backwards compatible (= caching is skipped by default). In addition, a caller can explicitly set the `DataFetchingPolicy` to `NETWORK_ONLY` to skip caching programmatically, even if caching is enabled in the OSGi configuration.
+
 ## Releases to Maven Central
 
 Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated `CircleCI` build that performs the deployment of the artifact to Maven Central.
