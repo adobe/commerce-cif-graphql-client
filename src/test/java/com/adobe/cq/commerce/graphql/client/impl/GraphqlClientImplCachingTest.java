@@ -16,6 +16,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.util.Collections;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.message.BasicHeader;
@@ -178,6 +179,22 @@ public class GraphqlClientImplCachingTest {
     }
 
     @Test
+    public void testNoCachingStrategy() throws Exception {
+        RequestOptions requestOptions = new RequestOptions();
+        assertNoCaching(dummy, requestOptions);
+    }
+
+    @Test
+    public void testNoDataFetchingPolicy() throws Exception {
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE);
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy);
+
+        assertNoCaching(dummy, requestOptions);
+    }
+
+    @Test
     public void testNoCachingForMutation() throws Exception {
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)
@@ -186,6 +203,38 @@ public class GraphqlClientImplCachingTest {
             .withCachingStrategy(cachingStrategy);
 
         assertNoCaching(new GraphqlRequest("mutation{dummy}"), requestOptions);
+    }
+
+    @Test
+    public void testNoCache() throws Exception {
+        graphqlClient = new GraphqlClientImpl();
+        graphqlClient.activate(new MockGraphqlClientConfiguration());
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy);
+
+        assertNoCaching(dummy, requestOptions);
+    }
+
+    @Test
+    public void testEmptyCache() throws Exception {
+        graphqlClient = new GraphqlClientImpl();
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setCacheConfigurations(ArrayUtils.EMPTY_STRING_ARRAY);
+        graphqlClient.activate(config);
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy);
+
+        assertNoCaching(dummy, requestOptions);
     }
 
     private void assertNoCaching(GraphqlRequest request, RequestOptions requestOptions) throws Exception {

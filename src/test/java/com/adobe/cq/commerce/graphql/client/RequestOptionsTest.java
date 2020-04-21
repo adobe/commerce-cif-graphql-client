@@ -36,6 +36,7 @@ public class RequestOptionsTest {
         Assert.assertEquals(opt1.hashCode(), opt1.hashCode());
         Assert.assertTrue(opt1.equals(opt1));
         Assert.assertFalse(opt1.equals("wrongclass"));
+        Assert.assertFalse(opt1.equals(null));
     }
 
     @Test

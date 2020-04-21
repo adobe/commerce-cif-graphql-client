@@ -45,6 +45,7 @@ public class GraphqlRequestTest {
         Assert.assertEquals(r1.hashCode(), r1.hashCode());
         Assert.assertTrue(r1.equals(r1));
         Assert.assertFalse(r1.equals("wrongclass"));
+        Assert.assertFalse(r1.equals(null));
     }
 
     @Test

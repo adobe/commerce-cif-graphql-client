@@ -169,7 +169,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
 
         DataFetchingPolicy dataFetchingPolicy = cachingStrategy.getDataFetchingPolicy();
-        if (dataFetchingPolicy != null && !DataFetchingPolicy.CACHE_FIRST.equals(dataFetchingPolicy)) {
+        if (!DataFetchingPolicy.CACHE_FIRST.equals(dataFetchingPolicy)) {
             return null;
         }
 
