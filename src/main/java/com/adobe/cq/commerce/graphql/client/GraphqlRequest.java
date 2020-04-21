@@ -78,14 +78,11 @@ public class GraphqlRequest {
         if (hash != null) {
             return hash.intValue();
         }
-        HashCodeBuilder builder = new HashCodeBuilder().append(query);
-        if (operationName != null) {
-            builder.append(operationName);
-        }
-        if (variables != null) {
-            builder.append(variables.hashCode());
-        }
-        hash = builder.toHashCode();
+        hash = new HashCodeBuilder()
+            .append(query)
+            .append(operationName)
+            .append(variables)
+            .toHashCode();
         return hash.intValue();
     }
 }

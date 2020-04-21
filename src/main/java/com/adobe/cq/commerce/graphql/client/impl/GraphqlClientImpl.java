@@ -106,8 +106,8 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
-        caches = new HashMap<>();
         if (ArrayUtils.isNotEmpty(configuration.cacheConfigurations())) {
+            caches = new HashMap<>();
             for (String cacheConfiguration : configuration.cacheConfigurations()) {
                 // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
                 if (StringUtils.isBlank(cacheConfiguration)) {
@@ -126,6 +126,8 @@ public class GraphqlClientImpl implements GraphqlClient {
                         .build());
                 }
             }
+        } else {
+            caches = null; // make sure it's always reset
         }
     }
 

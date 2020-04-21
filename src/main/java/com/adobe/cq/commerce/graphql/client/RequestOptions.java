@@ -140,17 +140,14 @@ public class RequestOptions {
         if (hash != null) {
             return hash.intValue();
         }
-        if (httpMethod == null && (headers == null || headers.isEmpty())) {
-            return 0;
-        }
         HashCodeBuilder builder = new HashCodeBuilder();
-        if (httpMethod != null) {
-            builder.append(httpMethod);
-        }
+        builder.append(httpMethod);
         if (headers != null) {
             headers.stream()
                 .sorted(Comparator.comparing(Header::getName))
                 .forEach(h -> builder.append(h.getName()).append(h.getValue()));
+        } else {
+            builder.append(headers);
         }
         hash = builder.toHashCode();
         return hash.intValue();
