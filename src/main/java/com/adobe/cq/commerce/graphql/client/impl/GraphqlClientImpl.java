@@ -122,7 +122,7 @@ public class GraphqlClientImpl implements GraphqlClient {
                 if (Boolean.valueOf(parts[1])) {
                     caches.put(parts[0], CacheBuilder.newBuilder()
                         .maximumSize(Integer.valueOf(parts[2]))
-                        .expireAfterWrite(Integer.valueOf(parts[3]), TimeUnit.MINUTES)
+                        .expireAfterWrite(Integer.valueOf(parts[3]), TimeUnit.SECONDS)
                         .build());
                 }
             }

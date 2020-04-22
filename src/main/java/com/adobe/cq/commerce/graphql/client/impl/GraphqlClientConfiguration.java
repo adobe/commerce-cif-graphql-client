@@ -96,7 +96,7 @@ public @interface GraphqlClientConfiguration {
             + "NAME (String) : the name of the cache - "
             + "ENABLE (true|false) : enables or disables the cache with that NAME - "
             + "MAXSIZE (Integer) : the maximum size of the cache in number of entries - "
-            + "TIMEOUT (Integer) : the timeout for each cache entry, in minutes.",
+            + "TIMEOUT (Integer) : the timeout for each cache entry, in seconds.",
         type = AttributeType.STRING)
     String[] cacheConfigurations();
 }
