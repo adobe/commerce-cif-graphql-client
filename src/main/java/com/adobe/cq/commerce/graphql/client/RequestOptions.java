@@ -15,10 +15,9 @@
 package com.adobe.cq.commerce.graphql.client;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -32,6 +31,11 @@ import com.google.gson.Gson;
  * This class is used to set various options when executing a GraphQL request.
  */
 public class RequestOptions {
+
+    /**
+     * To compare headers, we will sort them by name and value.
+     */
+    private static final Comparator<Header> HEADER_COMPARATOR = Comparator.comparing(Header::getName).thenComparing(Header::getValue);
 
     private Gson gson;
     private List<Header> headers;
@@ -124,11 +128,21 @@ public class RequestOptions {
         // We cannot use Objects.equals with lists because this checks object equality for all list elements
         // and elements must be in the same order.
 
-        Map<String, String> keyValues = new HashMap<>();
-        headers.stream().forEach(h -> keyValues.put(h.getName(), h.getValue()));
-        for (Header header : that.headers) {
-            String value = keyValues.get(header.getName());
-            if (!StringUtils.equals(value, header.getValue())) {
+        List<Header> sortedHeaders = headers.stream()
+            .sorted(HEADER_COMPARATOR)
+            .collect(Collectors.toList());
+
+        List<Header> thatSortedHeaders = that.headers.stream()
+            .sorted(HEADER_COMPARATOR)
+            .collect(Collectors.toList());
+
+        for (int i = 0, l = sortedHeaders.size(); i < l; i++) {
+            Header header = sortedHeaders.get(i);
+            Header thatHeader = thatSortedHeaders.get(i);
+            if (!StringUtils.equals(header.getName(), thatHeader.getName())) {
+                return false;
+            }
+            if (!StringUtils.equals(header.getValue(), thatHeader.getValue())) {
                 return false;
             }
         }
@@ -144,7 +158,7 @@ public class RequestOptions {
         builder.append(httpMethod);
         if (headers != null) {
             headers.stream()
-                .sorted(Comparator.comparing(Header::getName))
+                .sorted(HEADER_COMPARATOR)
                 .forEach(h -> builder.append(h.getName()).append(h.getValue()));
         } else {
             builder.append(headers);

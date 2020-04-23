@@ -58,13 +58,15 @@ public class RequestOptionsTest {
         List<Header> headers1 = new ArrayList<>();
         headers1.add(new BasicHeader("Store", "default"));
         headers1.add(new BasicHeader("Authentication", "Bearer 1234"));
+        headers1.add(new BasicHeader("Authentication", "Basic abcd"));
         opt1.withHeaders(headers1);
 
         RequestOptions opt2 = new RequestOptions();
         opt2.withHttpMethod(HttpMethod.GET);
         List<Header> headers2 = new LinkedList<>();
-        headers2.add(new BasicHeader("Authentication", "Bearer 1234")); // Same headers but different order
+        headers2.add(new BasicHeader("Authentication", "Basic abcd")); // Same headers but different order
         headers2.add(new BasicHeader("Store", "default"));
+        headers2.add(new BasicHeader("Authentication", "Bearer 1234"));
         opt2.withHeaders(headers2);
 
         Assert.assertEquals(opt1.hashCode(), opt2.hashCode());
@@ -165,6 +167,26 @@ public class RequestOptionsTest {
         List<Header> headers2 = new LinkedList<>();
         headers2.add(new BasicHeader("Store", "default"));
         headers2.add(new BasicHeader("Authentication", "Bearer 5678"));
+        opt2.withHeaders(headers2);
+
+        Assert.assertNotEquals(opt1.hashCode(), opt2.hashCode());
+        Assert.assertFalse(opt1.equals(opt2));
+    }
+
+    @Test
+    public void testNotEqualsDifferentHeaderNames() {
+        RequestOptions opt1 = new RequestOptions();
+        opt1.withHttpMethod(HttpMethod.GET);
+        List<Header> headers1 = new ArrayList<>();
+        headers1.add(new BasicHeader("Stored", "default"));
+        headers1.add(new BasicHeader("Authentication", "Bearer 1234"));
+        opt1.withHeaders(headers1);
+
+        RequestOptions opt2 = new RequestOptions();
+        opt2.withHttpMethod(HttpMethod.GET);
+        List<Header> headers2 = new LinkedList<>();
+        headers2.add(new BasicHeader("Store", "default"));
+        headers2.add(new BasicHeader("Authentication", "Bearer 1234"));
         opt2.withHeaders(headers2);
 
         Assert.assertNotEquals(opt1.hashCode(), opt2.hashCode());
