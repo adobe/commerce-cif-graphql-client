@@ -1,12 +1,14 @@
 coverage:
   status:
-    patch:
-      default:
-        enabled: true
-        target: 80%
-        base: auto
     project:
       default:
         enabled: true
         target: 80%
+        threshold: 0%
+        base: auto
+    patch:
+      default:
+        enabled: true
+        target: 80%
+        threshold: 0%
         base: auto
