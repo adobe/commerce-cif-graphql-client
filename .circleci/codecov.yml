@@ -10,5 +10,5 @@ coverage:
       default:
         enabled: true
         target: 80%
-        threshold: 0%
+        threshold: 10%
         base: auto
