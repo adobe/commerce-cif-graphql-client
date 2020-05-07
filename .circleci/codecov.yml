@@ -4,11 +4,11 @@ coverage:
       default:
         enabled: true
         target: 80%
-        threshold: null
+        threshold: 10%
         base: auto
     patch:
       default:
         enabled: true
         target: 80%
-        threshold: null
+        threshold: 10%
         base: auto

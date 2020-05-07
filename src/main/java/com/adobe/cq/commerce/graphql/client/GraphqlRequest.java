@@ -14,11 +14,18 @@
 
 package com.adobe.cq.commerce.graphql.client;
 
+import java.util.Objects;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+
 public class GraphqlRequest {
 
     protected String query;
     protected String operationName;
     protected Object variables;
+
+    private Integer hash;
 
     public GraphqlRequest(String query) {
         this.query = query;
@@ -48,4 +55,34 @@ public class GraphqlRequest {
         this.variables = variables;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        GraphqlRequest that = (GraphqlRequest) o;
+        if (!StringUtils.equals(query, that.query)) {
+            return false;
+        }
+        if (!StringUtils.equals(operationName, that.operationName)) {
+            return false;
+        }
+        return Objects.equals(variables, that.variables);
+    }
+
+    @Override
+    public int hashCode() {
+        if (hash != null) {
+            return hash.intValue();
+        }
+        hash = new HashCodeBuilder()
+            .append(query)
+            .append(operationName)
+            .append(variables)
+            .toHashCode();
+        return hash.intValue();
+    }
 }

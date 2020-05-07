@@ -24,6 +24,7 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     private String url;
     private Boolean acceptSelfSignedCertificates;
     private String[] httpHeaders;
+    private String[] cacheConfigurations;
 
     @Override
     public String identifier() {
@@ -76,6 +77,11 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
         return httpHeaders;
     }
 
+    @Override
+    public String[] cacheConfigurations() {
+        return cacheConfigurations;
+    }
+
     public void setUrl(String url) {
         this.url = url;
     }
@@ -86,5 +92,9 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
 
     public void setHttpHeaders(String... httpHeaders) {
         this.httpHeaders = httpHeaders;
+    }
+
+    public void setCacheConfigurations(String... cacheConfigurations) {
+        this.cacheConfigurations = cacheConfigurations;
     }
 }

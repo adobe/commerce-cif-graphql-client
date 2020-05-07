@@ -89,4 +89,14 @@ public @interface GraphqlClientConfiguration {
         description = "HTTP Headers which shall be sent with each request. Might be used for authentication. The format of each header is name:value",
         type = AttributeType.STRING)
     String[] httpHeaders();
+
+    @AttributeDefinition(
+        name = "GraphQL cache configurations",
+        description = "Each entry must follow the format NAME:ENABLE:MAXSIZE:TIMEOUT like for example product:true:1000:5 - "
+            + "NAME (String) : the name of the cache - "
+            + "ENABLE (true|false) : enables or disables the cache with that NAME - "
+            + "MAXSIZE (Integer) : the maximum size of the cache in number of entries - "
+            + "TIMEOUT (Integer) : the timeout for each cache entry, in seconds.",
+        type = AttributeType.STRING)
+    String[] cacheConfigurations();
 }

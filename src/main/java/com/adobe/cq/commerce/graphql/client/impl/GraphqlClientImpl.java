@@ -17,10 +17,15 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -51,11 +56,15 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.adobe.cq.commerce.graphql.client.CachingStrategy;
+import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -67,6 +76,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     protected HttpClient client;
     private Gson gson;
+    private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
 
     private String identifier;
     private String url;
@@ -92,6 +102,33 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         client = buildHttpClient();
         gson = new Gson();
+        configureCaches(configuration);
+    }
+
+    private void configureCaches(GraphqlClientConfiguration configuration) {
+        if (ArrayUtils.isNotEmpty(configuration.cacheConfigurations())) {
+            caches = new HashMap<>();
+            for (String cacheConfiguration : configuration.cacheConfigurations()) {
+                // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
+                if (StringUtils.isBlank(cacheConfiguration)) {
+                    continue;
+                }
+
+                String[] parts = cacheConfiguration.split(":");
+                if (parts.length != 4) {
+                    throw new IllegalStateException("Cache configuration entry doesn't have the right format --> " + cacheConfiguration);
+                }
+
+                if (Boolean.valueOf(parts[1])) {
+                    caches.put(parts[0], CacheBuilder.newBuilder()
+                        .maximumSize(Integer.valueOf(parts[2]))
+                        .expireAfterWrite(Integer.valueOf(parts[3]), TimeUnit.SECONDS)
+                        .build());
+                }
+            }
+        } else {
+            caches = null; // make sure it's always reset
+        }
     }
 
     @Override
@@ -104,8 +141,40 @@ public class GraphqlClientImpl implements GraphqlClient {
         return execute(request, typeOfT, typeofU, null);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
+        Cache<CacheKey, GraphqlResponse<Object, Object>> cache = toActiveCache(request, options);
+        if (cache != null) {
+            CacheKey key = new CacheKey(request, options);
+            try {
+                return (GraphqlResponse<T, U>) cache.get(key, () -> executeImpl(request, typeOfT, typeofU, options));
+            } catch (ExecutionException e) {
+                return null;
+            }
+        }
+        return executeImpl(request, typeOfT, typeofU, options);
+    }
+
+    private Cache<CacheKey, GraphqlResponse<Object, Object>> toActiveCache(GraphqlRequest request, RequestOptions options) {
+        if (caches == null || request.getQuery().trim().startsWith("mutation")) {
+            return null;
+        }
+
+        CachingStrategy cachingStrategy = options != null ? options.getCachingStrategy() : null;
+        if (cachingStrategy == null) {
+            return null;
+        }
+
+        DataFetchingPolicy dataFetchingPolicy = cachingStrategy.getDataFetchingPolicy();
+        if (!DataFetchingPolicy.CACHE_FIRST.equals(dataFetchingPolicy)) {
+            return null;
+        }
+
+        return caches.get(cachingStrategy.getCacheName());
+    }
+
+    private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query: " + request.getQuery());
         HttpResponse httpResponse;
         try {
