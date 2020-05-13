@@ -16,6 +16,9 @@ package com.adobe.cq.commerce.graphql.client;
 
 import java.lang.reflect.Type;
 
+import org.osgi.annotation.versioning.ProviderType;
+
+@ProviderType
 public interface GraphqlClient {
 
     /**
