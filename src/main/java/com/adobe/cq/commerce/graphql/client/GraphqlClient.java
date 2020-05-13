@@ -27,6 +27,13 @@ public interface GraphqlClient {
     public String getIdentifier();
 
     /**
+     * Returns the URL of the used GraphQL server endpoint.
+     * 
+     * @return The identifier value of this client.
+     */
+    public String getGraphQLEndpoint();
+
+    /**
      * Executes the given GraphQL request and deserializes the response data based on the types T and U.
      * The type T is used to deserialize the 'data' object of the GraphQL response, and the type U is used
      * to deserialize the 'errors' array of the GraphQL response.
