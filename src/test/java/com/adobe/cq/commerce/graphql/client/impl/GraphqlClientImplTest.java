@@ -236,4 +236,10 @@ public class GraphqlClientImplTest {
         GetQueryMatcher matcher = new GetQueryMatcher(request);
         Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
     }
+
+    @Test
+    public void testGetGraphQLEndpoint() throws Exception {
+        String endpointURL = graphqlClient.getGraphQLEndpoint();
+        assertEquals(MockGraphqlClientConfiguration.URL, endpointURL);
+    }
 }

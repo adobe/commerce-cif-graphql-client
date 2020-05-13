@@ -137,6 +137,11 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
+    public String getGraphQLEndpoint() {
+        return url;
+    }
+
+    @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU) {
         return execute(request, typeOfT, typeofU, null);
     }

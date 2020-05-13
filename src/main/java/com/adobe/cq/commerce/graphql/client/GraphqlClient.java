@@ -16,6 +16,9 @@ package com.adobe.cq.commerce.graphql.client;
 
 import java.lang.reflect.Type;
 
+import org.osgi.annotation.versioning.ProviderType;
+
+@ProviderType
 public interface GraphqlClient {
 
     /**
@@ -25,6 +28,13 @@ public interface GraphqlClient {
      * @return The identifier value of this client.
      */
     public String getIdentifier();
+
+    /**
+     * Returns the URL of the used GraphQL server endpoint.
+     * 
+     * @return The backend GraphQL server endpoint used by this client.
+     */
+    public String getGraphQLEndpoint();
 
     /**
      * Executes the given GraphQL request and deserializes the response data based on the types T and U.
