@@ -32,7 +32,7 @@ public interface GraphqlClient {
     /**
      * Returns the URL of the used GraphQL server endpoint.
      * 
-     * @return The identifier value of this client.
+     * @return The backend GraphQL server endpoint used by this client.
      */
     public String getGraphQLEndpoint();
 
