@@ -14,7 +14,9 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.ResourceResolverFactory;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -109,7 +111,12 @@ public class GraphqlClientAdapterFactoryTest {
         // Ensure that adapter returns null if not adapted from a resource
         Object target = factory.getAdapter(factory, Object.class);
         Assert.assertNull(target);
-
+        ResourceResolverFactory resourceResolverFactory = GraphqlAemContext.mockResourceResolverFactory(context);
+        try {
+            FieldUtils.writeField(factory, "resolverFactory", resourceResolverFactory, true);
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
         // Ensure that adapter returns null if not adapting to a GraphQL client
         Resource res = context.resourceResolver().getResource("/content/test");
         target = factory.getAdapter(res, Object.class);

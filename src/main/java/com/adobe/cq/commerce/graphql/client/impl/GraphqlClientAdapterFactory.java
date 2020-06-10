@@ -19,9 +19,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
+import org.apache.sling.api.resource.LoginException;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.ResourceResolver;
+import org.apache.sling.api.resource.ResourceResolverFactory;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.caconfig.ConfigurationBuilder;
+import org.apache.sling.serviceusermapping.ServiceUserMapped;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -35,6 +39,7 @@ import com.day.cq.commons.inherit.HierarchyNodeInheritanceValueMap;
 import com.day.cq.commons.inherit.InheritanceValueMap;
 import com.day.cq.wcm.api.Page;
 import com.day.cq.wcm.api.PageManager;
+import com.google.common.collect.ImmutableMap;
 
 @Component(
     service = { AdapterFactory.class },
@@ -43,15 +48,25 @@ import com.day.cq.wcm.api.PageManager;
         AdapterFactory.ADAPTER_CLASSES + "=" + GraphqlClientAdapterFactory.GRAPHQLCLIENT_CLASS_NAME })
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
+    private static final String CONFIGURATION_SUBSERVICE = "graphql-client-configuration";
+    private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
+
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
 
     protected static final String GRAPHQLCLIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
 
     protected static final String CONFIG_NAME = "cloudconfigs/commerce";
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
-
     protected Map<String, GraphqlClient> clients = new ConcurrentHashMap<>();
+
+    @Reference
+    private ServiceUserMapped serviceUserMapped;
+
+    @Reference
+    ResourceResolverFactory resolverFactory;
+
+    Map<String, Object> authInfo = ImmutableMap.of(ResourceResolverFactory.SUBSERVICE, CONFIGURATION_SUBSERVICE);
+    private ResourceResolver serviceResolver;
 
     @Reference(
         service = GraphqlClient.class,
@@ -74,33 +89,41 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
     @SuppressWarnings("unchecked")
     @Override
     public <AdapterType> AdapterType getAdapter(Object adaptable, Class<AdapterType> type) {
+        LOGGER.debug("Try to get a new graphql client from a resource");
         if (!(adaptable instanceof Resource) || type != GraphqlClient.class) {
             return null;
         }
 
-        Resource res = (Resource) adaptable;
+        try (ResourceResolver serviceResolver = resolverFactory.getServiceResourceResolver(authInfo)) {
+            Resource res = serviceResolver.getResource(((Resource) adaptable).getPath());
+            LOGGER.debug("Looking for a context configuration for the resource at {}", res.getPath());
+            ConfigurationBuilder configBuilder = res.adaptTo(ConfigurationBuilder.class);
+            ValueMap properties = configBuilder.name(CONFIG_NAME).asValueMap();
 
-        ConfigurationBuilder configBuilder = res.adaptTo(ConfigurationBuilder.class);
-        ValueMap properties = configBuilder.name(CONFIG_NAME).asValueMap();
+            String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
+            if (identifier == null) {
+                LOGGER.debug("No {} property found in the context configuration, falling back to reading it from the page",
+                    GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT);
+                identifier = readFallbackConfiguration(res);
+            }
 
-        String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
-        if (identifier == null) {
-            identifier = readFallbackConfiguration(res);
-        }
+            if (StringUtils.isEmpty(identifier)) {
+                LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res
+                    .getPath());
+                return null;
+            }
 
-        if (StringUtils.isEmpty(identifier)) {
-            LOGGER.error("Could not find {} property for given resource at {}", GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, res
-                .getPath());
+            GraphqlClient client = clients.get(identifier);
+            if (client == null) {
+                LOGGER.error("No GraphqlClient instance available for catalog identifier '{}'", identifier);
+                return null;
+            }
+
+            return (AdapterType) client;
+        } catch (LoginException e) {
+            LOGGER.error(e.getMessage(), e);
             return null;
         }
-
-        GraphqlClient client = clients.get(identifier);
-        if (client == null) {
-            LOGGER.error("No GraphqlClient instance available for catalog identifier '{}'", identifier);
-            return null;
-        }
-
-        return (AdapterType) client;
     }
 
     private String readFallbackConfiguration(Resource resource) {
