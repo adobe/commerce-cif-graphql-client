@@ -20,6 +20,16 @@ This installs everything by default to `localhost:4502` without any context path
 
 ## Using the GraphQL client
 
+### Prerequisites
+
+The GraphQL client needs a service user to read the configurations, so consumers must provide one or more user mappings. The minimum privilege matrix is the following:
+
+| **Path**     | **Privilege** |
+| -------------- | --------------- |
+| /conf          | jcr:read      |
+| /content       | jcr:read      |
+| /libs/settings | jcr:read       |
+
 To use this library in your project, just add the following maven dependency to your project and install the bundle in your AEM instance:
 
 ```xml
@@ -32,6 +42,8 @@ To use this library in your project, just add the following maven dependency to 
 ```
 
 You'll then have to setup and configure the client in your AEM instance.
+
+
 
 ## OSGi configuration
 
