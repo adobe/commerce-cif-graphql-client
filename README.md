@@ -22,13 +22,17 @@ This installs everything by default to `localhost:4502` without any context path
 
 ### Prerequisites
 
-The GraphQL client needs a service user to read the configurations, so consumers must provide one or more user mappings. The minimum privilege matrix is the following:
+The GraphQL client needs a service user to read the configurations, so consumers must provide one or more user mappings. The minimum privilege matrix for the service user(s) is the following:
 
 | **Path**     | **Privilege** |
 | -------------- | --------------- |
 | /conf          | jcr:read      |
 | /content       | jcr:read      |
 | /libs/settings | jcr:read       |
+
+You can either use one service user or an aggregate of several users, each with its own privilege set.
+
+### Using the library
 
 To use this library in your project, just add the following maven dependency to your project and install the bundle in your AEM instance:
 
