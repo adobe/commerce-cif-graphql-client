@@ -21,7 +21,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
-import org.apache.sling.caconfig.ConfigurationBuilder;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -79,9 +78,7 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         }
 
         Resource res = (Resource) adaptable;
-
-        ConfigurationBuilder configBuilder = res.adaptTo(ConfigurationBuilder.class);
-        ValueMap properties = configBuilder.name(CONFIG_NAME).asValueMap();
+        ValueMap properties = res.getValueMap();
 
         String identifier = properties.get(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
         if (identifier == null) {
