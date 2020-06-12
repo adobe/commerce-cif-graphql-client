@@ -32,7 +32,6 @@ public class GraphqlClientAdapterFactoryTest {
     public final AemContext context = GraphqlAemContext.createContext(ImmutableMap.of(
         "/content", "/context/graphql-client-adapter-factory-context.json",
         "/conf/test-config/settings", "/context/jcr-conf.json"));
-    
 
     @Test
     public void testGetClientForPageWithIdentifier() {
