@@ -23,6 +23,7 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     public static final String URL = "https://hostname/graphql";
     private String url;
     private Boolean acceptSelfSignedCertificates;
+    private Boolean allowHttpProtocol;
     private String[] httpHeaders;
     private String[] cacheConfigurations;
 
@@ -45,6 +46,12 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     public boolean acceptSelfSignedCertificates() {
         return acceptSelfSignedCertificates != null ? acceptSelfSignedCertificates
             : GraphqlClientConfiguration.ACCEPT_SELF_SIGNED_CERTIFICATES;
+    }
+
+    @Override
+    public boolean allowHttpProtocol() {
+        return allowHttpProtocol != null ? allowHttpProtocol
+            : GraphqlClientConfiguration.ALLOW_HTTP_PROTOCOL;
     }
 
     @Override
@@ -88,6 +95,10 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
 
     public void setAcceptSelfSignedCertificates(boolean acceptSelfSignedCertificates) {
         this.acceptSelfSignedCertificates = acceptSelfSignedCertificates;
+    }
+
+    public void setAllowHttpProtocol(Boolean allowHttpProtocol) {
+        this.allowHttpProtocol = allowHttpProtocol;
     }
 
     public void setHttpHeaders(String... httpHeaders) {

@@ -28,6 +28,7 @@ public @interface GraphqlClientConfiguration {
 
     int MAX_HTTP_CONNECTIONS_DEFAULT = 20;
     boolean ACCEPT_SELF_SIGNED_CERTIFICATES = false;
+    boolean ALLOW_HTTP_PROTOCOL = false;
 
     int DEFAULT_CONNECTION_TIMEOUT = 5000;
     int DEFAULT_SOCKET_TIMEOUT = 5000;
@@ -59,6 +60,12 @@ public @interface GraphqlClientConfiguration {
         description = "Enable insecure/developer mode to accept self-signed SSL certificates. Do NOT activate on production systems!",
         type = AttributeType.BOOLEAN)
     boolean acceptSelfSignedCertificates() default ACCEPT_SELF_SIGNED_CERTIFICATES;
+
+    @AttributeDefinition(
+        name = "Allow HTTP communication",
+        description = "Enable insecure/developer mode to allow communication via HTTP. Do NOT activate on production systems!",
+        type = AttributeType.BOOLEAN)
+    boolean allowHttpProtocol() default ALLOW_HTTP_PROTOCOL;
 
     @AttributeDefinition(
         name = "Max HTTP connections",

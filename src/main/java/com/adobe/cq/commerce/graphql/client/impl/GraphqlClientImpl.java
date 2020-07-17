@@ -37,9 +37,9 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
@@ -81,6 +81,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private String identifier;
     private String url;
     private boolean acceptSelfSignedCertificates;
+    private boolean allowHttpProtocol;
     private int maxHttpConnections;
     private HttpMethod httpMethod;
     private int connectionTimeout;
@@ -93,6 +94,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         identifier = configuration.identifier();
         url = configuration.url();
         acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
+        allowHttpProtocol = configuration.allowHttpProtocol();
         maxHttpConnections = configuration.maxHttpConnections();
         httpMethod = configuration.httpMethod();
         connectionTimeout = configuration.connectionTimeout();
@@ -227,8 +229,13 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
 
         // We use a pooled connection manager to support concurrent threads and connections
-        Registry<ConnectionSocketFactory> reg = RegistryBuilder.<ConnectionSocketFactory>create().register("https", sslsf).build();
-        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(reg);
+        RegistryBuilder<ConnectionSocketFactory> registryBuilder = RegistryBuilder.<ConnectionSocketFactory>create()
+            .register("https", sslsf);
+        if (allowHttpProtocol) {
+            LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
+            registryBuilder.register("http", PlainConnectionSocketFactory.getSocketFactory());
+        }
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(registryBuilder.build());
         cm.setMaxTotal(maxHttpConnections);
         cm.setDefaultMaxPerRoute(maxHttpConnections); // we just have one route to the GraphQL endpoint
 
