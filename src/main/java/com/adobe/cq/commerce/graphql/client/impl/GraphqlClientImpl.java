@@ -59,6 +59,7 @@ import org.slf4j.LoggerFactory;
 import com.adobe.cq.commerce.graphql.client.CachingStrategy;
 import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
+import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
@@ -78,30 +79,11 @@ public class GraphqlClientImpl implements GraphqlClient {
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
 
-    private String identifier;
-    private String url;
-    private boolean acceptSelfSignedCertificates;
-    private boolean allowHttpProtocol;
-    private int maxHttpConnections;
-    private HttpMethod httpMethod;
-    private int connectionTimeout;
-    private int socketTimeout;
-    private int requestPoolTimeout;
-    private String[] httpHeaders;
+    private GraphqlClientConfiguration configuration;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
-        identifier = configuration.identifier();
-        url = configuration.url();
-        acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
-        allowHttpProtocol = configuration.allowHttpProtocol();
-        maxHttpConnections = configuration.maxHttpConnections();
-        httpMethod = configuration.httpMethod();
-        connectionTimeout = configuration.connectionTimeout();
-        socketTimeout = configuration.socketTimeout();
-        requestPoolTimeout = configuration.requestPoolTimeout();
-        httpHeaders = configuration.httpHeaders();
-
+        this.configuration = configuration;
         client = buildHttpClient();
         gson = new Gson();
         configureCaches(configuration);
@@ -135,12 +117,17 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     @Override
     public String getIdentifier() {
-        return identifier;
+        return configuration.identifier();
     }
 
     @Override
     public String getGraphQLEndpoint() {
-        return url;
+        return configuration.url();
+    }
+
+    @Override
+    public GraphqlClientConfiguration getConfiguration() {
+        return configuration;
     }
 
     @Override
@@ -220,7 +207,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private HttpClient buildHttpClient() throws Exception {
         SSLConnectionSocketFactory sslsf = null;
-        if (acceptSelfSignedCertificates) {
+        if (configuration.acceptSelfSignedCertificates()) {
             LOGGER.warn("Self-signed SSL certificates are accepted. This should NOT be done on production systems!");
             SSLContext sslContext = SSLContextBuilder.create().loadTrustMaterial(new TrustAllStrategy()).build();
             sslsf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
@@ -231,18 +218,18 @@ public class GraphqlClientImpl implements GraphqlClient {
         // We use a pooled connection manager to support concurrent threads and connections
         RegistryBuilder<ConnectionSocketFactory> registryBuilder = RegistryBuilder.<ConnectionSocketFactory>create()
             .register("https", sslsf);
-        if (allowHttpProtocol) {
+        if (configuration.allowHttpProtocol()) {
             LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
             registryBuilder.register("http", PlainConnectionSocketFactory.getSocketFactory());
         }
         PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(registryBuilder.build());
-        cm.setMaxTotal(maxHttpConnections);
-        cm.setDefaultMaxPerRoute(maxHttpConnections); // we just have one route to the GraphQL endpoint
+        cm.setMaxTotal(configuration.maxHttpConnections());
+        cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint
 
         RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(connectionTimeout)
-            .setSocketTimeout(socketTimeout)
-            .setConnectionRequestTimeout(requestPoolTimeout)
+            .setConnectTimeout(configuration.connectionTimeout())
+            .setSocketTimeout(configuration.socketTimeout())
+            .setConnectionRequestTimeout(configuration.requestPoolTimeout())
             .build();
 
         return HttpClientBuilder.create()
@@ -253,12 +240,12 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     private HttpUriRequest buildRequest(GraphqlRequest request, RequestOptions options) throws UnsupportedEncodingException {
-        HttpMethod httpMethod = this.httpMethod;
+        HttpMethod httpMethod = this.configuration.httpMethod();
         if (options != null && options.getHttpMethod() != null) {
             httpMethod = options.getHttpMethod();
         }
 
-        RequestBuilder rb = RequestBuilder.create(httpMethod.toString()).setUri(url);
+        RequestBuilder rb = RequestBuilder.create(httpMethod.toString()).setUri(configuration.url());
         rb.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
 
         if (HttpMethod.GET.equals(httpMethod)) {
@@ -274,8 +261,8 @@ public class GraphqlClientImpl implements GraphqlClient {
             rb.setEntity(new StringEntity(gson.toJson(request)));
         }
 
-        if (httpHeaders != null) {
-            for (String httpHeader : httpHeaders) {
+        if (configuration.httpHeaders() != null) {
+            for (String httpHeader : configuration.httpHeaders()) {
                 // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
                 if (StringUtils.isBlank(httpHeader)) {
                     continue;

@@ -12,13 +12,11 @@
  *
  ******************************************************************************/
 
-package com.adobe.cq.commerce.graphql.client.impl;
+package com.adobe.cq.commerce.graphql.client;
 
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.AttributeType;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
-
-import com.adobe.cq.commerce.graphql.client.HttpMethod;
 
 @ObjectClassDefinition(name = "CIF GraphQL Client Configuration Factory")
 public @interface GraphqlClientConfiguration {

@@ -30,6 +30,7 @@ import org.junit.Test;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 
+import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Data;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Error;
