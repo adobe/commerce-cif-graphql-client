@@ -37,6 +37,13 @@ public interface GraphqlClient {
     public String getGraphQLEndpoint();
 
     /**
+     * Returns the complete configuration of the GraphQL client.
+     *
+     * @return GraphQL client configuration.
+     */
+    public GraphqlClientConfiguration getConfiguration();
+
+    /**
      * Executes the given GraphQL request and deserializes the response data based on the types T and U.
      * The type T is used to deserialize the 'data' object of the GraphQL response, and the type U is used
      * to deserialize the 'errors' array of the GraphQL response.

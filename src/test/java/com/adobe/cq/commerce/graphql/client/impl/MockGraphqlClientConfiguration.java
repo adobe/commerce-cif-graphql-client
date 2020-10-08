@@ -16,6 +16,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.lang.annotation.Annotation;
 
+import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 
 public class MockGraphqlClientConfiguration implements Annotation, GraphqlClientConfiguration {

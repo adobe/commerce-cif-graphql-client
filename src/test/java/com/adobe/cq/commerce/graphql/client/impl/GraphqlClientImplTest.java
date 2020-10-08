@@ -29,6 +29,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
@@ -62,17 +63,19 @@ public class GraphqlClientImplTest {
 
     private GraphqlClientImpl graphqlClient;
     private GraphqlRequest dummy = new GraphqlRequest("{dummy}");
+    private MockGraphqlClientConfiguration mockConfig;
 
     @Before
     public void setUp() throws Exception {
         graphqlClient = new GraphqlClientImpl();
 
-        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        mockConfig = new MockGraphqlClientConfiguration();
         // Add three test headers, one with extra white space around " : " to make sure we properly trim spaces, and one empty header
-        config.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE,
+        mockConfig.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : "
+            + CACHE_HEADER_VALUE,
             "");
 
-        graphqlClient.activate(config);
+        graphqlClient.activate(mockConfig);
         graphqlClient.client = Mockito.mock(HttpClient.class);
     }
 
@@ -241,5 +244,11 @@ public class GraphqlClientImplTest {
     public void testGetGraphQLEndpoint() throws Exception {
         String endpointURL = graphqlClient.getGraphQLEndpoint();
         assertEquals(MockGraphqlClientConfiguration.URL, endpointURL);
+    }
+
+    @Test
+    public void testGetConfiguration() {
+        GraphqlClientConfiguration configuration = graphqlClient.getConfiguration();
+        assertEquals(mockConfig, configuration);
     }
 }
