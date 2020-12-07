@@ -96,6 +96,9 @@ public class GraphqlClientImplTest {
         assertEquals("Some text", response.getData().text);
         assertEquals(42, response.getData().count.intValue());
 
+        assertEquals("{ \"data\": { \"text\": \"Some text\", \"count\": 42 }, \"errors\": [ { \"message\": \"Error message\" } ]}",
+            response.getRawData().replaceAll("\\n", "").replaceAll("\\s+", " "));
+
         // Check the response errors
         assertEquals(1, response.getErrors().size());
         Error error = response.getErrors().get(0);
