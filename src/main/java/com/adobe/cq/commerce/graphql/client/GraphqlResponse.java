@@ -20,6 +20,15 @@ public class GraphqlResponse<T, U> {
 
     protected T data;
     protected List<U> errors;
+    protected transient String rawData;
+
+    public String getRawData() {
+        return rawData;
+    }
+
+    public void setRawData(String rawData) {
+        this.rawData = rawData;
+    }
 
     public T getData() {
         return data;
