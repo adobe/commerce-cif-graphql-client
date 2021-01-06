@@ -62,7 +62,7 @@ public class GraphqlClientImplTest {
     }
 
     private GraphqlClientImpl graphqlClient;
-    private GraphqlRequest dummy = new GraphqlRequest("{dummy}");
+    private GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
     private MockGraphqlClientConfiguration mockConfig;
 
     @Before
