@@ -258,7 +258,7 @@ public class GraphqlClientImpl implements GraphqlClient {
                 rb.addParameter("variables", json);
             }
         } else {
-            rb.setEntity(new StringEntity(gson.toJson(request)));
+            rb.setEntity(new StringEntity(gson.toJson(request), StandardCharsets.UTF_8.name()));
         }
 
         if (configuration.httpHeaders() != null) {
