@@ -35,7 +35,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 public class GraphqlClientImplMetricsTest {
 
@@ -52,12 +51,11 @@ public class GraphqlClientImplMetricsTest {
 
     @Before
     public void setUp() throws Exception {
+        mockConfig.setUrl("http://foo.bar/api");
         aemContext.registerService(MetricRegistry.class, metricRegistry, "name", "cif");
         aemContext.registerInjectActivateService(graphqlClient);
         graphqlClient.activate(mockConfig);
         graphqlClient.client = mock(HttpClient.class);
-
-        mockConfig.setUrl("http://foo.bar/api");
     }
 
     @Test
