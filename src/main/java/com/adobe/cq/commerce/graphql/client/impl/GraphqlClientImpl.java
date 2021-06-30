@@ -11,7 +11,6 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.UnsupportedEncodingException;
@@ -20,8 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -69,9 +66,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
-import com.codahale.metrics.Counter;
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -89,7 +84,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private MetricRegistry metricsRegistry;
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
-    private Metrics metrics;
+    private GraphqlClientMetrics metrics;
     private GraphqlClientConfiguration configuration;
 
     @Activate
@@ -98,7 +93,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         client = buildHttpClient();
         gson = new Gson();
         configureCaches(configuration);
-        metrics = metricsRegistry != null ? new MetricsImpl(metricsRegistry, configuration) : Metrics.NOOP;
+        metrics = metricsRegistry != null ? new GraphqlClientMetricsImpl(metricsRegistry, configuration) : GraphqlClientMetrics.NOOP;
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
@@ -300,92 +295,5 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
 
         return rb.build();
-    }
-
-    /**
-     * This interface provides a facade of the metrics tracked by the {@link GraphqlClientImpl}. With {@link Metrics#NOOP} it provides a
-     * no-operation implementation for environments that don't have cif metrics enabled.
-     */
-    private interface Metrics {
-
-        Metrics NOOP = new Metrics() {
-            @Override public Runnable startRequestDurationTimer() {
-                return () -> {
-                    // do nothing
-                };
-            }
-
-            @Override public void incrementRequestErrorCount() {
-                // do nothing
-            }
-
-            @Override public void incrementRequestErrorCount(int status) {
-                // do nothing
-            }
-        };
-
-        /**
-         * Starts a request duration timer. The returned {@link Runnable} wraps the {@link Timer.Context#close()} and must be called in
-         * order to add the measurement to the metric.
-         *
-         * @return
-         */
-        Runnable startRequestDurationTimer();
-
-        /**
-         * Increments the generic request error count.
-         */
-        void incrementRequestErrorCount();
-
-        /**
-         * Increments the specific request error count for the given status.
-         *
-         * @param
-         */
-        void incrementRequestErrorCount(int status);
-
-    }
-
-    private static class MetricsImpl implements Metrics {
-
-        private static final String REQUEST_DURATION_METRIC = "graphql-client.request.duration";
-        private static final String REQUEST_ERROR_COUNT_METRIC = "graphql-client.request.error-count";
-        private static final String METRIC_LABEL_ENDPOINT = "endpoint";
-        private static final String METRIC_LABEL_STATUS_CODE = "status";
-
-        private final MetricRegistry metrics;
-        private final GraphqlClientConfiguration configuration;
-        private final Timer requestDurationTimer;
-        private final ConcurrentMap<Integer, Counter> requestErrorCounters;
-
-        public MetricsImpl(MetricRegistry metrics, GraphqlClientConfiguration configuration) {
-            this.metrics = metrics;
-            this.configuration = configuration;
-            this.requestDurationTimer = metrics.timer(REQUEST_DURATION_METRIC + ";endpoint=" + configuration.url());
-            this.requestErrorCounters = new ConcurrentHashMap<>();
-        }
-
-        @Override
-        public Runnable startRequestDurationTimer() {
-            return requestDurationTimer.time()::close;
-        }
-
-        @Override
-        public void incrementRequestErrorCount() {
-            incrementRequestErrorCount(0);
-        }
-
-        @Override
-        public void incrementRequestErrorCount(int status) {
-            requestErrorCounters.computeIfAbsent(status, k -> {
-                StringBuilder name = new StringBuilder();
-                name.append(REQUEST_ERROR_COUNT_METRIC);
-                name.append(';').append(METRIC_LABEL_ENDPOINT).append('=').append(configuration.url());
-                if (status > 0) {
-                    name.append(';').append(METRIC_LABEL_STATUS_CODE).append('=').append(status);
-                }
-                return metrics.counter(name.toString());
-            }).inc();
-        }
     }
 }
