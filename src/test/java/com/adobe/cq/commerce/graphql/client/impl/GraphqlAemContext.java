@@ -14,6 +14,7 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.Map;
@@ -37,6 +38,10 @@ public final class GraphqlAemContext {
     public static GraphqlClientAdapterFactory adapterFactory;
 
     private GraphqlAemContext() {}
+
+    public static AemContext createContext() {
+        return createContext(Collections.emptyMap());
+    }
 
     public static AemContext createContext(Map<String, String> contentPaths) {
         GraphqlAemContext.adapterFactory = new GraphqlClientAdapterFactory();

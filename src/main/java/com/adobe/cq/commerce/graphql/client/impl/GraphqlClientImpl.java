@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -52,6 +53,9 @@ import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +68,9 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -74,12 +81,20 @@ import com.google.gson.reflect.TypeToken;
 public class GraphqlClientImpl implements GraphqlClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
+    private static final String REQUEST_DURATION_METRIC = "graphql-client.request.duration";
+    private static final String REQUEST_ERROR_COUNT_METRIC = "graphql-client.request.error-count";
+    private static final String METRIC_LABEL_ENDPOINT = "endpoint";
+    private static final String METRIC_LABEL_STATUS_CODE = "status";
 
     protected HttpClient client;
+
+    @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
+    private MetricRegistry metrics;
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
-
     private GraphqlClientConfiguration configuration;
+    private Optional<Timer> requestDurationTimer;
+    private Map<Integer, Optional<Counter>> requestErrorCounters;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
@@ -170,10 +185,12 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query: " + request.getQuery());
+        Optional<Timer.Context> durationTimer = getRequestDurationTimer().map(Timer::time);
         HttpResponse httpResponse;
         try {
             httpResponse = client.execute(buildRequest(request, options));
         } catch (Exception e) {
+            getRequestErrorCounter().ifPresent(Counter::inc);
             throw new RuntimeException("Failed to send GraphQL request", e);
         }
 
@@ -183,7 +200,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             String json;
             try {
                 json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                durationTimer.ifPresent(Timer.Context::stop);
             } catch (Exception e) {
+                getRequestErrorCounter().ifPresent(Counter::inc);
                 throw new RuntimeException("Failed to read HTTP response content", e);
             }
 
@@ -201,8 +220,39 @@ public class GraphqlClientImpl implements GraphqlClient {
             return response;
         } else {
             EntityUtils.consumeQuietly(httpResponse.getEntity());
+            getRequestErrorCounter(statusLine.getStatusCode()).ifPresent(Counter::inc);
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
+    }
+
+    private Optional<Timer> getRequestDurationTimer() {
+        if (requestDurationTimer == null) {
+            requestDurationTimer = Optional.ofNullable(metrics)
+                .map(m -> m.timer(REQUEST_DURATION_METRIC + ";endpoint=" + configuration.url()));
+        }
+        return requestDurationTimer;
+    }
+
+    private Optional<Counter> getRequestErrorCounter() {
+        return getRequestErrorCounter(null);
+    }
+
+    private Optional<Counter> getRequestErrorCounter(Integer statusCode) {
+        if (requestErrorCounters == null) {
+            requestErrorCounters = new HashMap<>();
+        }
+        return requestErrorCounters.computeIfAbsent(statusCode, status -> {
+            if (metrics == null) {
+                return Optional.empty();
+            }
+            StringBuilder name = new StringBuilder();
+            name.append(REQUEST_ERROR_COUNT_METRIC);
+            name.append(';').append(METRIC_LABEL_ENDPOINT).append('=').append(configuration.url());
+            if (status != null) {
+                name.append(';').append(METRIC_LABEL_STATUS_CODE).append('=').append(status);
+            }
+            return Optional.of(metrics.counter(name.toString()));
+        });
     }
 
     private HttpClient buildHttpClient() throws Exception {
