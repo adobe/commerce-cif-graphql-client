@@ -182,7 +182,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         try {
             httpResponse = client.execute(buildRequest(request, options));
         } catch (Exception e) {
-            metrics.incrementRequestErrorCount();
+            metrics.incrementRequestErrors();
             throw new RuntimeException("Failed to send GraphQL request", e);
         }
 
@@ -194,7 +194,7 @@ public class GraphqlClientImpl implements GraphqlClient {
                 json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
                 stopTimer.run();
             } catch (Exception e) {
-                metrics.incrementRequestErrorCount();
+                metrics.incrementRequestErrors();
                 throw new RuntimeException("Failed to read HTTP response content", e);
             }
 
@@ -212,7 +212,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             return response;
         } else {
             EntityUtils.consumeQuietly(httpResponse.getEntity());
-            metrics.incrementRequestErrorCount(statusLine.getStatusCode());
+            metrics.incrementRequestErrors(statusLine.getStatusCode());
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }

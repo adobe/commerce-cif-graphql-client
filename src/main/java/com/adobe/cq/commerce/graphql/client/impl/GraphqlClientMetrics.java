@@ -16,10 +16,13 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import com.codahale.metrics.Timer;
 
 /**
- * This interface provides a facade of the metrics tracked by the {@link GraphqlClientImpl}. With {@link GraphqlClientMetrics#NOOP} it provides a
- * no-operation implementation for environments that don't have cif metrics enabled.
+ * This interface provides a facade of the metrics tracked by the {@link GraphqlClientImpl}. With {@link GraphqlClientMetrics#NOOP} it
+ * provides a no-operation implementation for environments that don't have cif metrics enabled.
  */
 interface GraphqlClientMetrics {
+
+    String REQUEST_DURATION_METRIC = "graphql-client.request.duration";
+    String REQUEST_ERROR_COUNT_METRIC = "graphql-client.request.errors";
 
     GraphqlClientMetrics NOOP = new GraphqlClientMetrics() {
         @Override public Runnable startRequestDurationTimer() {
@@ -28,11 +31,11 @@ interface GraphqlClientMetrics {
             };
         }
 
-        @Override public void incrementRequestErrorCount() {
+        @Override public void incrementRequestErrors() {
             // do nothing
         }
 
-        @Override public void incrementRequestErrorCount(int status) {
+        @Override public void incrementRequestErrors(int status) {
             // do nothing
         }
     };
@@ -48,13 +51,13 @@ interface GraphqlClientMetrics {
     /**
      * Increments the generic request error count.
      */
-    void incrementRequestErrorCount();
+    void incrementRequestErrors();
 
     /**
      * Increments the specific request error count for the given status.
      *
      * @param
      */
-    void incrementRequestErrorCount(int status);
+    void incrementRequestErrors(int status);
 
 }

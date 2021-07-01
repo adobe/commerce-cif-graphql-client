@@ -23,8 +23,6 @@ import com.codahale.metrics.Timer;
 
 class GraphqlClientMetricsImpl implements GraphqlClientMetrics {
 
-    private static final String REQUEST_DURATION_METRIC = "graphql-client.request.duration";
-    private static final String REQUEST_ERROR_COUNT_METRIC = "graphql-client.request.error-count";
     private static final String METRIC_LABEL_ENDPOINT = "endpoint";
     private static final String METRIC_LABEL_STATUS_CODE = "status";
 
@@ -46,12 +44,12 @@ class GraphqlClientMetricsImpl implements GraphqlClientMetrics {
     }
 
     @Override
-    public void incrementRequestErrorCount() {
-        incrementRequestErrorCount(0);
+    public void incrementRequestErrors() {
+        incrementRequestErrors(0);
     }
 
     @Override
-    public void incrementRequestErrorCount(int status) {
+    public void incrementRequestErrors(int status) {
         requestErrorCounters.computeIfAbsent(status, k -> {
             StringBuilder name = new StringBuilder();
             name.append(REQUEST_ERROR_COUNT_METRIC);
