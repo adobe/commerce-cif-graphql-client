@@ -14,7 +14,6 @@
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,7 +22,6 @@ import java.util.function.Supplier;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.codahale.metrics.Counter;
-import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 

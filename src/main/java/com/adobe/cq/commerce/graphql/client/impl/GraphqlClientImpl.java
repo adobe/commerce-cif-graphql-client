@@ -124,10 +124,16 @@ public class GraphqlClientImpl implements GraphqlClient {
                     String cacheName = parts[0];
                     int maxSize = Integer.parseInt(parts[2]);
                     int ttl = Integer.parseInt(parts[3]);
-                    Cache<CacheKey, GraphqlResponse<?, ?>> cache = CacheBuilder.newBuilder()
+                    CacheBuilder<?, ?> cacheBuilder = CacheBuilder.newBuilder()
                         .maximumSize(maxSize)
-                        .expireAfterWrite(ttl, TimeUnit.SECONDS)
-                        .build();
+                        .expireAfterWrite(ttl, TimeUnit.SECONDS);
+
+                    // if we have metrics, record cache stats
+                    if (metrics != GraphqlClientMetrics.NOOP) {
+                        cacheBuilder = cacheBuilder.recordStats();
+                    }
+
+                    Cache<CacheKey, GraphqlResponse<?, ?>> cache = (Cache<CacheKey, GraphqlResponse<?, ?>>) cacheBuilder.build();
                     caches.put(cacheName, cache);
                     metrics.addCacheMetric(GraphqlClientMetrics.CACHE_HIT_METRIC, cacheName, () -> cache.stats().hitCount());
                     metrics.addCacheMetric(GraphqlClientMetrics.CACHE_MISS_METRIC, cacheName, () -> cache.stats().missCount());

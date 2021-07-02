@@ -21,7 +21,6 @@ import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.sling.testing.mock.osgi.MockOsgi;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -47,11 +46,9 @@ public class GraphqlClientImplMetricsTest {
     private final GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
     private final GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
 
-    private static class Data {
-    }
+    private static class Data {}
 
-    private static class Error {
-    }
+    private static class Error {}
 
     @Before
     public void setUp() {
