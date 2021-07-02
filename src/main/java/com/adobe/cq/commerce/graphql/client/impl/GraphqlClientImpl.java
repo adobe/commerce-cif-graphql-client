@@ -51,6 +51,7 @@ import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicyOption;
@@ -83,7 +84,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
     private MetricRegistry metricsRegistry;
     private Gson gson;
-    private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
+    private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private GraphqlClientMetrics metrics;
     private GraphqlClientConfiguration configuration;
 
@@ -92,8 +93,17 @@ public class GraphqlClientImpl implements GraphqlClient {
         this.configuration = configuration;
         client = buildHttpClient();
         gson = new Gson();
+        metrics = metricsRegistry != null
+            ? new GraphqlClientMetricsImpl(metricsRegistry, configuration)
+            : GraphqlClientMetrics.NOOP;
         configureCaches(configuration);
-        metrics = metricsRegistry != null ? new GraphqlClientMetricsImpl(metricsRegistry, configuration) : GraphqlClientMetrics.NOOP;
+    }
+
+    @Deactivate
+    protected void deactivate() {
+        if (metrics instanceof GraphqlClientMetricsImpl) {
+            ((GraphqlClientMetricsImpl) metrics).close();
+        }
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
@@ -110,11 +120,19 @@ public class GraphqlClientImpl implements GraphqlClient {
                     throw new IllegalStateException("Cache configuration entry doesn't have the right format --> " + cacheConfiguration);
                 }
 
-                if (Boolean.valueOf(parts[1])) {
-                    caches.put(parts[0], CacheBuilder.newBuilder()
-                        .maximumSize(Integer.valueOf(parts[2]))
-                        .expireAfterWrite(Integer.valueOf(parts[3]), TimeUnit.SECONDS)
-                        .build());
+                if (Boolean.parseBoolean(parts[1])) {
+                    String cacheName = parts[0];
+                    int maxSize = Integer.parseInt(parts[2]);
+                    int ttl = Integer.parseInt(parts[3]);
+                    Cache<CacheKey, GraphqlResponse<?, ?>> cache = CacheBuilder.newBuilder()
+                        .maximumSize(maxSize)
+                        .expireAfterWrite(ttl, TimeUnit.SECONDS)
+                        .build();
+                    caches.put(cacheName, cache);
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_HIT_METRIC, cacheName, () -> cache.stats().hitCount());
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_MISS_METRIC, cacheName, () -> cache.stats().missCount());
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_EVICTION_METRIC, cacheName, () -> cache.stats().evictionCount());
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_USAGE_METRIC, cacheName, () -> (float) cache.size() / maxSize);
                 }
             }
         } else {
@@ -145,7 +163,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     @SuppressWarnings("unchecked")
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
-        Cache<CacheKey, GraphqlResponse<Object, Object>> cache = toActiveCache(request, options);
+        Cache<CacheKey, GraphqlResponse<?, ?>> cache = toActiveCache(request, options);
         if (cache != null) {
             CacheKey key = new CacheKey(request, options);
             try {
@@ -157,7 +175,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         return executeImpl(request, typeOfT, typeofU, options);
     }
 
-    private Cache<CacheKey, GraphqlResponse<Object, Object>> toActiveCache(GraphqlRequest request, RequestOptions options) {
+    private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
         if (caches == null || request.getQuery().trim().startsWith("mutation")) {
             return null;
         }

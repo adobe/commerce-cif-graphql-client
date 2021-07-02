@@ -13,29 +13,54 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 
-class GraphqlClientMetricsImpl implements GraphqlClientMetrics {
+class GraphqlClientMetricsImpl implements GraphqlClientMetrics, Closeable {
 
+    private static final String METRIC_LABEL_IDENTIFIER = "identifier";
     private static final String METRIC_LABEL_ENDPOINT = "endpoint";
     private static final String METRIC_LABEL_STATUS_CODE = "status";
+    private static final String METRIC_LABEL_CACHE_NAME = "cacheName";
 
     private final MetricRegistry metrics;
     private final GraphqlClientConfiguration configuration;
     private final Timer requestDurationTimer;
     private final ConcurrentMap<Integer, Counter> requestErrorCounters;
+    private final List<Runnable> disposables = new LinkedList<>();
 
     GraphqlClientMetricsImpl(MetricRegistry metrics, GraphqlClientConfiguration configuration) {
         this.metrics = metrics;
         this.configuration = configuration;
-        this.requestDurationTimer = metrics.timer(REQUEST_DURATION_METRIC + ";endpoint=" + configuration.url());
+        this.requestDurationTimer = metrics.timer(REQUEST_DURATION_METRIC
+            + ';' + METRIC_LABEL_ENDPOINT + '=' + configuration.url());
         this.requestErrorCounters = new ConcurrentHashMap<>();
+    }
+
+    @Override
+    public void close() {
+        disposables.forEach(Runnable::run);
+        disposables.clear();
+    }
+
+    @Override
+    public void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier) {
+        String metricNameAndLabels = metricName
+            + ';' + METRIC_LABEL_IDENTIFIER + '=' + configuration.identifier()
+            + ';' + METRIC_LABEL_CACHE_NAME + '=' + cacheName;
+        metrics.gauge(metricNameAndLabels, () -> valueSupplier::get);
+        disposables.add(() -> metrics.remove(metricNameAndLabels));
     }
 
     @Override
