@@ -29,10 +29,17 @@ interface GraphqlClientMetrics {
     String CACHE_MISS_METRIC = "graphql-client.cache.misses";
     String CACHE_EVICTION_METRIC = "graphql-client.cache.evictions";
     String CACHE_USAGE_METRIC = "graphql-client.cache.usage";
+    String CONNECTION_POOL_AVAILABLE_METRIC = "graphql-client.connection-pool.available-connections";
+    String CONNECTION_POOL_PENDING_METRIC = "graphql-client.connection-pool.pending-requests";
+    String CONNECTION_POOL_USAGE_METRIC = "graphql-client.connection-pool.usage";
 
     GraphqlClientMetrics NOOP = new GraphqlClientMetrics() {
 
-        @Override public void addCacheMetric(String metric, String cacheName, Supplier<? extends Number> valueSupplier) {
+        @Override public void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier) {
+            //do nothing
+        }
+
+        @Override public void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier) {
             // do nothing
         }
 
@@ -52,9 +59,14 @@ interface GraphqlClientMetrics {
     };
 
     /**
+     * Adds a connection pool metric.
+     */
+    void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier);
+
+    /**
      * Adds a cache metric.
      */
-    void addCacheMetric(String metric, String cacheName, Supplier<? extends Number> valueSupplier);
+    void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier);
 
     /**
      * Starts a request duration timer. The returned {@link Runnable} wraps the {@link Timer.Context#close()} and must be called in
