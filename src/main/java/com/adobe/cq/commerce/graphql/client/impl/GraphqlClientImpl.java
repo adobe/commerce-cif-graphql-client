@@ -11,7 +11,6 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.UnsupportedEncodingException;
@@ -52,6 +51,9 @@ import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +66,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -76,9 +79,12 @@ public class GraphqlClientImpl implements GraphqlClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
 
     protected HttpClient client;
+
+    @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
+    private MetricRegistry metricsRegistry;
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
-
+    private GraphqlClientMetrics metrics;
     private GraphqlClientConfiguration configuration;
 
     @Activate
@@ -87,6 +93,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         client = buildHttpClient();
         gson = new Gson();
         configureCaches(configuration);
+        metrics = metricsRegistry != null ? new GraphqlClientMetricsImpl(metricsRegistry, configuration) : GraphqlClientMetrics.NOOP;
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
@@ -170,10 +177,12 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query: " + request.getQuery());
+        Runnable stopTimer = metrics.startRequestDurationTimer();
         HttpResponse httpResponse;
         try {
             httpResponse = client.execute(buildRequest(request, options));
         } catch (Exception e) {
+            metrics.incrementRequestErrors();
             throw new RuntimeException("Failed to send GraphQL request", e);
         }
 
@@ -183,7 +192,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             String json;
             try {
                 json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                stopTimer.run();
             } catch (Exception e) {
+                metrics.incrementRequestErrors();
                 throw new RuntimeException("Failed to read HTTP response content", e);
             }
 
@@ -201,6 +212,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             return response;
         } else {
             EntityUtils.consumeQuietly(httpResponse.getEntity());
+            metrics.incrementRequestErrors(statusLine.getStatusCode());
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }

@@ -16,6 +16,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -165,6 +166,20 @@ public class TestUtils {
         Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
 
         return json;
+    }
+
+    public static void setupHttpResponse(InputStream data, HttpClient httpClient, int httpCode) throws IOException {
+        HttpEntity mockedHttpEntity = Mockito.mock(HttpEntity.class);
+        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
+        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
+
+        Mockito.when(mockedHttpEntity.getContent()).thenReturn(data);
+
+        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
+        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+
+        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
+        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
     }
 
     public static void setupNullResponse(HttpClient httpClient) throws IOException {
