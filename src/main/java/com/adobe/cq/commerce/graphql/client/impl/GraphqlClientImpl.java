@@ -46,6 +46,8 @@ import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.osgi.services.HttpClientBuilderFactory;
+import org.apache.http.pool.PoolStats;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
@@ -83,6 +85,9 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
     private MetricRegistry metricsRegistry;
+    @Reference
+    private HttpClientBuilderFactory clientBuilderFactory = HttpClientBuilder::create;
+
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private GraphqlClientMetrics metrics;
@@ -91,12 +96,13 @@ public class GraphqlClientImpl implements GraphqlClient {
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
         this.configuration = configuration;
-        client = buildHttpClient();
         gson = new Gson();
         metrics = metricsRegistry != null
             ? new GraphqlClientMetricsImpl(metricsRegistry, configuration)
             : GraphqlClientMetrics.NOOP;
+
         configureCaches(configuration);
+        configureHttpClient();
     }
 
     @Deactivate
@@ -241,8 +247,8 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
     }
 
-    private HttpClient buildHttpClient() throws Exception {
-        SSLConnectionSocketFactory sslsf = null;
+    private void configureHttpClient() throws Exception {
+        SSLConnectionSocketFactory sslsf;
         if (configuration.acceptSelfSignedCertificates()) {
             LOGGER.warn("Self-signed SSL certificates are accepted. This should NOT be done on production systems!");
             SSLContext sslContext = SSLContextBuilder.create().loadTrustMaterial(new TrustAllStrategy()).build();
@@ -262,13 +268,20 @@ public class GraphqlClientImpl implements GraphqlClient {
         cm.setMaxTotal(configuration.maxHttpConnections());
         cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint
 
+        metrics.addConnectionPoolMetric(GraphqlClientMetrics.CONNECTION_POOL_PENDING_METRIC, () -> cm.getTotalStats().getPending());
+        metrics.addConnectionPoolMetric(GraphqlClientMetrics.CONNECTION_POOL_AVAILABLE_METRIC, () -> cm.getTotalStats().getAvailable());
+        metrics.addConnectionPoolMetric(GraphqlClientMetrics.CONNECTION_POOL_USAGE_METRIC, () -> {
+            PoolStats stats = cm.getTotalStats();
+            return (float) stats.getLeased() / stats.getMax();
+        });
+
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(configuration.connectionTimeout())
             .setSocketTimeout(configuration.socketTimeout())
             .setConnectionRequestTimeout(configuration.requestPoolTimeout())
             .build();
 
-        return HttpClientBuilder.create()
+        client = clientBuilderFactory.newBuilder()
             .setDefaultRequestConfig(requestConfig)
             .setConnectionManager(cm)
             .disableCookieManagement()

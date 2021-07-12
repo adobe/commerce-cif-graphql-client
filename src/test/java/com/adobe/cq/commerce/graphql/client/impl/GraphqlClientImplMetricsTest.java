@@ -19,6 +19,8 @@ import java.io.InputStream;
 
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.sling.testing.mock.osgi.MockOsgi;
 import org.junit.Before;
 import org.junit.Rule;
@@ -52,6 +54,7 @@ public class GraphqlClientImplMetricsTest {
 
     @Before
     public void setUp() {
+        aemContext.registerService(HttpClientBuilderFactory.class, HttpClientBuilder::create);
         aemContext.registerService(MetricRegistry.class, metricRegistry, "name", "cif");
         aemContext.registerInjectActivateService(graphqlClient,
             "identifier", "default",
@@ -102,6 +105,27 @@ public class GraphqlClientImplMetricsTest {
         assertNotNull(barEvictions);
         Gauge<?> barUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;identifier=default;cacheName=bar");
         assertNotNull(barUsage);
+
+        // and when, then
+        MockOsgi.deactivate(graphqlClient, aemContext.bundleContext());
+        assertEquals(0, metricRegistry.getGauges().size());
+    }
+
+    @Test
+    public void testConnectionPoolMetricsAddedAndRemoved() throws IOException {
+        // given
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
+            "identifier", "default");
+
+        // when, then
+        Gauge<?> availableConnections = metricRegistry.getGauges().get(
+            "graphql-client.connection-pool.available-connections;identifier=default");
+        assertNotNull(availableConnections);
+        Gauge<?> pendingRequests = metricRegistry.getGauges().get("graphql-client.connection-pool.pending-requests;identifier=default");
+        assertNotNull(pendingRequests);
+        Gauge<?> usage = metricRegistry.getGauges().get("graphql-client.connection-pool.usage;identifier=default");
+        assertNotNull(usage);
 
         // and when, then
         MockOsgi.deactivate(graphqlClient, aemContext.bundleContext());

@@ -53,6 +53,14 @@ class GraphqlClientMetricsImpl implements GraphqlClientMetrics, Closeable {
     }
 
     @Override
+    public void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier) {
+        String metricNameAndLabels = metricName
+            + ';' + METRIC_LABEL_IDENTIFIER + '=' + configuration.identifier();
+        metrics.gauge(metricNameAndLabels, () -> valueSupplier::get);
+        disposables.add(() -> metrics.remove(metricNameAndLabels));
+    }
+
+    @Override
     public void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier) {
         String metricNameAndLabels = metricName
             + ';' + METRIC_LABEL_IDENTIFIER + '=' + configuration.identifier()
