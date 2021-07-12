@@ -19,12 +19,16 @@ import java.io.InputStream;
 
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.osgi.services.HttpClientBuilderFactory;
+import org.apache.sling.testing.mock.osgi.MockOsgi;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import io.wcm.testing.mock.aem.junit.AemContext;
@@ -43,18 +47,18 @@ public class GraphqlClientImplMetricsTest {
     private final MetricRegistry metricRegistry = new MetricRegistry();
     private final GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
     private final GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
-    private final MockGraphqlClientConfiguration mockConfig = new MockGraphqlClientConfiguration();
 
     private static class Data {}
 
     private static class Error {}
 
     @Before
-    public void setUp() throws Exception {
-        mockConfig.setUrl("http://foo.bar/api");
+    public void setUp() {
+        aemContext.registerService(HttpClientBuilderFactory.class, HttpClientBuilder::create);
         aemContext.registerService(MetricRegistry.class, metricRegistry, "name", "cif");
-        aemContext.registerInjectActivateService(graphqlClient);
-        graphqlClient.activate(mockConfig);
+        aemContext.registerInjectActivateService(graphqlClient,
+            "identifier", "default",
+            "url", "http://foo.bar/api");
         graphqlClient.client = mock(HttpClient.class);
     }
 
@@ -70,6 +74,62 @@ public class GraphqlClientImplMetricsTest {
         Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;endpoint=http://foo.bar/api");
         assertNotNull(timer);
         assertEquals(1, timer.getCount());
+    }
+
+    @Test
+    public void testCacheMetricsAddedAndRemovedForMultipleCaches() throws IOException {
+        // given
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
+            "identifier", "default",
+            "url", "http://foo.bar/api",
+            "cacheConfigurations", new String[] {
+                "foo:true:100:100",
+                "bar:true:100:100"
+            });
+
+        // when, then
+        Gauge<?> fooHits = metricRegistry.getGauges().get("graphql-client.cache.hits;identifier=default;cacheName=foo");
+        assertNotNull(fooHits);
+        Gauge<?> fooMisses = metricRegistry.getGauges().get("graphql-client.cache.misses;identifier=default;cacheName=foo");
+        assertNotNull(fooMisses);
+        Gauge<?> fooEvictions = metricRegistry.getGauges().get("graphql-client.cache.evictions;identifier=default;cacheName=foo");
+        assertNotNull(fooEvictions);
+        Gauge<?> fooUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;identifier=default;cacheName=foo");
+        assertNotNull(fooUsage);
+        Gauge<?> barHits = metricRegistry.getGauges().get("graphql-client.cache.hits;identifier=default;cacheName=bar");
+        assertNotNull(barHits);
+        Gauge<?> barMisses = metricRegistry.getGauges().get("graphql-client.cache.misses;identifier=default;cacheName=bar");
+        assertNotNull(barMisses);
+        Gauge<?> barEvictions = metricRegistry.getGauges().get("graphql-client.cache.evictions;identifier=default;cacheName=bar");
+        assertNotNull(barEvictions);
+        Gauge<?> barUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;identifier=default;cacheName=bar");
+        assertNotNull(barUsage);
+
+        // and when, then
+        MockOsgi.deactivate(graphqlClient, aemContext.bundleContext());
+        assertEquals(0, metricRegistry.getGauges().size());
+    }
+
+    @Test
+    public void testConnectionPoolMetricsAddedAndRemoved() throws IOException {
+        // given
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
+            "identifier", "default");
+
+        // when, then
+        Gauge<?> availableConnections = metricRegistry.getGauges().get(
+            "graphql-client.connection-pool.available-connections;identifier=default");
+        assertNotNull(availableConnections);
+        Gauge<?> pendingRequests = metricRegistry.getGauges().get("graphql-client.connection-pool.pending-requests;identifier=default");
+        assertNotNull(pendingRequests);
+        Gauge<?> usage = metricRegistry.getGauges().get("graphql-client.connection-pool.usage;identifier=default");
+        assertNotNull(usage);
+
+        // and when, then
+        MockOsgi.deactivate(graphqlClient, aemContext.bundleContext());
+        assertEquals(0, metricRegistry.getGauges().size());
     }
 
     @Test

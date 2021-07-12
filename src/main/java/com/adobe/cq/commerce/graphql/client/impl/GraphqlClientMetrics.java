@@ -13,6 +13,8 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.function.Supplier;
+
 import com.codahale.metrics.Timer;
 
 /**
@@ -23,8 +25,24 @@ interface GraphqlClientMetrics {
 
     String REQUEST_DURATION_METRIC = "graphql-client.request.duration";
     String REQUEST_ERROR_COUNT_METRIC = "graphql-client.request.errors";
+    String CACHE_HIT_METRIC = "graphql-client.cache.hits";
+    String CACHE_MISS_METRIC = "graphql-client.cache.misses";
+    String CACHE_EVICTION_METRIC = "graphql-client.cache.evictions";
+    String CACHE_USAGE_METRIC = "graphql-client.cache.usage";
+    String CONNECTION_POOL_AVAILABLE_METRIC = "graphql-client.connection-pool.available-connections";
+    String CONNECTION_POOL_PENDING_METRIC = "graphql-client.connection-pool.pending-requests";
+    String CONNECTION_POOL_USAGE_METRIC = "graphql-client.connection-pool.usage";
 
     GraphqlClientMetrics NOOP = new GraphqlClientMetrics() {
+
+        @Override public void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier) {
+            //do nothing
+        }
+
+        @Override public void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier) {
+            // do nothing
+        }
+
         @Override public Runnable startRequestDurationTimer() {
             return () -> {
                 // do nothing
@@ -39,6 +57,16 @@ interface GraphqlClientMetrics {
             // do nothing
         }
     };
+
+    /**
+     * Adds a connection pool metric.
+     */
+    void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier);
+
+    /**
+     * Adds a cache metric.
+     */
+    void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier);
 
     /**
      * Starts a request duration timer. The returned {@link Runnable} wraps the {@link Timer.Context#close()} and must be called in
