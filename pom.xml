@@ -138,6 +138,7 @@
                     <preparationGoals>clean install</preparationGoals>
                     <goals>deploy</goals>
                     <projectVersionPolicyId>OddEvenVersionPolicy</projectVersionPolicyId>
+                    <pushChanges>false</pushChanges>
                 </configuration>
             </plugin>
 
