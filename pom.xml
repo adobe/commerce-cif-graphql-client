@@ -17,7 +17,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.adobe.commerce.cif</groupId>
     <artifactId>graphql-client</artifactId>
-    <version>1.7.2-SNAPSHOT</version>
+    <version>1.7.3-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
     <name>Generic GraphQL client</name>
@@ -51,7 +51,6 @@
 
     <build>
         <plugins>
-
             <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
@@ -139,6 +138,7 @@
                     <preparationGoals>clean install</preparationGoals>
                     <goals>deploy</goals>
                     <projectVersionPolicyId>OddEvenVersionPolicy</projectVersionPolicyId>
+                    <pushChanges>false</pushChanges>
                 </configuration>
             </plugin>
 
@@ -310,8 +310,8 @@
 
             <plugin>
                 <groupId>org.apache.sling</groupId>
-                <artifactId>maven-sling-plugin</artifactId>
-                <version>2.1.0</version>
+                <artifactId>sling-maven-plugin</artifactId>
+                <version>2.4.2</version>
                 <configuration>
                     <slingUrl>http://${aem.host}:${aem.port}${aem.contextPath}/system/console</slingUrl>
                 </configuration>
@@ -418,6 +418,28 @@
     </dependencies>
 
     <profiles>
+        <profile>
+            <id>autoInstallBundle</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.sling</groupId>
+                        <artifactId>sling-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>install-bundle</id>
+                                <goals>
+                                    <goal>install</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <!-- GPG Signature on release -->
         <profile>
             <id>release-sign-artifacts</id>

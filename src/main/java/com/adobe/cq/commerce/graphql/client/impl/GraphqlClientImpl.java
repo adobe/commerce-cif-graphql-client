@@ -11,7 +11,6 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.UnsupportedEncodingException;
@@ -47,11 +46,17 @@ import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.osgi.services.HttpClientBuilderFactory;
+import org.apache.http.pool.PoolStats;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +69,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -76,17 +82,34 @@ public class GraphqlClientImpl implements GraphqlClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
 
     protected HttpClient client;
-    private Gson gson;
-    private Map<String, Cache<CacheKey, GraphqlResponse<Object, Object>>> caches;
 
+    @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
+    private MetricRegistry metricsRegistry;
+    @Reference
+    private HttpClientBuilderFactory clientBuilderFactory = HttpClientBuilder::create;
+
+    private Gson gson;
+    private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
+    private GraphqlClientMetrics metrics;
     private GraphqlClientConfiguration configuration;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
         this.configuration = configuration;
-        client = buildHttpClient();
         gson = new Gson();
+        metrics = metricsRegistry != null
+            ? new GraphqlClientMetricsImpl(metricsRegistry, configuration)
+            : GraphqlClientMetrics.NOOP;
+
         configureCaches(configuration);
+        configureHttpClient();
+    }
+
+    @Deactivate
+    protected void deactivate() {
+        if (metrics instanceof GraphqlClientMetricsImpl) {
+            ((GraphqlClientMetricsImpl) metrics).close();
+        }
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
@@ -103,11 +126,25 @@ public class GraphqlClientImpl implements GraphqlClient {
                     throw new IllegalStateException("Cache configuration entry doesn't have the right format --> " + cacheConfiguration);
                 }
 
-                if (Boolean.valueOf(parts[1])) {
-                    caches.put(parts[0], CacheBuilder.newBuilder()
-                        .maximumSize(Integer.valueOf(parts[2]))
-                        .expireAfterWrite(Integer.valueOf(parts[3]), TimeUnit.SECONDS)
-                        .build());
+                if (Boolean.parseBoolean(parts[1])) {
+                    String cacheName = parts[0];
+                    int maxSize = Integer.parseInt(parts[2]);
+                    int ttl = Integer.parseInt(parts[3]);
+                    CacheBuilder<?, ?> cacheBuilder = CacheBuilder.newBuilder()
+                        .maximumSize(maxSize)
+                        .expireAfterWrite(ttl, TimeUnit.SECONDS);
+
+                    // if we have metrics, record cache stats
+                    if (metrics != GraphqlClientMetrics.NOOP) {
+                        cacheBuilder = cacheBuilder.recordStats();
+                    }
+
+                    Cache<CacheKey, GraphqlResponse<?, ?>> cache = (Cache<CacheKey, GraphqlResponse<?, ?>>) cacheBuilder.build();
+                    caches.put(cacheName, cache);
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_HIT_METRIC, cacheName, () -> cache.stats().hitCount());
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_MISS_METRIC, cacheName, () -> cache.stats().missCount());
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_EVICTION_METRIC, cacheName, () -> cache.stats().evictionCount());
+                    metrics.addCacheMetric(GraphqlClientMetrics.CACHE_USAGE_METRIC, cacheName, () -> (float) cache.size() / maxSize);
                 }
             }
         } else {
@@ -138,7 +175,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     @SuppressWarnings("unchecked")
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
-        Cache<CacheKey, GraphqlResponse<Object, Object>> cache = toActiveCache(request, options);
+        Cache<CacheKey, GraphqlResponse<?, ?>> cache = toActiveCache(request, options);
         if (cache != null) {
             CacheKey key = new CacheKey(request, options);
             try {
@@ -150,7 +187,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         return executeImpl(request, typeOfT, typeofU, options);
     }
 
-    private Cache<CacheKey, GraphqlResponse<Object, Object>> toActiveCache(GraphqlRequest request, RequestOptions options) {
+    private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
         if (caches == null || request.getQuery().trim().startsWith("mutation")) {
             return null;
         }
@@ -170,10 +207,12 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query: " + request.getQuery());
+        Runnable stopTimer = metrics.startRequestDurationTimer();
         HttpResponse httpResponse;
         try {
             httpResponse = client.execute(buildRequest(request, options));
         } catch (Exception e) {
+            metrics.incrementRequestErrors();
             throw new RuntimeException("Failed to send GraphQL request", e);
         }
 
@@ -183,7 +222,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             String json;
             try {
                 json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                stopTimer.run();
             } catch (Exception e) {
+                metrics.incrementRequestErrors();
                 throw new RuntimeException("Failed to read HTTP response content", e);
             }
 
@@ -201,12 +242,13 @@ public class GraphqlClientImpl implements GraphqlClient {
             return response;
         } else {
             EntityUtils.consumeQuietly(httpResponse.getEntity());
+            metrics.incrementRequestErrors(statusLine.getStatusCode());
             throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }
 
-    private HttpClient buildHttpClient() throws Exception {
-        SSLConnectionSocketFactory sslsf = null;
+    private void configureHttpClient() throws Exception {
+        SSLConnectionSocketFactory sslsf;
         if (configuration.acceptSelfSignedCertificates()) {
             LOGGER.warn("Self-signed SSL certificates are accepted. This should NOT be done on production systems!");
             SSLContext sslContext = SSLContextBuilder.create().loadTrustMaterial(new TrustAllStrategy()).build();
@@ -226,13 +268,20 @@ public class GraphqlClientImpl implements GraphqlClient {
         cm.setMaxTotal(configuration.maxHttpConnections());
         cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint
 
+        metrics.addConnectionPoolMetric(GraphqlClientMetrics.CONNECTION_POOL_PENDING_METRIC, () -> cm.getTotalStats().getPending());
+        metrics.addConnectionPoolMetric(GraphqlClientMetrics.CONNECTION_POOL_AVAILABLE_METRIC, () -> cm.getTotalStats().getAvailable());
+        metrics.addConnectionPoolMetric(GraphqlClientMetrics.CONNECTION_POOL_USAGE_METRIC, () -> {
+            PoolStats stats = cm.getTotalStats();
+            return (float) stats.getLeased() / stats.getMax();
+        });
+
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(configuration.connectionTimeout())
             .setSocketTimeout(configuration.socketTimeout())
             .setConnectionRequestTimeout(configuration.requestPoolTimeout())
             .build();
 
-        return HttpClientBuilder.create()
+        client = clientBuilderFactory.newBuilder()
             .setDefaultRequestConfig(requestConfig)
             .setConnectionManager(cm)
             .disableCookieManagement()
