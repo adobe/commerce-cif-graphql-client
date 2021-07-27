@@ -83,7 +83,7 @@ public class GraphqlClientImplTest {
         mockConfig = new MockGraphqlClientConfiguration();
         // Add three test headers, one with extra white space around " : " to make sure we properly trim spaces, and one empty header
         mockConfig.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : "
-                + CACHE_HEADER_VALUE,
+            + CACHE_HEADER_VALUE,
             "");
 
         graphqlClient.activate(mockConfig);
