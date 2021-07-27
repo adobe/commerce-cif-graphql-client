@@ -110,6 +110,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             LOGGER.warn("Request pool timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
                 configuration.requestPoolTimeout());
         }
+
         this.configuration = configuration;
         gson = new Gson();
         metrics = metricsRegistry != null
