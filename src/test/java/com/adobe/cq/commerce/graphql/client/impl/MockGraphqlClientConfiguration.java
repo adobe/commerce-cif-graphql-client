@@ -11,117 +11,14 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.lang.annotation.Annotation;
-
-import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
-import com.adobe.cq.commerce.graphql.client.HttpMethod;
-
-public class MockGraphqlClientConfiguration implements Annotation, GraphqlClientConfiguration {
+class MockGraphqlClientConfiguration extends GraphqlClientConfigurationImpl {
 
     public static final String URL = "https://hostname/graphql";
-    private String url;
-    private Boolean acceptSelfSignedCertificates;
-    private Boolean allowHttpProtocol;
-    private String[] httpHeaders;
-    private String[] cacheConfigurations;
-    private int socketTimeout = GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT;
-    private int connectionTimeout = GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT;
-    private int requestPoolTimeout = GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
 
-    @Override
-    public String identifier() {
-        return GraphqlClientConfiguration.DEFAULT_IDENTIFIER;
+    public MockGraphqlClientConfiguration() {
+        super(URL);
     }
 
-    @Override
-    public String url() {
-        return url != null ? url : URL;
-    }
-
-    @Override
-    public HttpMethod httpMethod() {
-        return HttpMethod.POST;
-    }
-
-    @Override
-    public boolean acceptSelfSignedCertificates() {
-        return acceptSelfSignedCertificates != null ? acceptSelfSignedCertificates
-            : GraphqlClientConfiguration.ACCEPT_SELF_SIGNED_CERTIFICATES;
-    }
-
-    @Override
-    public boolean allowHttpProtocol() {
-        return allowHttpProtocol != null ? allowHttpProtocol
-            : GraphqlClientConfiguration.ALLOW_HTTP_PROTOCOL;
-    }
-
-    @Override
-    public int maxHttpConnections() {
-        return GraphqlClientConfiguration.MAX_HTTP_CONNECTIONS_DEFAULT;
-    }
-
-    @Override
-    public int connectionTimeout() {
-        return connectionTimeout;
-    }
-
-    @Override
-    public int socketTimeout() {
-        return socketTimeout;
-    }
-
-    @Override
-    public int requestPoolTimeout() {
-        return requestPoolTimeout;
-    }
-
-    @Override
-    public Class<? extends Annotation> annotationType() {
-        return GraphqlClientConfiguration.class;
-    }
-
-    @Override
-    public String[] httpHeaders() {
-        return httpHeaders;
-    }
-
-    @Override
-    public String[] cacheConfigurations() {
-        return cacheConfigurations;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public void setAcceptSelfSignedCertificates(Boolean acceptSelfSignedCertificates) {
-        this.acceptSelfSignedCertificates = acceptSelfSignedCertificates;
-    }
-
-    public void setAllowHttpProtocol(Boolean allowHttpProtocol) {
-        this.allowHttpProtocol = allowHttpProtocol;
-    }
-
-    public void setHttpHeaders(String... httpHeaders) {
-        this.httpHeaders = httpHeaders;
-    }
-
-    public void setCacheConfigurations(String... cacheConfigurations) {
-        this.cacheConfigurations = cacheConfigurations;
-    }
-
-    public void setSocketTimeout(int socketTimeout) {
-        this.socketTimeout = socketTimeout;
-    }
-
-    public void setConnectionTimeout(int connectionTimeout) {
-        this.connectionTimeout = connectionTimeout;
-    }
-
-    public void setRequestPoolTimeout(int requestPoolTimeout) {
-        this.requestPoolTimeout = requestPoolTimeout;
-    }
 }

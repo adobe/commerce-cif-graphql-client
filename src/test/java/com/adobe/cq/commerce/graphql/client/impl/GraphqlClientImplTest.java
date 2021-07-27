@@ -81,6 +81,7 @@ public class GraphqlClientImplTest {
         graphqlClient = new GraphqlClientImpl();
 
         mockConfig = new MockGraphqlClientConfiguration();
+        mockConfig.setIdentifier("mockIdentifier");
         // Add three test headers, one with extra white space around " : " to make sure we properly trim spaces, and one empty header
         mockConfig.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : "
             + CACHE_HEADER_VALUE,
@@ -90,22 +91,16 @@ public class GraphqlClientImplTest {
         graphqlClient.client = Mockito.mock(HttpClient.class);
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidSocketTimeout() throws Exception {
+    @Test
+    public void testInvalidTimeouts() throws Exception {
         mockConfig.setSocketTimeout(0);
-        graphqlClient.activate(mockConfig);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidConnectionTimeout() throws Exception {
         mockConfig.setConnectionTimeout(0);
-        graphqlClient.activate(mockConfig);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidRequestPoolTimeout() throws Exception {
         mockConfig.setRequestPoolTimeout(0);
         graphqlClient.activate(mockConfig);
+
+        assertEquals(GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT, graphqlClient.getConfiguration().socketTimeout());
+        assertEquals(GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT, graphqlClient.getConfiguration().connectionTimeout());
+        assertEquals(GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT, graphqlClient.getConfiguration().requestPoolTimeout());
     }
 
     @Test
@@ -151,8 +146,6 @@ public class GraphqlClientImplTest {
         assertEquals(1, response.getErrors().size());
         Error error = response.getErrors().get(0);
         assertEquals("Error message", error.message);
-
-        assertEquals(GraphqlClientConfiguration.DEFAULT_IDENTIFIER, graphqlClient.getIdentifier());
     }
 
     @Test
@@ -300,6 +293,7 @@ public class GraphqlClientImplTest {
     @Test
     public void testGetConfiguration() {
         GraphqlClientConfiguration configuration = graphqlClient.getConfiguration();
-        assertEquals(mockConfig, configuration);
+        assertEquals(mockConfig.identifier(), configuration.identifier());
+        assertEquals("mockIdentifier", graphqlClient.getIdentifier());
     }
 }
