@@ -95,6 +95,21 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
+        if (configuration.socketTimeout() <= 0 || configuration.connectionTimeout() <= 0 || configuration.requestPoolTimeout() <= 0) {
+            throw new IllegalArgumentException("infinite timeout forbidden");
+        }
+        if (configuration.socketTimeout() > GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT) {
+            LOGGER.warn("Socket timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
+                configuration.socketTimeout());
+        }
+        if (configuration.connectionTimeout() > GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT) {
+            LOGGER.warn("Connection timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
+                configuration.connectionTimeout());
+        }
+        if (configuration.requestPoolTimeout() > GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT) {
+            LOGGER.warn("Request pool timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
+                configuration.requestPoolTimeout());
+        }
         this.configuration = configuration;
         gson = new Gson();
         metrics = metricsRegistry != null

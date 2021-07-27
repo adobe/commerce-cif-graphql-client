@@ -27,6 +27,9 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
     private Boolean allowHttpProtocol;
     private String[] httpHeaders;
     private String[] cacheConfigurations;
+    private int socketTimeout = GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT;
+    private int connectionTimeout = GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT;
+    private int requestPoolTimeout = GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
 
     @Override
     public String identifier() {
@@ -62,17 +65,17 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
 
     @Override
     public int connectionTimeout() {
-        return GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT;
+        return connectionTimeout;
     }
 
     @Override
     public int socketTimeout() {
-        return GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT;
+        return socketTimeout;
     }
 
     @Override
     public int requestPoolTimeout() {
-        return GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
+        return requestPoolTimeout;
     }
 
     @Override
@@ -94,7 +97,7 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
         this.url = url;
     }
 
-    public void setAcceptSelfSignedCertificates(boolean acceptSelfSignedCertificates) {
+    public void setAcceptSelfSignedCertificates(Boolean acceptSelfSignedCertificates) {
         this.acceptSelfSignedCertificates = acceptSelfSignedCertificates;
     }
 
@@ -108,5 +111,17 @@ public class MockGraphqlClientConfiguration implements Annotation, GraphqlClient
 
     public void setCacheConfigurations(String... cacheConfigurations) {
         this.cacheConfigurations = cacheConfigurations;
+    }
+
+    public void setSocketTimeout(int socketTimeout) {
+        this.socketTimeout = socketTimeout;
+    }
+
+    public void setConnectionTimeout(int connectionTimeout) {
+        this.connectionTimeout = connectionTimeout;
+    }
+
+    public void setRequestPoolTimeout(int requestPoolTimeout) {
+        this.requestPoolTimeout = requestPoolTimeout;
     }
 }

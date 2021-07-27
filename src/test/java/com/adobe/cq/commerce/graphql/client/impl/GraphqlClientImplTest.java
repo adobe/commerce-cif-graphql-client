@@ -79,6 +79,24 @@ public class GraphqlClientImplTest {
         graphqlClient.client = Mockito.mock(HttpClient.class);
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidSocketTimeout() throws Exception {
+        mockConfig.setSocketTimeout(0);
+        graphqlClient.activate(mockConfig);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidConnectionTimeout() throws Exception {
+        mockConfig.setConnectionTimeout(0);
+        graphqlClient.activate(mockConfig);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidRequestPoolTimeout() throws Exception {
+        mockConfig.setRequestPoolTimeout(0);
+        graphqlClient.activate(mockConfig);
+    }
+
     @Test
     public void testRequestResponse() throws Exception {
         TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
