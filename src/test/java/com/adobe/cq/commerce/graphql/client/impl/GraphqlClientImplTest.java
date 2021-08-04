@@ -25,10 +25,17 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.message.BasicHeader;
+import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.Appender;
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
@@ -46,6 +53,10 @@ import com.google.gson.JsonParseException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class GraphqlClientImplTest {
 
@@ -70,6 +81,7 @@ public class GraphqlClientImplTest {
         graphqlClient = new GraphqlClientImpl();
 
         mockConfig = new MockGraphqlClientConfiguration();
+        mockConfig.setIdentifier("mockIdentifier");
         // Add three test headers, one with extra white space around " : " to make sure we properly trim spaces, and one empty header
         mockConfig.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : "
             + CACHE_HEADER_VALUE,
@@ -77,6 +89,40 @@ public class GraphqlClientImplTest {
 
         graphqlClient.activate(mockConfig);
         graphqlClient.client = Mockito.mock(HttpClient.class);
+    }
+
+    @Test
+    public void testInvalidTimeouts() throws Exception {
+        mockConfig.setSocketTimeout(0);
+        mockConfig.setConnectionTimeout(0);
+        mockConfig.setRequestPoolTimeout(0);
+        graphqlClient.activate(mockConfig);
+
+        assertEquals(GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT, graphqlClient.getConfiguration().socketTimeout());
+        assertEquals(GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT, graphqlClient.getConfiguration().connectionTimeout());
+        assertEquals(GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT, graphqlClient.getConfiguration().requestPoolTimeout());
+    }
+
+    @Test
+    public void testWarningsAreLoggedForTimeoutsTooBig() throws Exception {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        Logger logger = loggerContext.getLogger(GraphqlClientImpl.class);
+        logger.setLevel(Level.WARN);
+        Appender<ILoggingEvent> appender = mock(Appender.class);
+        logger.addAppender(appender);
+
+        mockConfig.setSocketTimeout(10000);
+        mockConfig.setConnectionTimeout(10000);
+        mockConfig.setRequestPoolTimeout(10000);
+        graphqlClient.activate(mockConfig);
+
+        // verify the 3 warnings are logged
+        verify(appender, times(3)).doAppend(argThat(new CustomMatcher<ILoggingEvent>("log event of level warn") {
+            @Override
+            public boolean matches(Object o) {
+                return o instanceof ILoggingEvent && ((ILoggingEvent) o).getLevel() == Level.WARN;
+            }
+        }));
     }
 
     @Test
@@ -100,8 +146,6 @@ public class GraphqlClientImplTest {
         assertEquals(1, response.getErrors().size());
         Error error = response.getErrors().get(0);
         assertEquals("Error message", error.message);
-
-        assertEquals(GraphqlClientConfiguration.DEFAULT_IDENTIFIER, graphqlClient.getIdentifier());
     }
 
     @Test
@@ -249,6 +293,7 @@ public class GraphqlClientImplTest {
     @Test
     public void testGetConfiguration() {
         GraphqlClientConfiguration configuration = graphqlClient.getConfiguration();
-        assertEquals(mockConfig, configuration);
+        assertEquals(mockConfig.identifier(), configuration.identifier());
+        assertEquals("mockIdentifier", graphqlClient.getIdentifier());
     }
 }

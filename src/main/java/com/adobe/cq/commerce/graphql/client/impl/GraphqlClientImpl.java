@@ -91,15 +91,45 @@ public class GraphqlClientImpl implements GraphqlClient {
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private GraphqlClientMetrics metrics;
-    private GraphqlClientConfiguration configuration;
+    private GraphqlClientConfigurationImpl configuration;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration) throws Exception {
-        this.configuration = configuration;
-        gson = new Gson();
-        metrics = metricsRegistry != null
+        this.configuration = new GraphqlClientConfigurationImpl(configuration);
+        this.gson = new Gson();
+        this.metrics = metricsRegistry != null
             ? new GraphqlClientMetricsImpl(metricsRegistry, configuration)
             : GraphqlClientMetrics.NOOP;
+
+        if (this.configuration.socketTimeout() <= 0) {
+            LOGGER.warn("Socket timeout set to infinity. This may cause Thread starvation and should be urgently reviewed. Falling back to "
+                + "default configuration.");
+            this.configuration.setSocketTimeout(GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT);
+        }
+        if (this.configuration.socketTimeout() > GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT) {
+            LOGGER.warn("Socket timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
+                configuration.socketTimeout());
+        }
+        if (this.configuration.connectionTimeout() <= 0) {
+            LOGGER.warn(
+                "Connection timeout set to infinity. This may cause Thread starvation and should be urgently reviewed. Falling back to "
+                    + "default configuration.");
+            this.configuration.setConnectionTimeout(GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT);
+        }
+        if (this.configuration.connectionTimeout() > GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT) {
+            LOGGER.warn("Connection timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
+                configuration.connectionTimeout());
+        }
+        if (this.configuration.requestPoolTimeout() <= 0) {
+            LOGGER.warn(
+                "Connection timeout set to infinity. This may cause Thread starvation and should be urgently reviewed. Falling back to "
+                    + "default configuration.");
+            this.configuration.setRequestPoolTimeout(GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT);
+        }
+        if (this.configuration.requestPoolTimeout() > GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT) {
+            LOGGER.warn("Request pool timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
+                configuration.requestPoolTimeout());
+        }
 
         configureCaches(configuration);
         configureHttpClient();

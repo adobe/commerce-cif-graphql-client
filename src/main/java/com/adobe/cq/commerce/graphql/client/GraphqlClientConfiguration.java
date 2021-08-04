@@ -73,25 +73,33 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "Http connection timeout",
-        description = "The timeout in milliseconds until a connection is established. A timeout value of zero is interpreted as an infinite timeout.",
+        description = "The timeout in milliseconds until a connection is established. Is the timeout longer than the default timeout a "
+            + "warning will be logged. Is it 0 or smaller it will fallback to the default timeout and a warning will be logged. Defaults "
+            + "to " + DEFAULT_CONNECTION_TIMEOUT,
         type = AttributeType.INTEGER)
     int connectionTimeout() default DEFAULT_CONNECTION_TIMEOUT;
 
     @AttributeDefinition(
         name = "Http socket timeout",
-        description = "The socket timeout in milliseconds, which is the timeout for waiting for data or, put differently, a maximum period inactivity between two consecutive data packets. A timeout value of zero is interpreted as an infinite timeout.",
+        description = "The socket timeout in milliseconds, which is the timeout for waiting for data or, put differently, a maximum period "
+            + "inactivity between two consecutive data packets. Is the timeout longer than the default timeout a warning will be logged. "
+            + "Is it 0 or smaller it will fallback to the default timeout and a warning will be logged. Defaults to "
+            + DEFAULT_SOCKET_TIMEOUT,
         type = AttributeType.INTEGER)
     int socketTimeout() default DEFAULT_SOCKET_TIMEOUT;
 
     @AttributeDefinition(
         name = "Request pool timeout",
-        description = "The timeout in milliseconds used when requesting a connection from the connection manager. A timeout value of zero is interpreted as an infinite timeout.",
+        description = "The timeout in milliseconds used when requesting a connection from the connection manager. Is the timeout longer "
+            + "than the default timeout a warning will be logged. Is it 0 or smaller it will fallback to the default timeout and a "
+            + "warning will be logged. Defaults to " + DEFAULT_REQUESTPOOL_TIMEOUT,
         type = AttributeType.INTEGER)
     int requestPoolTimeout() default DEFAULT_REQUESTPOOL_TIMEOUT;
 
     @AttributeDefinition(
         name = "Default HTTP Headers",
-        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. The format of each header is name:value",
+        description = "HTTP Headers which shall be sent with each request. Might be used for authentication. The format of each header is "
+            + "name:value",
         type = AttributeType.STRING)
     String[] httpHeaders();
 

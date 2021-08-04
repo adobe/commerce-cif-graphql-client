@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
 import org.mockserver.client.MockServerClient;
+import org.mockserver.configuration.ConfigurationProperties;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
@@ -36,6 +37,10 @@ import static org.junit.Assert.assertEquals;
 public class MockServerHelper {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MockServerHelper.class);
+
+    static {
+        ConfigurationProperties.logLevel("ERROR");
+    }
 
     private final ClientAndServer mockServer;
     private final GraphqlRequest dummy = new GraphqlRequest("{dummy}");
