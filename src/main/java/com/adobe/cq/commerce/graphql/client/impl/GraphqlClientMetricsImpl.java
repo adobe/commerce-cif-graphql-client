@@ -27,10 +27,10 @@ import com.codahale.metrics.Timer;
 
 class GraphqlClientMetricsImpl implements GraphqlClientMetrics, Closeable {
 
-    private static final String METRIC_LABEL_IDENTIFIER = "identifier";
-    private static final String METRIC_LABEL_ENDPOINT = "endpoint";
-    private static final String METRIC_LABEL_STATUS_CODE = "status";
-    private static final String METRIC_LABEL_CACHE_NAME = "cacheName";
+    private static final String METRIC_LABEL_IDENTIFIER = "gql_client_identifier";
+    private static final String METRIC_LABEL_ENDPOINT = "gql_client_endpoint";
+    private static final String METRIC_LABEL_STATUS_CODE = "gql_response_status";
+    private static final String METRIC_LABEL_CACHE_NAME = "gql_cache_name";
 
     private final MetricRegistry metrics;
     private final GraphqlClientConfiguration configuration;
