@@ -71,7 +71,7 @@ public class GraphqlClientImplMetricsTest {
         graphqlClient.execute(dummy, Data.class, Error.class);
 
         // then
-        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;endpoint=http://foo.bar/api");
+        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=http://foo.bar/api");
         assertNotNull(timer);
         assertEquals(1, timer.getCount());
     }
@@ -89,21 +89,23 @@ public class GraphqlClientImplMetricsTest {
             });
 
         // when, then
-        Gauge<?> fooHits = metricRegistry.getGauges().get("graphql-client.cache.hits;identifier=default;cacheName=foo");
+        Gauge<?> fooHits = metricRegistry.getGauges().get("graphql-client.cache.hits;gql_client_identifier=default;gql_cache_name=foo");
         assertNotNull(fooHits);
-        Gauge<?> fooMisses = metricRegistry.getGauges().get("graphql-client.cache.misses;identifier=default;cacheName=foo");
+        Gauge<?> fooMisses = metricRegistry.getGauges().get("graphql-client.cache.misses;gql_client_identifier=default;gql_cache_name=foo");
         assertNotNull(fooMisses);
-        Gauge<?> fooEvictions = metricRegistry.getGauges().get("graphql-client.cache.evictions;identifier=default;cacheName=foo");
+        Gauge<?> fooEvictions = metricRegistry.getGauges().get(
+            "graphql-client.cache.evictions;gql_client_identifier=default;gql_cache_name=foo");
         assertNotNull(fooEvictions);
-        Gauge<?> fooUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;identifier=default;cacheName=foo");
+        Gauge<?> fooUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;gql_client_identifier=default;gql_cache_name=foo");
         assertNotNull(fooUsage);
-        Gauge<?> barHits = metricRegistry.getGauges().get("graphql-client.cache.hits;identifier=default;cacheName=bar");
+        Gauge<?> barHits = metricRegistry.getGauges().get("graphql-client.cache.hits;gql_client_identifier=default;gql_cache_name=bar");
         assertNotNull(barHits);
-        Gauge<?> barMisses = metricRegistry.getGauges().get("graphql-client.cache.misses;identifier=default;cacheName=bar");
+        Gauge<?> barMisses = metricRegistry.getGauges().get("graphql-client.cache.misses;gql_client_identifier=default;gql_cache_name=bar");
         assertNotNull(barMisses);
-        Gauge<?> barEvictions = metricRegistry.getGauges().get("graphql-client.cache.evictions;identifier=default;cacheName=bar");
+        Gauge<?> barEvictions = metricRegistry.getGauges().get(
+            "graphql-client.cache.evictions;gql_client_identifier=default;gql_cache_name=bar");
         assertNotNull(barEvictions);
-        Gauge<?> barUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;identifier=default;cacheName=bar");
+        Gauge<?> barUsage = metricRegistry.getGauges().get("graphql-client.cache.usage;gql_client_identifier=default;gql_cache_name=bar");
         assertNotNull(barUsage);
 
         // and when, then
@@ -120,11 +122,12 @@ public class GraphqlClientImplMetricsTest {
 
         // when, then
         Gauge<?> availableConnections = metricRegistry.getGauges().get(
-            "graphql-client.connection-pool.available-connections;identifier=default");
+            "graphql-client.connection-pool.available-connections;gql_client_identifier=default");
         assertNotNull(availableConnections);
-        Gauge<?> pendingRequests = metricRegistry.getGauges().get("graphql-client.connection-pool.pending-requests;identifier=default");
+        Gauge<?> pendingRequests = metricRegistry.getGauges().get(
+            "graphql-client.connection-pool.pending-requests;gql_client_identifier=default");
         assertNotNull(pendingRequests);
-        Gauge<?> usage = metricRegistry.getGauges().get("graphql-client.connection-pool.usage;identifier=default");
+        Gauge<?> usage = metricRegistry.getGauges().get("graphql-client.connection-pool.usage;gql_client_identifier=default");
         assertNotNull(usage);
 
         // and when, then
@@ -146,10 +149,10 @@ public class GraphqlClientImplMetricsTest {
         }
 
         // then
-        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;endpoint=http://foo.bar/api");
+        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=http://foo.bar/api");
         assertNotNull(timer);
         assertEquals(0, timer.getCount());
-        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;endpoint=http://foo.bar/api");
+        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;gql_client_endpoint=http://foo.bar/api");
         assertNotNull(counter);
         assertEquals(1, counter.getCount());
     }
@@ -174,10 +177,10 @@ public class GraphqlClientImplMetricsTest {
         }
 
         // then
-        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;endpoint=http://foo.bar/api");
+        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=http://foo.bar/api");
         assertNotNull(timer);
         assertEquals(0, timer.getCount());
-        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;endpoint=http://foo.bar/api");
+        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;gql_client_endpoint=http://foo.bar/api");
         assertNotNull(counter);
         assertEquals(1, counter.getCount());
     }
@@ -196,7 +199,8 @@ public class GraphqlClientImplMetricsTest {
         }
 
         // then
-        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;endpoint=http://foo.bar/api;status=500");
+        Counter counter = metricRegistry.getCounters().get(
+            "graphql-client.request.errors;gql_client_endpoint=http://foo.bar/api;gql_response_status=500");
         assertNotNull(counter);
         assertEquals(1, counter.getCount());
     }
