@@ -290,10 +290,16 @@ public class GraphqlClientImpl implements GraphqlClient {
         // We use a pooled connection manager to support concurrent threads and connections
         RegistryBuilder<ConnectionSocketFactory> registryBuilder = RegistryBuilder.<ConnectionSocketFactory>create()
             .register("https", sslsf);
-        if (configuration.allowHttpProtocol()) {
-            LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
+
+        boolean useProxy = StringUtils.isNotEmpty(System.getProperty("http.proxyHost"));
+        // enable HTTP support only if explictly enabled or an http proxy is configured
+        if (configuration.allowHttpProtocol() || useProxy) {
             registryBuilder.register("http", PlainConnectionSocketFactory.getSocketFactory());
+            if (configuration.allowHttpProtocol()) {
+                LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
+            }
         }
+
         PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(registryBuilder.build());
         cm.setMaxTotal(configuration.maxHttpConnections());
         cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint

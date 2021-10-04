@@ -14,9 +14,13 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import org.apache.http.config.Registry;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.internal.util.reflection.Whitebox;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Data;
@@ -80,4 +84,29 @@ public class ProtocolTest {
         mockServer.validateSampleResponse(response);
     }
 
+    /**
+     * HTTP communcation should work if enabled via proxy.
+     */
+    @Test(timeout = 15000)
+    public void testSimpleRequest_HTTP_Allowed_Proxy() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setUrl("https://localhost:" + mockServer.getLocalPort() + "/graphql");
+        config.setAcceptSelfSignedCertificates(true);
+
+        System.setProperty("http.proxyHost", "localhost");
+        GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
+        graphqlClient.activate(config);
+
+        Object connManager = Whitebox.getInternalState(graphqlClient.client, "connManager");
+        Object connectionOperator = Whitebox.getInternalState(connManager, "connectionOperator");
+        Object registry = Whitebox.getInternalState(connectionOperator, "socketFactoryRegistry");
+
+        Registry<ConnectionSocketFactory> socketFactoryRegistry = (Registry<ConnectionSocketFactory>) registry;
+        Assert.assertNotNull(socketFactoryRegistry.lookup("https"));
+        Assert.assertNotNull(socketFactoryRegistry.lookup("http"));
+
+        GraphqlResponse<Data, Error> response = mockServer.executeGraphqlClientDummyRequest(graphqlClient);
+        mockServer.validateSampleResponse(response);
+        System.clearProperty("http.proxyHost");
+    }
 }
