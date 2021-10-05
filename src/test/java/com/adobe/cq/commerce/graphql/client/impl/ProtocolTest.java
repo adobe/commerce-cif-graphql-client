@@ -60,8 +60,6 @@ public class ProtocolTest {
 
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
         graphqlClient.activate(config);
-
-        mockServer.executeGraphqlClientDummyRequest(graphqlClient);
     }
 
     /**

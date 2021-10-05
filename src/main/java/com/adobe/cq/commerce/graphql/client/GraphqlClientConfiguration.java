@@ -42,7 +42,7 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "GraphQL Service URL",
-        description = "The URL of the GraphQL server endpoint.",
+        description = "The URL of the GraphQL server endpoint, this must be a secure host using HTTPS.",
         type = AttributeType.STRING,
         required = true)
     String url();
