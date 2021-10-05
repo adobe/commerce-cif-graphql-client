@@ -51,6 +51,7 @@ import org.apache.http.pool.PoolStats;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
+import org.osgi.service.component.ComponentException;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -129,6 +130,14 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (this.configuration.requestPoolTimeout() > GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT) {
             LOGGER.warn("Request pool timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
                 configuration.requestPoolTimeout());
+        }
+
+        if (StringUtils.startsWith(this.configuration.url(), "http://")) {
+            if (this.configuration.allowHttpProtocol()) {
+                LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
+            } else {
+                throw new ComponentException("Insecure HTTP communication for GraphQL origin is not allowed.");
+            }
         }
 
         configureCaches(configuration);
@@ -289,11 +298,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         // We use a pooled connection manager to support concurrent threads and connections
         RegistryBuilder<ConnectionSocketFactory> registryBuilder = RegistryBuilder.<ConnectionSocketFactory>create()
-            .register("https", sslsf);
-        if (configuration.allowHttpProtocol()) {
-            LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
-            registryBuilder.register("http", PlainConnectionSocketFactory.getSocketFactory());
-        }
+            .register("http", PlainConnectionSocketFactory.getSocketFactory()).register("https", sslsf);
         PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(registryBuilder.build());
         cm.setMaxTotal(configuration.maxHttpConnections());
         cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint

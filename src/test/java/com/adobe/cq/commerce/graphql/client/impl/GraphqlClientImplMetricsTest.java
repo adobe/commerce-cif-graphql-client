@@ -58,7 +58,7 @@ public class GraphqlClientImplMetricsTest {
         aemContext.registerService(MetricRegistry.class, metricRegistry, "name", "cif");
         aemContext.registerInjectActivateService(graphqlClient,
             "identifier", "default",
-            "url", "http://foo.bar/api");
+            "url", "https://foo.bar/api");
         graphqlClient.client = mock(HttpClient.class);
     }
 
@@ -71,7 +71,7 @@ public class GraphqlClientImplMetricsTest {
         graphqlClient.execute(dummy, Data.class, Error.class);
 
         // then
-        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=http://foo.bar/api");
+        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=https://foo.bar/api");
         assertNotNull(timer);
         assertEquals(1, timer.getCount());
     }
@@ -82,7 +82,7 @@ public class GraphqlClientImplMetricsTest {
         TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
             "identifier", "default",
-            "url", "http://foo.bar/api",
+            "url", "https://foo.bar/api",
             "cacheConfigurations", new String[] {
                 "foo:true:100:100",
                 "bar:true:100:100"
@@ -149,10 +149,10 @@ public class GraphqlClientImplMetricsTest {
         }
 
         // then
-        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=http://foo.bar/api");
+        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=https://foo.bar/api");
         assertNotNull(timer);
         assertEquals(0, timer.getCount());
-        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;gql_client_endpoint=http://foo.bar/api");
+        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;gql_client_endpoint=https://foo.bar/api");
         assertNotNull(counter);
         assertEquals(1, counter.getCount());
     }
@@ -177,10 +177,10 @@ public class GraphqlClientImplMetricsTest {
         }
 
         // then
-        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=http://foo.bar/api");
+        Timer timer = metricRegistry.getTimers().get("graphql-client.request.duration;gql_client_endpoint=https://foo.bar/api");
         assertNotNull(timer);
         assertEquals(0, timer.getCount());
-        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;gql_client_endpoint=http://foo.bar/api");
+        Counter counter = metricRegistry.getCounters().get("graphql-client.request.errors;gql_client_endpoint=https://foo.bar/api");
         assertNotNull(counter);
         assertEquals(1, counter.getCount());
     }
@@ -200,7 +200,7 @@ public class GraphqlClientImplMetricsTest {
 
         // then
         Counter counter = metricRegistry.getCounters().get(
-            "graphql-client.request.errors;gql_client_endpoint=http://foo.bar/api;gql_response_status=500");
+            "graphql-client.request.errors;gql_client_endpoint=https://foo.bar/api;gql_response_status=500");
         assertNotNull(counter);
         assertEquals(1, counter.getCount());
     }
