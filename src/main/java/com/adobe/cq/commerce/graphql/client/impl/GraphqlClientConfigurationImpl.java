@@ -34,6 +34,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
     private int requestPoolTimeout = GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
     private String[] httpHeaders = new String[0];
     private String[] cacheConfigurations = new String[0];
+    private String userAgent = GraphqlClientConfiguration.USER_AGENT;
 
     GraphqlClientConfigurationImpl(String url) {
         this.url = url;
@@ -51,6 +52,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         requestPoolTimeout = configuration.requestPoolTimeout();
         httpHeaders = configuration.httpHeaders();
         cacheConfigurations = configuration.cacheConfigurations();
+        userAgent = configuration.userAgent();
     }
 
     @Override
@@ -146,6 +148,15 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setHttpHeaders(String... httpHeaders) {
         this.httpHeaders = httpHeaders;
+    }
+
+    @Override
+    public String userAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
     }
 
     @Override

@@ -320,6 +320,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             .setDefaultRequestConfig(requestConfig)
             .setConnectionManager(cm)
             .disableCookieManagement()
+            .setUserAgent(configuration.userAgent())
             .build();
     }
 

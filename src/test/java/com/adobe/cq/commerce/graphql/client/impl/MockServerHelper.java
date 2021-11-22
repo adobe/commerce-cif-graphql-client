@@ -55,12 +55,16 @@ public class MockServerHelper {
         return graphqlClient.execute(dummy, Data.class, Error.class);
     }
 
-    public void resetWithSampleResponse() {
+    public MockServerClient resetWithSampleResponse() {
         String json = getResource("sample-graphql-response.json");
-        mockServer.reset().when(HttpRequest.request().withPath("/graphql"))
+        MockServerClient mockServerClient = mockServer.reset();
+        mockServerClient
+            .when(HttpRequest.request().withPath("/graphql"))
             .respond(HttpResponse.response().withHeader(HttpHeaders.CONTENT_TYPE, "application/json")
                 .withHeader(HttpHeaders.CONNECTION, "keep-alive").withBody(json)
                 .withDelay(TimeUnit.MILLISECONDS, 50));
+
+        return mockServerClient;
     }
 
     public void validateSampleResponse(GraphqlResponse<Data, Error> response) throws IOException {

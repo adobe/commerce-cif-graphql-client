@@ -285,7 +285,7 @@ public class GraphqlClientImplTest {
     }
 
     @Test
-    public void testGetGraphQLEndpoint() throws Exception {
+    public void testGetGraphQLEndpoint() {
         String endpointURL = graphqlClient.getGraphQLEndpoint();
         assertEquals(MockGraphqlClientConfiguration.URL, endpointURL);
     }
