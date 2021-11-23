@@ -82,7 +82,7 @@ import com.google.gson.reflect.TypeToken;
 public class GraphqlClientImpl implements GraphqlClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
-    private static final String USER_AGENT_NAME = "CifGraphqlClient";
+    private static final String USER_AGENT_NAME = "Adobe-CifGraphqlClient";
 
     protected HttpClient client;
 

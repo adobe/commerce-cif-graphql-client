@@ -93,6 +93,6 @@ public class ProtocolTest {
         MockServerClient client = mockServer.resetWithSampleResponse();
         mockServer.executeGraphqlClientDummyRequest(graphqlClient);
 
-        client.verify(HttpRequest.request().withHeader("user-agent", "CifGraphqlClient/TEST (Java/" + JAVA_VERSION + ")"));
+        client.verify(HttpRequest.request().withHeader("user-agent", "Adobe-CifGraphqlClient/TEST (Java/" + JAVA_VERSION + ")"));
     }
 }
