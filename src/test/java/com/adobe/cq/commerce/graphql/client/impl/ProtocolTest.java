@@ -27,6 +27,7 @@ import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Error;
 public class ProtocolTest {
 
     private static MockServerHelper mockServer;
+    private static String JAVA_VERSION = System.getProperty("java.version");
 
     @BeforeClass
     public static void initServer() {
@@ -85,7 +86,6 @@ public class ProtocolTest {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setUrl("https://localhost:" + mockServer.getLocalPort() + "/graphql");
         config.setAcceptSelfSignedCertificates(true);
-        config.setUserAgent("my-user-agent");
 
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
         graphqlClient.activate(config);
@@ -93,6 +93,6 @@ public class ProtocolTest {
         MockServerClient client = mockServer.resetWithSampleResponse();
         mockServer.executeGraphqlClientDummyRequest(graphqlClient);
 
-        client.verify(HttpRequest.request().withHeader("user-agent", config.userAgent()));
+        client.verify(HttpRequest.request().withHeader("user-agent", "CifGraphqlClient/TEST (Java/" + JAVA_VERSION + ")"));
     }
 }

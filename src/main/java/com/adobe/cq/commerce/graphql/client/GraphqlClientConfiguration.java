@@ -21,7 +21,6 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 @ObjectClassDefinition(name = "CIF GraphQL Client Configuration Factory")
 public @interface GraphqlClientConfiguration {
 
-    String USER_AGENT = "Adobe AEM CIF GraphqlClient";
     String CQ_GRAPHQL_CLIENT = "cq:graphqlClient";
     String DEFAULT_IDENTIFIER = "default";
 
@@ -103,13 +102,6 @@ public @interface GraphqlClientConfiguration {
             + "name:value",
         type = AttributeType.STRING)
     String[] httpHeaders();
-
-    @AttributeDefinition(
-        name = "User Agent",
-        description = "The User Agent used by the http client per default. This may be overwritten for individual requests. "
-            + "Defaults to " + USER_AGENT,
-        type = AttributeType.STRING)
-    String userAgent() default USER_AGENT;
 
     @AttributeDefinition(
         name = "GraphQL cache configurations",
