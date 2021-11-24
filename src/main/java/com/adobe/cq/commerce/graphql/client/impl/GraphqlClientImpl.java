@@ -51,6 +51,7 @@ import org.apache.http.pool.PoolStats;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
+import org.apache.http.util.VersionInfo;
 import org.osgi.service.component.ComponentException;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -81,6 +82,7 @@ import com.google.gson.reflect.TypeToken;
 public class GraphqlClientImpl implements GraphqlClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
+    private static final String USER_AGENT_NAME = "Adobe-CifGraphqlClient";
 
     protected HttpClient client;
 
@@ -320,6 +322,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             .setDefaultRequestConfig(requestConfig)
             .setConnectionManager(cm)
             .disableCookieManagement()
+            .setUserAgent(VersionInfo.getUserAgent(USER_AGENT_NAME, "com.adobe.cq.commerce.graphql.client", this.getClass()))
             .build();
     }
 

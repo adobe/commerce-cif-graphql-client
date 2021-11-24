@@ -17,6 +17,8 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockserver.client.MockServerClient;
+import org.mockserver.model.HttpRequest;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Data;
@@ -25,6 +27,7 @@ import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Error;
 public class ProtocolTest {
 
     private static MockServerHelper mockServer;
+    private static String JAVA_VERSION = System.getProperty("java.version");
 
     @BeforeClass
     public static void initServer() {
@@ -63,7 +66,7 @@ public class ProtocolTest {
     }
 
     /**
-     * HTTP communcation should work if enabled via configuration.
+     * HTTP communication should work if enabled via configuration.
      */
     @Test(timeout = 15000)
     public void testSimpleRequest_HTTP_Allowed() throws Exception {
@@ -78,4 +81,18 @@ public class ProtocolTest {
         mockServer.validateSampleResponse(response);
     }
 
+    @Test(timeout = 15000)
+    public void testUserAgent() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setUrl("https://localhost:" + mockServer.getLocalPort() + "/graphql");
+        config.setAcceptSelfSignedCertificates(true);
+
+        GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
+        graphqlClient.activate(config);
+
+        MockServerClient client = mockServer.resetWithSampleResponse();
+        mockServer.executeGraphqlClientDummyRequest(graphqlClient);
+
+        client.verify(HttpRequest.request().withHeader("user-agent", "Adobe-CifGraphqlClient/TEST (Java/" + JAVA_VERSION + ")"));
+    }
 }
