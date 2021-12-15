@@ -27,6 +27,8 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
+import org.apache.http.HeaderElement;
+import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
@@ -37,6 +39,7 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.DefaultHostnameVerifier;
@@ -46,8 +49,11 @@ import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.http.pool.PoolStats;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.protocol.HttpContext;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
@@ -143,7 +149,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
 
         configureCaches(configuration);
-        configureHttpClient();
+        client = configureHttpClientBuilder().build();
     }
 
     @Deactivate
@@ -288,7 +294,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
     }
 
-    private void configureHttpClient() throws Exception {
+    HttpClientBuilder configureHttpClientBuilder() throws Exception {
         SSLConnectionSocketFactory sslsf;
         if (configuration.acceptSelfSignedCertificates()) {
             LOGGER.warn("Self-signed SSL certificates are accepted. This should NOT be done on production systems!");
@@ -318,12 +324,17 @@ public class GraphqlClientImpl implements GraphqlClient {
             .setConnectionRequestTimeout(configuration.requestPoolTimeout())
             .build();
 
-        client = clientBuilderFactory.newBuilder()
-            .setDefaultRequestConfig(requestConfig)
+        HttpClientBuilder httpClientBuilder = clientBuilderFactory.newBuilder();
+        httpClientBuilder.setDefaultRequestConfig(requestConfig)
             .setConnectionManager(cm)
             .disableCookieManagement()
-            .setUserAgent(VersionInfo.getUserAgent(USER_AGENT_NAME, "com.adobe.cq.commerce.graphql.client", this.getClass()))
-            .build();
+            .setUserAgent(VersionInfo.getUserAgent(USER_AGENT_NAME, "com.adobe.cq.commerce.graphql.client", this.getClass()));
+
+        if (configuration.connectionKeepAlive() != GraphqlClientConfiguration.DEFAULT_CONNECTION_KEEP_ALIVE) {
+            httpClientBuilder.setKeepAliveStrategy(new ConfigurableConnectionKeepAliveStrategy(configuration.connectionKeepAlive()));
+        }
+
+        return httpClientBuilder;
     }
 
     private HttpUriRequest buildRequest(GraphqlRequest request, RequestOptions options) throws UnsupportedEncodingException {
@@ -370,5 +381,27 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
 
         return rb.build();
+    }
+
+    static class ConfigurableConnectionKeepAliveStrategy implements ConnectionKeepAliveStrategy {
+        private int defaultConnectionKeepAlive;
+
+        public ConfigurableConnectionKeepAliveStrategy(int defaultConnectionKeepAlive) {
+            this.defaultConnectionKeepAlive = defaultConnectionKeepAlive;
+        }
+
+        @Override
+        public long getKeepAliveDuration(HttpResponse httpResponse, HttpContext httpContext) {
+            HeaderElementIterator it = new BasicHeaderElementIterator(httpResponse.headerIterator(HTTP.CONN_KEEP_ALIVE));
+            while (it.hasNext()) {
+                HeaderElement he = it.nextElement();
+                String param = he.getName();
+                String value = he.getValue();
+                if (value != null && param.equalsIgnoreCase("timeout")) {
+                    return Long.parseLong(value) * 1000;
+                }
+            }
+            return defaultConnectionKeepAlive * 1000L;
+        }
     }
 }

@@ -31,6 +31,7 @@ public @interface GraphqlClientConfiguration {
     int DEFAULT_CONNECTION_TIMEOUT = 5000;
     int DEFAULT_SOCKET_TIMEOUT = 5000;
     int DEFAULT_REQUESTPOOL_TIMEOUT = 2000;
+    int DEFAULT_CONNECTION_KEEP_ALIVE = -1;
 
     @AttributeDefinition(
         name = "GraphQL Service Identifier",
@@ -95,6 +96,13 @@ public @interface GraphqlClientConfiguration {
             + "warning will be logged. Defaults to " + DEFAULT_REQUESTPOOL_TIMEOUT,
         type = AttributeType.INTEGER)
     int requestPoolTimeout() default DEFAULT_REQUESTPOOL_TIMEOUT;
+
+    @AttributeDefinition(
+        name = "Connection keep alive",
+        description = "The number of seconds the unused connections are kept in the connection pool. Defaults to "
+            + DEFAULT_CONNECTION_KEEP_ALIVE + ", keep alive indefinitely.",
+        type = AttributeType.INTEGER)
+    int connectionKeepAlive() default DEFAULT_CONNECTION_KEEP_ALIVE;
 
     @AttributeDefinition(
         name = "Default HTTP Headers",
