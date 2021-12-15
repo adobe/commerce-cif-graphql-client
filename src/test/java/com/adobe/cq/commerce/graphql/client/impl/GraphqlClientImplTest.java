@@ -19,6 +19,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.http.Header;
@@ -318,10 +319,11 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testCustomConnectionKeepAlive() throws Exception {
+        int customKeepAlive = 10;
+
         graphqlClient = new GraphqlClientImpl();
         mockConfig = new MockGraphqlClientConfiguration();
-        int customKeepLive = 10;
-        mockConfig.setConnectionKeepAlive(customKeepLive);
+        mockConfig.setConnectionKeepAlive(customKeepAlive);
         graphqlClient.activate(mockConfig);
         HttpClientBuilder builder = graphqlClient.configureHttpClientBuilder();
         ConnectionKeepAliveStrategy connectionKeepAliveStrategy = getBuilderKeepAliveStrategy(builder);
@@ -331,20 +333,49 @@ public class GraphqlClientImplTest {
         // with empty headers
         HttpResponse httpResponse = mock(HttpResponse.class);
         when(httpResponse.headerIterator(anyString())).thenReturn(mock(HeaderIterator.class));
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
 
-        assertEquals(customKeepLive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+        // with keep alive header timeout invalid
+        prepareResponse(httpResponse, "2.5");
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
 
-        // with keep alive header
-        HeaderIterator headerIterator = mock(HeaderIterator.class);
-        when(headerIterator.hasNext()).thenReturn(true);
+        // with keep alive header timeout negative
+        prepareResponse(httpResponse, "-1");
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+
+        // with keep alive header timeout smaller than custom
+        int responseKeepAlive = 5;
+        prepareResponse(httpResponse, String.valueOf(responseKeepAlive));
+        assertEquals(responseKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+
+        // with keep alive header timeout larger than custom
+        prepareResponse(httpResponse, "15");
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+    }
+
+    private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {
         Header header = mock(Header.class);
         when(header.getName()).thenReturn(HTTP.CONN_KEEP_ALIVE);
-        int responseKeepAlive = 5;
         when(header.getValue()).thenReturn("timeout=" + responseKeepAlive);
-        when(headerIterator.nextHeader()).thenReturn(header);
-        when(httpResponse.headerIterator(anyString())).thenReturn(headerIterator);
+        List<Header> headerList = new ArrayList<>();
+        headerList.add(header);
+        Iterator<Header> headerIterator = headerList.iterator();
+        when(httpResponse.headerIterator(anyString())).thenReturn(new HeaderIterator() {
+            @Override
+            public boolean hasNext() {
+                return headerIterator.hasNext();
+            }
 
-        assertEquals(responseKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+            @Override
+            public Header nextHeader() {
+                return headerIterator.next();
+            }
+
+            @Override
+            public Object next() {
+                return headerIterator.next();
+            }
+        });
     }
 
     ConnectionKeepAliveStrategy getBuilderKeepAliveStrategy(HttpClientBuilder builder) throws Exception {

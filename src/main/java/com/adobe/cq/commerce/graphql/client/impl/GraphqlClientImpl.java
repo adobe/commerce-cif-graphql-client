@@ -392,16 +392,27 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         @Override
         public long getKeepAliveDuration(HttpResponse httpResponse, HttpContext httpContext) {
+            long keepAliveSeconds = defaultConnectionKeepAlive;
+
             HeaderElementIterator it = new BasicHeaderElementIterator(httpResponse.headerIterator(HTTP.CONN_KEEP_ALIVE));
             while (it.hasNext()) {
                 HeaderElement he = it.nextElement();
                 String param = he.getName();
                 String value = he.getValue();
                 if (value != null && param.equalsIgnoreCase("timeout")) {
-                    return Long.parseLong(value) * 1000;
+                    try {
+                        long headerConnectionKeepAlive = Long.parseLong(value);
+                        if (headerConnectionKeepAlive > 0) {
+                            keepAliveSeconds = Math.min(keepAliveSeconds, headerConnectionKeepAlive);
+                            break;
+                        }
+                    } catch (NumberFormatException x) {
+                        // ignore
+                    }
                 }
             }
-            return defaultConnectionKeepAlive * 1000L;
+
+            return keepAliveSeconds * 1000L;
         }
     }
 }
