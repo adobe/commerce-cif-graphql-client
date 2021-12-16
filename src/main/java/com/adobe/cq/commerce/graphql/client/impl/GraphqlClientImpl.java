@@ -407,7 +407,7 @@ public class GraphqlClientImpl implements GraphqlClient {
                             break;
                         }
                     } catch (NumberFormatException x) {
-                        // ignore
+                        LOGGER.debug("Invalid connection keep alive timeout: {}", value);
                     }
                 }
             }

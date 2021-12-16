@@ -100,7 +100,7 @@ public @interface GraphqlClientConfiguration {
     @AttributeDefinition(
         name = "Connection keep alive",
         description = "The number of seconds the unused connections are kept in the connection pool. Defaults to "
-            + DEFAULT_CONNECTION_KEEP_ALIVE + ", keep alive indefinitely.",
+            + DEFAULT_CONNECTION_KEEP_ALIVE + ". If the value is <= 0 then the connection is kept alive indefinitely.",
         type = AttributeType.INTEGER)
     int connectionKeepAlive() default DEFAULT_CONNECTION_KEEP_ALIVE;
 
