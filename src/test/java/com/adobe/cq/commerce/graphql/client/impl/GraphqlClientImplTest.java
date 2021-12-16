@@ -19,7 +19,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.http.Header;
@@ -31,6 +30,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicListHeaderIterator;
 import org.apache.http.protocol.HTTP;
 import org.hamcrest.CustomMatcher;
 import org.junit.Before;
@@ -62,8 +62,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -357,25 +356,7 @@ public class GraphqlClientImplTest {
         Header header = mock(Header.class);
         when(header.getName()).thenReturn(HTTP.CONN_KEEP_ALIVE);
         when(header.getValue()).thenReturn("timeout=" + responseKeepAlive);
-        List<Header> headerList = new ArrayList<>();
-        headerList.add(header);
-        Iterator<Header> headerIterator = headerList.iterator();
-        when(httpResponse.headerIterator(anyString())).thenReturn(new HeaderIterator() {
-            @Override
-            public boolean hasNext() {
-                return headerIterator.hasNext();
-            }
-
-            @Override
-            public Header nextHeader() {
-                return headerIterator.next();
-            }
-
-            @Override
-            public Object next() {
-                return headerIterator.next();
-            }
-        });
+        when(httpResponse.headerIterator(anyString())).thenReturn(new BasicListHeaderIterator(Collections.singletonList(header), null));
     }
 
     ConnectionKeepAliveStrategy getBuilderKeepAliveStrategy(HttpClientBuilder builder) throws Exception {
