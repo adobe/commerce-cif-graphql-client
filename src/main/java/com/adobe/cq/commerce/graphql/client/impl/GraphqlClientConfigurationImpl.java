@@ -34,6 +34,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
     private int requestPoolTimeout = GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
     private String[] httpHeaders = new String[0];
     private String[] cacheConfigurations = new String[0];
+    private int connectionKeepAlive = GraphqlClientConfiguration.DEFAULT_CONNECTION_KEEP_ALIVE;
 
     GraphqlClientConfigurationImpl(String url) {
         this.url = url;
@@ -51,6 +52,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         requestPoolTimeout = configuration.requestPoolTimeout();
         httpHeaders = configuration.httpHeaders();
         cacheConfigurations = configuration.cacheConfigurations();
+        connectionKeepAlive = configuration.connectionKeepAlive();
     }
 
     @Override
@@ -155,5 +157,14 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setCacheConfigurations(String... cacheConfigurations) {
         this.cacheConfigurations = cacheConfigurations;
+    }
+
+    @Override
+    public int connectionKeepAlive() {
+        return connectionKeepAlive;
+    }
+
+    public void setConnectionKeepAlive(int connectionKeepAlive) {
+        this.connectionKeepAlive = connectionKeepAlive;
     }
 }

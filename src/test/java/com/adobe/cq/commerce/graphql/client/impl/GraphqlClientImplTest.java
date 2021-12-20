@@ -15,16 +15,23 @@
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 import org.apache.http.Header;
+import org.apache.http.HeaderIterator;
 import org.apache.http.HttpHeaders;
+import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicListHeaderIterator;
+import org.apache.http.protocol.HTTP;
 import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,10 +60,13 @@ import com.google.gson.JsonParseException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.mockito.Matchers.argThat;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class GraphqlClientImplTest {
 
@@ -295,5 +305,63 @@ public class GraphqlClientImplTest {
         GraphqlClientConfiguration configuration = graphqlClient.getConfiguration();
         assertEquals(mockConfig.identifier(), configuration.identifier());
         assertEquals("mockIdentifier", graphqlClient.getIdentifier());
+    }
+
+    @Test
+    public void testDefaultConnectionKeepAlive() throws Exception {
+        graphqlClient = new GraphqlClientImpl();
+        mockConfig = new MockGraphqlClientConfiguration();
+        graphqlClient.activate(mockConfig);
+        HttpClientBuilder builder = graphqlClient.configureHttpClientBuilder();
+        assertNull(getBuilderKeepAliveStrategy(builder));
+    }
+
+    @Test
+    public void testCustomConnectionKeepAlive() throws Exception {
+        int customKeepAlive = 10;
+
+        graphqlClient = new GraphqlClientImpl();
+        mockConfig = new MockGraphqlClientConfiguration();
+        mockConfig.setConnectionKeepAlive(customKeepAlive);
+        graphqlClient.activate(mockConfig);
+        HttpClientBuilder builder = graphqlClient.configureHttpClientBuilder();
+        ConnectionKeepAliveStrategy connectionKeepAliveStrategy = getBuilderKeepAliveStrategy(builder);
+
+        assertTrue(connectionKeepAliveStrategy instanceof GraphqlClientImpl.ConfigurableConnectionKeepAliveStrategy);
+
+        // with empty headers
+        HttpResponse httpResponse = mock(HttpResponse.class);
+        when(httpResponse.headerIterator(anyString())).thenReturn(mock(HeaderIterator.class));
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+
+        // with keep alive header timeout invalid
+        prepareResponse(httpResponse, "2.5");
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+
+        // with keep alive header timeout negative
+        prepareResponse(httpResponse, "-1");
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+
+        // with keep alive header timeout smaller than custom
+        int responseKeepAlive = 5;
+        prepareResponse(httpResponse, String.valueOf(responseKeepAlive));
+        assertEquals(responseKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+
+        // with keep alive header timeout larger than custom
+        prepareResponse(httpResponse, "15");
+        assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+    }
+
+    private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {
+        Header header = mock(Header.class);
+        when(header.getName()).thenReturn(HTTP.CONN_KEEP_ALIVE);
+        when(header.getValue()).thenReturn("timeout=" + responseKeepAlive);
+        when(httpResponse.headerIterator(anyString())).thenReturn(new BasicListHeaderIterator(Collections.singletonList(header), null));
+    }
+
+    ConnectionKeepAliveStrategy getBuilderKeepAliveStrategy(HttpClientBuilder builder) throws Exception {
+        Field field = builder.getClass().getDeclaredField("keepAliveStrategy");
+        field.setAccessible(true);
+        return (ConnectionKeepAliveStrategy) field.get(builder);
     }
 }
