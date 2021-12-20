@@ -330,7 +330,7 @@ public class GraphqlClientImpl implements GraphqlClient {
             .disableCookieManagement()
             .setUserAgent(VersionInfo.getUserAgent(USER_AGENT_NAME, "com.adobe.cq.commerce.graphql.client", this.getClass()));
 
-        if (configuration.connectionKeepAlive() != GraphqlClientConfiguration.DEFAULT_CONNECTION_KEEP_ALIVE) {
+        if (configuration.connectionKeepAlive() >= 0) {
             httpClientBuilder.setKeepAliveStrategy(new ConfigurableConnectionKeepAliveStrategy(configuration.connectionKeepAlive()));
         }
 
