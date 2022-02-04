@@ -374,12 +374,10 @@ public class GraphqlClientImpl implements GraphqlClient {
             rb.setEntity(new StringEntity(gson.toJson(request), StandardCharsets.UTF_8.name()));
         }
 
-        if (configuration.httpHeaders() != null) {
-            for (String httpHeader : configuration.httpHeaders()) {
-                String[] parts = StringUtils.split(httpHeader, ":", 2);
-                if (parts.length == 2 && StringUtils.isNoneBlank(parts[0], parts[1])) {
-                    rb.addHeader(parts[0].trim(), parts[1].trim());
-                }
+        for (String httpHeader : configuration.httpHeaders()) {
+            String[] parts = StringUtils.split(httpHeader, ":", 2);
+            if (parts.length == 2 && StringUtils.isNoneBlank(parts[0], parts[1])) {
+                rb.addHeader(parts[0].trim(), parts[1].trim());
             }
         }
 
