@@ -15,23 +15,27 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import org.junit.Test;
 
+import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
+
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class GraphqlClientConfigurationImplTest {
 
     @Test
     public void testReturnsAlwaysNonNullHeaders() {
-        MockGraphqlClientConfiguration mockConfig = new MockGraphqlClientConfiguration();
+        GraphqlClientConfiguration mockConfig = mock(GraphqlClientConfiguration.class);
         assertNotNull(new GraphqlClientConfigurationImpl(mockConfig).httpHeaders());
-        mockConfig.setHttpHeaders("foo: bar");
+        when(mockConfig.httpHeaders()).thenReturn(new String[] { "foo: bar" });
         assertNotNull(new GraphqlClientConfigurationImpl(mockConfig).httpHeaders());
     }
 
     @Test
     public void testReturnsAlwaysNonNullCacheConfigurations() {
-        MockGraphqlClientConfiguration mockConfig = new MockGraphqlClientConfiguration();
+        GraphqlClientConfiguration mockConfig = mock(GraphqlClientConfiguration.class);
         assertNotNull(new GraphqlClientConfigurationImpl(mockConfig).cacheConfigurations());
-        mockConfig.setCacheConfigurations("foo: bar");
+        when(mockConfig.cacheConfigurations()).thenReturn(new String[] { "foo: bar" });
         assertNotNull(new GraphqlClientConfigurationImpl(mockConfig).cacheConfigurations());
     }
 }
