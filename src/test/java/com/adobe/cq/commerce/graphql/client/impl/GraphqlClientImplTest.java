@@ -143,7 +143,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testInvalidHttpHeaders() throws Exception {
-        mockConfig.setHttpHeaders("anything", "", "Name:", ":Value", "Header: Value");
+        mockConfig.setHttpHeaders("anything", "", ":Value", "Name: ", "Header: Value");
         graphqlClient.activate(mockConfig);
         assertArrayEquals(new String[] { "Header: Value" }, graphqlClient.getConfiguration().httpHeaders());
     }
@@ -154,7 +154,7 @@ public class GraphqlClientImplTest {
         // configuration
         TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         GraphqlClientConfigurationImpl activeConfig = (GraphqlClientConfigurationImpl) graphqlClient.getConfiguration();
-        activeConfig.setHttpHeaders("anything", "", ":Value", "Name:", "Header: Value");
+        activeConfig.setHttpHeaders("anything", "", ":Value", "Name: ", "Header: Value");
         graphqlClient.execute(dummy, Data.class, Error.class);
 
         List<Header> expectedHeaders = new ArrayList<>();
