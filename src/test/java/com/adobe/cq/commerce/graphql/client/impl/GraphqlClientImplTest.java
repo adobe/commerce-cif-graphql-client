@@ -58,6 +58,7 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -114,25 +115,37 @@ public class GraphqlClientImplTest {
     }
 
     @Test
-    public void testWarningsAreLoggedForTimeoutsTooBig() throws Exception {
+    public void testWarningsAreLoggedForInvalidConfigurations() throws Exception {
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
         Logger logger = loggerContext.getLogger(GraphqlClientImpl.class);
         logger.setLevel(Level.WARN);
-        Appender<ILoggingEvent> appender = mock(Appender.class);
-        logger.addAppender(appender);
+        Appender<ILoggingEvent> appender = mock(Appender.class, "testWarningsAreLoggedForTimeoutsTooBig");
+        try {
+            logger.addAppender(appender);
 
-        mockConfig.setSocketTimeout(10000);
-        mockConfig.setConnectionTimeout(10000);
-        mockConfig.setRequestPoolTimeout(10000);
+            mockConfig.setSocketTimeout(10000);
+            mockConfig.setConnectionTimeout(10000);
+            mockConfig.setRequestPoolTimeout(10000);
+            mockConfig.setHttpHeaders("");
+            graphqlClient.activate(mockConfig);
+
+            // verify the 3 warnings are logged
+            verify(appender, times(4)).doAppend(argThat(new CustomMatcher<ILoggingEvent>("log event of level warn") {
+                @Override
+                public boolean matches(Object o) {
+                    return o instanceof ILoggingEvent && ((ILoggingEvent) o).getLevel() == Level.WARN;
+                }
+            }));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
+    public void testInvalidHttpHeaders() throws Exception {
+        mockConfig.setHttpHeaders("anything", "", "Name:", ":Value", "Header: Value");
         graphqlClient.activate(mockConfig);
-
-        // verify the 3 warnings are logged
-        verify(appender, times(3)).doAppend(argThat(new CustomMatcher<ILoggingEvent>("log event of level warn") {
-            @Override
-            public boolean matches(Object o) {
-                return o instanceof ILoggingEvent && ((ILoggingEvent) o).getLevel() == Level.WARN;
-            }
-        }));
+        assertArrayEquals(new String[] { "Header: Value" }, graphqlClient.getConfiguration().httpHeaders());
     }
 
     @Test
@@ -209,7 +222,6 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testCustomGson() throws Exception {
-
         // A custom deserializer that returns dummy data
         class CustomDeserializer implements JsonDeserializer<Data> {
             public Data deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
@@ -244,29 +256,6 @@ public class GraphqlClientImplTest {
         // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
         HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
         Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
-    }
-
-    private void testConfigureHeader(String header) throws Exception {
-        graphqlClient = new GraphqlClientImpl();
-        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
-        config.setHttpHeaders(header);
-        graphqlClient.activate(config);
-        graphqlClient.execute(dummy, Data.class, Error.class);
-    }
-
-    @Test(expected = RuntimeException.class)
-    public void testInvalidHeaderSeparator() throws Exception {
-        testConfigureHeader(HttpHeaders.AUTHORIZATION + "=" + AUTH_HEADER_VALUE);
-    }
-
-    @Test(expected = RuntimeException.class)
-    public void testInvalidHeaderNoValue() throws Exception {
-        testConfigureHeader(HttpHeaders.AUTHORIZATION + ":");
-    }
-
-    @Test(expected = RuntimeException.class)
-    public void testInvalidHeaderNoName() throws Exception {
-        testConfigureHeader(":" + AUTH_HEADER_VALUE);
     }
 
     @Test

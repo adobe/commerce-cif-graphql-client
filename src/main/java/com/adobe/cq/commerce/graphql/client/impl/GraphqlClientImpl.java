@@ -16,6 +16,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,6 +146,20 @@ public class GraphqlClientImpl implements GraphqlClient {
                 LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
             } else {
                 throw new ComponentException("Insecure HTTP communication for GraphQL origin is not allowed.");
+            }
+        }
+
+        if (this.configuration.httpHeaders().length > 0) {
+            String[] newHeaders = Arrays.stream(this.configuration.httpHeaders())
+                .filter(header -> {
+                    String[] parts = StringUtils.split(header, ":", 2);
+                    return parts.length == 2 && StringUtils.isNoneBlank(parts[0], parts[1]);
+                })
+                .toArray(String[]::new);
+
+            if (newHeaders.length != this.configuration.httpHeaders().length) {
+                LOGGER.warn("Configuration contains invalid HTTP headers, please review the configuration.");
+                this.configuration.setHttpHeaders(newHeaders);
             }
         }
 
@@ -367,16 +382,19 @@ public class GraphqlClientImpl implements GraphqlClient {
                 }
 
                 int idx = httpHeader.indexOf(":");
-                if (idx < 1 || httpHeader.length() <= (idx + 1)) {
-                    throw new IllegalStateException("The HTTP header is not a name:value pair --> " + httpHeader);
+                if (idx < 1) {
+                    // should not happen since we filter invalid headers in activate()
+                    LOGGER.debug("Invalid http header, skipping: {}", httpHeader);
+                    continue;
                 }
+
                 rb.addHeader(httpHeader.substring(0, idx).trim(), httpHeader.substring(idx + 1).trim());
             }
         }
 
         if (options != null && options.getHeaders() != null) {
             for (Header header : options.getHeaders()) {
-                rb.addHeader(header.getName(), header.getValue());
+                rb.addHeader(header);
             }
         }
 
