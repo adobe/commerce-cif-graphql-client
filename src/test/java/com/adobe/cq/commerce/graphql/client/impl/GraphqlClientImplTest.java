@@ -94,9 +94,9 @@ public class GraphqlClientImplTest {
         mockConfig = new MockGraphqlClientConfiguration();
         mockConfig.setIdentifier("mockIdentifier");
         // Add three test headers, one with extra white space around " : " to make sure we properly trim spaces, and one empty header
-        mockConfig.setHttpHeaders(HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE, HttpHeaders.CACHE_CONTROL + " : "
-            + CACHE_HEADER_VALUE,
-            "");
+        mockConfig.setHttpHeaders(
+            HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE,
+            HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE);
 
         graphqlClient.activate(mockConfig);
         graphqlClient.client = Mockito.mock(HttpClient.class);
@@ -146,6 +146,23 @@ public class GraphqlClientImplTest {
         mockConfig.setHttpHeaders("anything", "", "Name:", ":Value", "Header: Value");
         graphqlClient.activate(mockConfig);
         assertArrayEquals(new String[] { "Header: Value" }, graphqlClient.getConfiguration().httpHeaders());
+    }
+
+    @Test
+    public void testInvalidHttpHeadersSkipped() throws Exception {
+        // should not be possible in real world, but may happen if a regression is introduced that exposes the setHttpHeaders() of the
+        // configuration
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        GraphqlClientConfigurationImpl activeConfig = (GraphqlClientConfigurationImpl) graphqlClient.getConfiguration();
+        activeConfig.setHttpHeaders("anything", "", ":Value", "Name:", "Header: Value");
+        graphqlClient.execute(dummy, Data.class, Error.class);
+
+        List<Header> expectedHeaders = new ArrayList<>();
+        expectedHeaders.add(new BasicHeader("Header", "Value"));
+
+        // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
+        HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
     }
 
     @Test

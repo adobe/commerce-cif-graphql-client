@@ -376,19 +376,10 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         if (configuration.httpHeaders() != null) {
             for (String httpHeader : configuration.httpHeaders()) {
-                // We ignore empty values, this may happen because of the way the AEM OSGi configuration editor works
-                if (StringUtils.isBlank(httpHeader)) {
-                    continue;
+                String[] parts = StringUtils.split(httpHeader, ":", 2);
+                if (parts.length == 2 && StringUtils.isNoneBlank(parts[0], parts[1])) {
+                    rb.addHeader(parts[0].trim(), parts[1].trim());
                 }
-
-                int idx = httpHeader.indexOf(":");
-                if (idx < 1) {
-                    // should not happen since we filter invalid headers in activate()
-                    LOGGER.debug("Invalid http header, skipping: {}", httpHeader);
-                    continue;
-                }
-
-                rb.addHeader(httpHeader.substring(0, idx).trim(), httpHeader.substring(idx + 1).trim());
             }
         }
 
