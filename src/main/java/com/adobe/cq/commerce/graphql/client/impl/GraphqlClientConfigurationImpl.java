@@ -50,8 +50,8 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         connectionTimeout = configuration.connectionTimeout();
         socketTimeout = configuration.socketTimeout();
         requestPoolTimeout = configuration.requestPoolTimeout();
-        httpHeaders = configuration.httpHeaders();
-        cacheConfigurations = configuration.cacheConfigurations();
+        httpHeaders = configuration.httpHeaders() != null ? configuration.httpHeaders() : this.httpHeaders;
+        cacheConfigurations = configuration.cacheConfigurations() != null ? configuration.cacheConfigurations() : this.cacheConfigurations;
         connectionKeepAlive = configuration.connectionKeepAlive();
     }
 
