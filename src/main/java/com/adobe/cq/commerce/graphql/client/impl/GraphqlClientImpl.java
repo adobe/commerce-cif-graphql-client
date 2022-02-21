@@ -15,6 +15,8 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -139,6 +141,17 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (this.configuration.requestPoolTimeout() > GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT) {
             LOGGER.warn("Request pool timeout is too big: {}. This may cause Thread starvation and should be urgently reviewed.",
                 configuration.requestPoolTimeout());
+        }
+
+        if (StringUtils.isBlank(this.configuration.url())) {
+            throw new ComponentException("No endpoint url");
+        } else {
+            try {
+                // validate url syntax
+                new URL(this.configuration.url());
+            } catch (MalformedURLException ex) {
+                throw new ComponentException("Invalid endpoint url", ex);
+            }
         }
 
         if (StringUtils.startsWith(this.configuration.url(), "http://")) {

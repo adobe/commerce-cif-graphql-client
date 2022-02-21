@@ -36,6 +36,7 @@ import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.osgi.service.component.ComponentException;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
@@ -100,6 +101,18 @@ public class GraphqlClientImplTest {
 
         graphqlClient.activate(mockConfig);
         graphqlClient.client = Mockito.mock(HttpClient.class);
+    }
+
+    @Test(expected = ComponentException.class)
+    public void testEmptyUrlThrows() throws Exception {
+        mockConfig.setUrl("");
+        graphqlClient.activate(mockConfig);
+    }
+
+    @Test(expected = ComponentException.class)
+    public void testInvalidUrlThrows() throws Exception {
+        mockConfig.setUrl("$[env:URL]");
+        graphqlClient.activate(mockConfig);
     }
 
     @Test
