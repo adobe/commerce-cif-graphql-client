@@ -84,7 +84,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-@Component(service = GraphqlClient.class)
+@Component(service = { GraphqlClient.class, GraphqlClientImpl.class })
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
 
@@ -211,6 +211,14 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
         } else {
             caches = null; // make sure it's always reset
+        }
+    }
+
+    public void invalidateCaches() {
+        if (caches != null) {
+            for (Cache<?, ?> cache : caches.values()) {
+                cache.invalidateAll();
+            }
         }
     }
 

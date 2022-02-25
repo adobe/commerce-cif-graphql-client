@@ -32,11 +32,14 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.mockito.ArgumentMatcher;
-import org.mockito.Mockito;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.google.gson.Gson;
+
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestUtils {
 
@@ -150,47 +153,48 @@ public class TestUtils {
      */
     public static String setupHttpResponse(String filename, HttpClient httpClient, int httpCode) throws IOException {
         String json = getResource(filename);
-
-        HttpEntity mockedHttpEntity = Mockito.mock(HttpEntity.class);
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
-        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
-
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        Mockito.when(mockedHttpEntity.getContent()).thenReturn(new ByteArrayInputStream(bytes));
-        Mockito.when(mockedHttpEntity.getContentLength()).thenReturn(new Long(bytes.length));
 
-        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+        HttpResponse mockedHttpResponse = mock(HttpResponse.class);
+        StatusLine mockedStatusLine = mock(StatusLine.class);
 
-        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
-        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
+        when(mockedHttpResponse.getEntity()).then(inv -> {
+            HttpEntity mockHttpEntity = mock(HttpEntity.class);
+            when(mockHttpEntity.getContent()).thenReturn(new ByteArrayInputStream(bytes));
+            when(mockHttpEntity.getContentLength()).thenReturn(new Long(bytes.length));
+            return mockHttpEntity;
+        });
+        when(httpClient.execute((HttpUriRequest) any())).thenReturn(mockedHttpResponse);
+
+        when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
+        when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
 
         return json;
     }
 
     public static void setupHttpResponse(InputStream data, HttpClient httpClient, int httpCode) throws IOException {
-        HttpEntity mockedHttpEntity = Mockito.mock(HttpEntity.class);
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
-        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
+        HttpEntity mockedHttpEntity = mock(HttpEntity.class);
+        HttpResponse mockedHttpResponse = mock(HttpResponse.class);
+        StatusLine mockedStatusLine = mock(StatusLine.class);
 
-        Mockito.when(mockedHttpEntity.getContent()).thenReturn(data);
+        when(mockedHttpEntity.getContent()).thenReturn(data);
 
-        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+        when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
+        when(httpClient.execute((HttpUriRequest) any())).thenReturn(mockedHttpResponse);
 
-        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
-        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
+        when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
+        when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
     }
 
     public static void setupNullResponse(HttpClient httpClient) throws IOException {
-        HttpResponse mockedHttpResponse = Mockito.mock(HttpResponse.class);
-        StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
+        HttpResponse mockedHttpResponse = mock(HttpResponse.class);
+        StatusLine mockedStatusLine = mock(StatusLine.class);
 
-        Mockito.when(mockedHttpResponse.getEntity()).thenReturn(null);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+        when(mockedHttpResponse.getEntity()).thenReturn(null);
+        when(httpClient.execute((HttpUriRequest) any())).thenReturn(mockedHttpResponse);
 
-        Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_OK);
-        Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
+        when(mockedStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_OK);
+        when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
     }
 
     public static String getResource(String filename) throws IOException {

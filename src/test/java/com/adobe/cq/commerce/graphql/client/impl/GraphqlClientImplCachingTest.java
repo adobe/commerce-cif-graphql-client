@@ -22,15 +22,20 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.message.BasicHeader;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import com.adobe.cq.commerce.graphql.client.CachingStrategy;
 import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.day.cq.replication.ReplicationAction;
+import com.day.cq.replication.ReplicationActionType;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class GraphqlClientImplCachingTest {
 
@@ -57,7 +62,7 @@ public class GraphqlClientImplCachingTest {
         config.setCacheConfigurations(MY_CACHE + ":true:100:5", MY_DISABLED_CACHE + ":false:100:5", "");
 
         graphqlClient.activate(config);
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        graphqlClient.client = mock(HttpClient.class);
     }
 
     @Test(expected = IllegalStateException.class)
@@ -94,13 +99,39 @@ public class GraphqlClientImplCachingTest {
         assertEquals("Some text", response.getData().text);
         assertEquals(42, response.getData().count.intValue());
 
-        // This reponse is coming from the cache
+        // This response is coming from the cache
         GraphqlResponse<Data, Error> response2 = graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
         assertEquals("Some text", response2.getData().text);
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was only called once
-        Mockito.verify(graphqlClient.client).execute(Mockito.any());
+        verify(graphqlClient.client, times(1)).execute(any());
+    }
+
+    @Test
+    public void testActiveCacheInvalidation() throws Exception {
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy);
+
+        CacheInvalidationHandler invalidationHandler = new CacheInvalidationHandler();
+        invalidationHandler.graphqlClients = Collections.singletonList(graphqlClient);
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+
+        // execute query
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+
+        // invalidate caches
+        invalidationHandler.handleEvent(new ReplicationAction(ReplicationActionType.ACTIVATE, "/").toEvent());
+
+        // execute query again
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+
+        // HTTP client was only called once
+        verify(graphqlClient.client, times(2)).execute(any());
     }
 
     @Test
@@ -124,7 +155,7 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was called twice
-        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any());
+        verify(graphqlClient.client, times(2)).execute(any());
     }
 
     @Test
@@ -153,7 +184,7 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was called twice
-        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any());
+        verify(graphqlClient.client, times(2)).execute(any());
     }
 
     @Test
@@ -214,7 +245,7 @@ public class GraphqlClientImplCachingTest {
     public void testNoCache() throws Exception {
         graphqlClient = new GraphqlClientImpl();
         graphqlClient.activate(new MockGraphqlClientConfiguration());
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        graphqlClient.client = mock(HttpClient.class);
 
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)
@@ -231,7 +262,7 @@ public class GraphqlClientImplCachingTest {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(ArrayUtils.EMPTY_STRING_ARRAY);
         graphqlClient.activate(config);
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        graphqlClient.client = mock(HttpClient.class);
 
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)
@@ -255,6 +286,6 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was called twice
-        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any());
+        verify(graphqlClient.client, times(2)).execute(any());
     }
 }
