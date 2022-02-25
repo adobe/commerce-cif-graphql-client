@@ -51,6 +51,8 @@ import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.GetQueryMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.HeadersMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.RequestBodyMatcher;
+import com.day.cq.replication.ReplicationAction;
+import com.day.cq.replication.ReplicationActionType;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -356,6 +358,14 @@ public class GraphqlClientImplTest {
         // with keep alive header timeout larger than custom
         prepareResponse(httpResponse, "15");
         assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+    }
+
+    @Test
+    public void testCacheInvalidationIgnored() {
+        // the subject is not configured for caching, if it is invalidated anyway it should not fail
+        CacheInvalidationHandler handler = new CacheInvalidationHandler();
+        handler.graphqlClients = Collections.singletonList(graphqlClient);
+        handler.handleEvent(new ReplicationAction(ReplicationActionType.ACTIVATE, "/").toEvent());
     }
 
     private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {
