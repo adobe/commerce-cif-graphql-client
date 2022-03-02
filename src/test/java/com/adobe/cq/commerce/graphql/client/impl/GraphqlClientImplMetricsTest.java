@@ -118,7 +118,7 @@ public class GraphqlClientImplMetricsTest {
         // given
         TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
-            "identifier", "default");
+            "identifier", "default", "url", "https://example.com");
 
         // when, then
         Gauge<?> availableConnections = metricRegistry.getGauges().get(
