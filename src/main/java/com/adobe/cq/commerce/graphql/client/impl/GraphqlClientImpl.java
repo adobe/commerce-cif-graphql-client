@@ -113,9 +113,6 @@ public class GraphqlClientImpl implements GraphqlClient {
         throws Exception {
         this.configuration = new GraphqlClientConfigurationImpl(configuration);
         this.gson = new Gson();
-        this.metrics = metricsRegistry != null
-            ? new GraphqlClientMetricsImpl(metricsRegistry, configuration)
-            : GraphqlClientMetrics.NOOP;
 
         if (this.configuration.socketTimeout() <= 0) {
             LOGGER.warn("Socket timeout set to infinity. This may cause Thread starvation and should be urgently reviewed. Falling back to "
@@ -182,6 +179,10 @@ public class GraphqlClientImpl implements GraphqlClient {
                 this.configuration.setHttpHeaders(newHeaders);
             }
         }
+
+        this.metrics = metricsRegistry != null
+            ? new GraphqlClientMetricsImpl(metricsRegistry, configuration)
+            : GraphqlClientMetrics.NOOP;
 
         configureCaches(configuration);
         client = configureHttpClientBuilder().build();
