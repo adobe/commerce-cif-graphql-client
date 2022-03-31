@@ -23,6 +23,7 @@ import org.apache.http.message.BasicHeader;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.CachingStrategy;
 import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
@@ -31,6 +32,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
 
 public class GraphqlClientImplCachingTest {
 
@@ -56,29 +58,29 @@ public class GraphqlClientImplCachingTest {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(MY_CACHE + ":true:100:5", MY_DISABLED_CACHE + ":false:100:5", "");
 
-        graphqlClient.activate(config);
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        graphqlClient.activate(config, mock(BundleContext.class));
+        graphqlClient.client = mock(HttpClient.class);
     }
 
     @Test(expected = IllegalStateException.class)
     public void testInvalidCacheConfiguration() throws Exception {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(MY_CACHE + ":true:"); // Not enough parameters
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
     }
 
     @Test(expected = NumberFormatException.class)
     public void testInvalidMaxSizeParameter() throws Exception {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(MY_CACHE + ":true:bad:5"); // Cache max size must be an Integer
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
     }
 
     @Test(expected = NumberFormatException.class)
     public void testInvalidTimeoutParameter() throws Exception {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(MY_CACHE + ":true:100:bad"); // Cache timeout must be an Integer
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
     }
 
     @Test
@@ -213,8 +215,8 @@ public class GraphqlClientImplCachingTest {
     @Test
     public void testNoCache() throws Exception {
         graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(new MockGraphqlClientConfiguration());
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        graphqlClient.activate(new MockGraphqlClientConfiguration(), mock(BundleContext.class));
+        graphqlClient.client = mock(HttpClient.class);
 
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)
@@ -230,8 +232,8 @@ public class GraphqlClientImplCachingTest {
         graphqlClient = new GraphqlClientImpl();
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(ArrayUtils.EMPTY_STRING_ARRAY);
-        graphqlClient.activate(config);
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        graphqlClient.activate(config, mock(BundleContext.class));
+        graphqlClient.client = mock(HttpClient.class);
 
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)

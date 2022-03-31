@@ -20,6 +20,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -61,7 +62,8 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.apache.http.util.VersionInfo;
-import org.osgi.service.component.ComponentException;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -86,7 +88,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-@Component(service = GraphqlClient.class)
+@Component(service = {})
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
 
@@ -104,9 +106,11 @@ public class GraphqlClientImpl implements GraphqlClient {
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private GraphqlClientMetrics metrics;
     private GraphqlClientConfigurationImpl configuration;
+    private ServiceRegistration<?> registration;
 
     @Activate
-    public void activate(GraphqlClientConfiguration configuration) throws Exception {
+    public void activate(GraphqlClientConfiguration configuration, BundleContext bundleContext)
+        throws Exception {
         this.configuration = new GraphqlClientConfigurationImpl(configuration);
         this.gson = new Gson();
         this.metrics = metricsRegistry != null
@@ -144,13 +148,15 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
 
         if (StringUtils.isBlank(this.configuration.url())) {
-            throw new ComponentException("No endpoint url");
+            LOGGER.info("No endpoint url configured for '{}'", configuration.identifier());
+            return;
         } else {
             try {
                 // validate url syntax
                 new URL(this.configuration.url());
             } catch (MalformedURLException ex) {
-                throw new ComponentException("Invalid endpoint url", ex);
+                LOGGER.error("Invalid endpoint url configured for: {}", configuration.identifier());
+                return;
             }
         }
 
@@ -158,7 +164,8 @@ public class GraphqlClientImpl implements GraphqlClient {
             if (this.configuration.allowHttpProtocol()) {
                 LOGGER.warn("Insecure HTTP communication is allowed. This should NOT be done on production systems!");
             } else {
-                throw new ComponentException("Insecure HTTP communication for GraphQL origin is not allowed.");
+                LOGGER.error("Insecure HTTP communication for GraphQL origin is not allowed for '{}'", configuration.identifier());
+                return;
             }
         }
 
@@ -178,6 +185,10 @@ public class GraphqlClientImpl implements GraphqlClient {
 
         configureCaches(configuration);
         client = configureHttpClientBuilder().build();
+
+        Hashtable<String, Object> serviceProps = new Hashtable<>();
+        serviceProps.put("identifier", configuration.identifier());
+        registration = bundleContext.registerService(GraphqlClient.class, this, serviceProps);
     }
 
     @Deactivate
@@ -185,6 +196,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (metrics instanceof GraphqlClientMetricsImpl) {
             ((GraphqlClientMetricsImpl) metrics).close();
         }
+        registration.unregister();
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {

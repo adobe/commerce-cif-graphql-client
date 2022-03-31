@@ -36,7 +36,7 @@ import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.osgi.service.component.ComponentException;
+import org.osgi.framework.BundleContext;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
@@ -44,6 +44,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
+import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
@@ -64,8 +65,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.*;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -99,20 +104,31 @@ public class GraphqlClientImplTest {
             HttpHeaders.AUTHORIZATION + ":" + AUTH_HEADER_VALUE,
             HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE);
 
-        graphqlClient.activate(mockConfig);
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
         graphqlClient.client = Mockito.mock(HttpClient.class);
     }
 
-    @Test(expected = ComponentException.class)
-    public void testEmptyUrlThrows() throws Exception {
-        mockConfig.setUrl("");
-        graphqlClient.activate(mockConfig);
+    @Test
+    public void testRegistersAsGraphqlClientService() throws Exception {
+        BundleContext bundleContext = mock(BundleContext.class);
+        graphqlClient.activate(mockConfig, bundleContext);
+        verify(bundleContext).registerService(eq(GraphqlClient.class), eq(graphqlClient), any());
     }
 
-    @Test(expected = ComponentException.class)
+    @Test
+    public void testEmptyUrlRegistersNoService() throws Exception {
+        BundleContext bundleContext = mock(BundleContext.class);
+        mockConfig.setUrl("");
+        graphqlClient.activate(mockConfig, bundleContext);
+        verify(bundleContext, never()).registerService(any(Class.class), any(GraphqlClientImpl.class), any());
+    }
+
+    @Test
     public void testInvalidUrlThrows() throws Exception {
+        BundleContext bundleContext = mock(BundleContext.class);
         mockConfig.setUrl("$[env:URL]");
-        graphqlClient.activate(mockConfig);
+        graphqlClient.activate(mockConfig, bundleContext);
+        verify(bundleContext, never()).registerService(any(Class.class), any(GraphqlClientImpl.class), any());
     }
 
     @Test
@@ -120,7 +136,7 @@ public class GraphqlClientImplTest {
         mockConfig.setSocketTimeout(0);
         mockConfig.setConnectionTimeout(0);
         mockConfig.setRequestPoolTimeout(0);
-        graphqlClient.activate(mockConfig);
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
 
         assertEquals(GraphqlClientConfiguration.DEFAULT_SOCKET_TIMEOUT, graphqlClient.getConfiguration().socketTimeout());
         assertEquals(GraphqlClientConfiguration.DEFAULT_CONNECTION_TIMEOUT, graphqlClient.getConfiguration().connectionTimeout());
@@ -140,7 +156,7 @@ public class GraphqlClientImplTest {
             mockConfig.setConnectionTimeout(10000);
             mockConfig.setRequestPoolTimeout(10000);
             mockConfig.setHttpHeaders("");
-            graphqlClient.activate(mockConfig);
+            graphqlClient.activate(mockConfig, mock(BundleContext.class));
 
             // verify the 3 warnings are logged
             verify(appender, times(4)).doAppend(argThat(new CustomMatcher<ILoggingEvent>("log event of level warn") {
@@ -157,7 +173,7 @@ public class GraphqlClientImplTest {
     @Test
     public void testInvalidHttpHeaders() throws Exception {
         mockConfig.setHttpHeaders("anything", "", ":Value", "Name: ", "Header: Value");
-        graphqlClient.activate(mockConfig);
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
         assertArrayEquals(new String[] { "Header: Value" }, graphqlClient.getConfiguration().httpHeaders());
     }
 
@@ -330,7 +346,7 @@ public class GraphqlClientImplTest {
     public void testDefaultConnectionKeepAlive() throws Exception {
         graphqlClient = new GraphqlClientImpl();
         mockConfig = new MockGraphqlClientConfiguration();
-        graphqlClient.activate(mockConfig);
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
         HttpClientBuilder builder = graphqlClient.configureHttpClientBuilder();
         assertNull(getBuilderKeepAliveStrategy(builder));
     }
@@ -342,7 +358,7 @@ public class GraphqlClientImplTest {
         graphqlClient = new GraphqlClientImpl();
         mockConfig = new MockGraphqlClientConfiguration();
         mockConfig.setConnectionKeepAlive(customKeepAlive);
-        graphqlClient.activate(mockConfig);
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
         HttpClientBuilder builder = graphqlClient.configureHttpClientBuilder();
         ConnectionKeepAliveStrategy connectionKeepAliveStrategy = getBuilderKeepAliveStrategy(builder);
 
