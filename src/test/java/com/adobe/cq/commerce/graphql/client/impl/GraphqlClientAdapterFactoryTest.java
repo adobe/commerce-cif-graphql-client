@@ -18,6 +18,7 @@ import org.apache.sling.api.resource.Resource;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.google.common.collect.ImmutableMap;
@@ -83,7 +84,7 @@ public class GraphqlClientAdapterFactoryTest {
     @Test
     public void testErrorCases() throws Exception {
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(new MockGraphqlClientConfiguration());
+        graphqlClient.activate(new MockGraphqlClientConfiguration(), mock(BundleContext.class));
 
         GraphqlClientAdapterFactory factory = new GraphqlClientAdapterFactory();
         factory.bindGraphqlClient(graphqlClient, null);

@@ -29,6 +29,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
+import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
@@ -36,6 +37,7 @@ import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Data;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Error;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockserver.model.HttpStatusCode.INTERNAL_SERVER_ERROR_500;
 
 public class ConcurrencyTest {
@@ -63,7 +65,7 @@ public class ConcurrencyTest {
         config.setAcceptSelfSignedCertificates(true);
 
         graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
     }
 
     @Test(timeout = 15000)

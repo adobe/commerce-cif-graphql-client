@@ -19,10 +19,16 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockserver.client.MockServerClient;
 import org.mockserver.model.HttpRequest;
+import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Data;
 import com.adobe.cq.commerce.graphql.client.impl.MockServerHelper.Error;
+
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 public class ProtocolTest {
 
@@ -47,7 +53,7 @@ public class ProtocolTest {
         config.setAcceptSelfSignedCertificates(true);
 
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
 
         GraphqlResponse<Data, Error> response = mockServer.executeGraphqlClientDummyRequest(graphqlClient);
         mockServer.validateSampleResponse(response);
@@ -56,13 +62,15 @@ public class ProtocolTest {
     /**
      * Ensure HTTP communication is by default not allowed.
      */
-    @Test(expected = RuntimeException.class)
+    @Test
     public void testSimpleRequest_HTTP_Disallowed() throws Exception {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setUrl("http://localhost:" + mockServer.getLocalPort() + "/graphql");
 
+        BundleContext bundleContext = mock(BundleContext.class);
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, bundleContext);
+        verify(bundleContext, never()).registerService(any(Class.class), any(GraphqlClientImpl.class), any());
     }
 
     /**
@@ -75,7 +83,7 @@ public class ProtocolTest {
         config.setAllowHttpProtocol(true);
 
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
 
         GraphqlResponse<Data, Error> response = mockServer.executeGraphqlClientDummyRequest(graphqlClient);
         mockServer.validateSampleResponse(response);
@@ -88,7 +96,7 @@ public class ProtocolTest {
         config.setAcceptSelfSignedCertificates(true);
 
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(config);
+        graphqlClient.activate(config, mock(BundleContext.class));
 
         MockServerClient client = mockServer.resetWithSampleResponse();
         mockServer.executeGraphqlClientDummyRequest(graphqlClient);
