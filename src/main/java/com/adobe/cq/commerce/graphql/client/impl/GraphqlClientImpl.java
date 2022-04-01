@@ -197,7 +197,9 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (metrics instanceof GraphqlClientMetricsImpl) {
             ((GraphqlClientMetricsImpl) metrics).close();
         }
-        registration.unregister();
+        if (registration != null) {
+            registration.unregister();
+        }
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
