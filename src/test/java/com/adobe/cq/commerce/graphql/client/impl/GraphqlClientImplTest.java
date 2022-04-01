@@ -37,6 +37,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceRegistration;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
@@ -110,9 +111,22 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testRegistersAsGraphqlClientService() throws Exception {
+        // given
         BundleContext bundleContext = mock(BundleContext.class);
+        ServiceRegistration registration = mock(ServiceRegistration.class);
+        when(bundleContext.registerService(eq(GraphqlClient.class), eq(graphqlClient), any())).thenReturn(registration);
+
+        // when
         graphqlClient.activate(mockConfig, bundleContext);
+
+        // then
         verify(bundleContext).registerService(eq(GraphqlClient.class), eq(graphqlClient), any());
+
+        // and when
+        graphqlClient.deactivate();
+
+        // then
+        verify(registration).unregister();
     }
 
     @Test
@@ -121,14 +135,18 @@ public class GraphqlClientImplTest {
         mockConfig.setUrl("");
         graphqlClient.activate(mockConfig, bundleContext);
         verify(bundleContext, never()).registerService(any(Class.class), any(GraphqlClientImpl.class), any());
+        // verify that no exception is thrown
+        graphqlClient.deactivate();
     }
 
     @Test
-    public void testInvalidUrlThrows() throws Exception {
+    public void testInvalidUrlRegistersNoService() throws Exception {
         BundleContext bundleContext = mock(BundleContext.class);
         mockConfig.setUrl("$[env:URL]");
         graphqlClient.activate(mockConfig, bundleContext);
         verify(bundleContext, never()).registerService(any(Class.class), any(GraphqlClientImpl.class), any());
+        // verify that no exception is thrown
+        graphqlClient.deactivate();
     }
 
     @Test
