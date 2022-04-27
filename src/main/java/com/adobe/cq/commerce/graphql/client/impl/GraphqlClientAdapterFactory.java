@@ -14,10 +14,10 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
@@ -54,7 +54,7 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
-    protected List<Holder> clients = new CopyOnWriteArrayList<>();
+    protected NavigableSet<Holder> clients = new ConcurrentSkipListSet<>();
     protected Map<String, GraphqlClient> clientsByIdentifier = new ConcurrentHashMap<>();
     protected BundleContext bundleContext;
 
@@ -68,7 +68,6 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         String identifier = graphqlClient.getIdentifier();
         LOGGER.info("Registering GraphqlClient '{}'", identifier);
         clients.add(new Holder(graphqlClient, properties));
-        clients.sort(null);
         clientsByIdentifier.remove(identifier);
     }
 

@@ -14,8 +14,6 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.util.Collections;
-
 import org.apache.sling.api.resource.Resource;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -91,17 +89,18 @@ public class GraphqlClientAdapterFactoryTest {
         GraphqlClient additionalClient = mock(GraphqlClient.class);
         when(additionalClient.getIdentifier()).thenReturn(GraphqlAemContext.CATALOG_IDENTIFIER);
 
-        context.registerService(GraphqlClient.class, additionalClient,
-            Constants.SERVICE_RANKING, -10,
-            GraphqlClientImpl.PROP_IDENTIFIER, GraphqlAemContext.CATALOG_IDENTIFIER);
+        // add a client with a high ranking that should not be used / never returned
+        GraphqlClient unusedClient = mock(GraphqlClient.class);
+        when(unusedClient.getIdentifier()).thenReturn("unused");
+        context.registerService(GraphqlClient.class, unusedClient, Constants.SERVICE_RANKING, 1000);
+
+        context.registerService(GraphqlClient.class, additionalClient, Constants.SERVICE_RANKING, -10);
 
         // should get the default gql client (service ranking = 0)
         GraphqlClient client = context.resourceResolver().getResource("/content/pageA").adaptTo(GraphqlClient.class);
         assertNotEquals(additionalClient, client);
 
-        context.registerService(GraphqlClient.class, additionalClient,
-            Constants.SERVICE_RANKING, 10,
-            GraphqlClientImpl.PROP_IDENTIFIER, GraphqlAemContext.CATALOG_IDENTIFIER);
+        context.registerService(GraphqlClient.class, additionalClient, Constants.SERVICE_RANKING, 10);
 
         // should get the additional gql client (service ranking = 10)
         client = context.resourceResolver().getResource("/content/pageA").adaptTo(GraphqlClient.class);
@@ -111,10 +110,14 @@ public class GraphqlClientAdapterFactoryTest {
     @Test
     public void testErrorCases() throws Exception {
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
-        graphqlClient.activate(new MockGraphqlClientConfiguration(), mock(BundleContext.class));
+        MockGraphqlClientConfiguration configuration = new MockGraphqlClientConfiguration();
+        configuration.setIdentifier("default");
+        graphqlClient.activate(configuration, mock(BundleContext.class));
 
         GraphqlClientAdapterFactory factory = new GraphqlClientAdapterFactory();
-        factory.bindGraphqlClient(graphqlClient, Collections.emptyMap());
+        factory.bindGraphqlClient(graphqlClient, ImmutableMap.of(
+            Constants.SERVICE_ID, 999L,
+            GraphqlClientImpl.PROP_IDENTIFIER, "default"));
 
         // Ensure that adapter returns null if not adapted from a resource
         Object target = factory.getAdapter(factory, Object.class);
