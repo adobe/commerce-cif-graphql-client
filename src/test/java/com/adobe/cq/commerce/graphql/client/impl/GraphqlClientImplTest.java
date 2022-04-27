@@ -19,6 +19,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Dictionary;
 import java.util.List;
 
 import org.apache.http.Header;
@@ -35,8 +36,10 @@ import org.apache.http.protocol.HTTP;
 import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
 import org.slf4j.LoggerFactory;
 
@@ -111,16 +114,20 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testRegistersAsGraphqlClientService() throws Exception {
+        ArgumentCaptor<Dictionary> serviceProps = ArgumentCaptor.forClass(Dictionary.class);
         // given
         BundleContext bundleContext = mock(BundleContext.class);
         ServiceRegistration registration = mock(ServiceRegistration.class);
-        when(bundleContext.registerService(eq(GraphqlClient.class), eq(graphqlClient), any())).thenReturn(registration);
+        when(bundleContext.registerService(eq(GraphqlClient.class), eq(graphqlClient), serviceProps.capture())).thenReturn(registration);
+        mockConfig.setServiceRanking(200);
 
         // when
         graphqlClient.activate(mockConfig, bundleContext);
 
         // then
         verify(bundleContext).registerService(eq(GraphqlClient.class), eq(graphqlClient), any());
+        assertEquals(200, serviceProps.getValue().get(Constants.SERVICE_RANKING));
+        assertEquals("mockIdentifier", serviceProps.getValue().get("identifier"));
 
         // and when
         graphqlClient.deactivate();

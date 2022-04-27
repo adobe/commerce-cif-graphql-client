@@ -14,13 +14,21 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.Comparator;
 import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceReference;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -44,14 +52,20 @@ import com.day.cq.wcm.api.PageManager;
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
-
     protected static final String GRAPHQLCLIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
-
     protected static final String CONFIG_NAME = "cloudconfigs/commerce";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
+    protected NavigableSet<ServiceReference<GraphqlClient>> references = new ConcurrentSkipListSet<>(Comparator.reverseOrder());
+    protected Set<ServiceReference<GraphqlClient>> referencesInUse = new CopyOnWriteArraySet<>();
     protected Map<String, GraphqlClient> clients = new ConcurrentHashMap<>();
+    protected BundleContext bundleContext;
+
+    @Activate
+    protected void activate(BundleContext bundleContext) {
+        this.bundleContext = bundleContext;
+    }
 
     @Reference(
         service = GraphqlClient.class,
@@ -59,15 +73,25 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         unbind = "unbindGraphqlClient",
         cardinality = ReferenceCardinality.AT_LEAST_ONE,
         policy = ReferencePolicy.DYNAMIC)
-    protected void bindGraphqlClient(GraphqlClient graphqlClient, Map<?, ?> properties) {
-        String identifier = graphqlClient.getIdentifier();
+    protected void bindGraphqlClient(ServiceReference<GraphqlClient> ref) {
+        String identifier = (String) ref.getProperty(GraphqlClientImpl.PROP_IDENTIFIER);
         LOGGER.info("Registering GraphqlClient '{}'", identifier);
-        clients.put(identifier, graphqlClient);
+        references.add(ref);
+        clients.remove(identifier);
     }
 
-    protected void unbindGraphqlClient(GraphqlClient graphqlClient, Map<?, ?> properties) {
-        String identifier = graphqlClient.getIdentifier();
+    protected void unbindGraphqlClient(ServiceReference<GraphqlClient> ref) {
+        String identifier = (String) ref.getProperty(GraphqlClientImpl.PROP_IDENTIFIER);
         LOGGER.info("De-registering GraphqlClient '{}'", identifier);
+        references.remove(ref);
+        if (referencesInUse.remove(ref)) {
+            try {
+                bundleContext.ungetService(ref);
+            } catch (IllegalStateException ex) {
+                // If this BundleContext is no longer valid.
+                // Can be ignored as the framework will clean up the references
+            }
+        }
         clients.remove(identifier);
     }
 
@@ -92,7 +116,17 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
             return null;
         }
 
-        GraphqlClient client = clients.get(identifier);
+        GraphqlClient client = clients.computeIfAbsent(identifier, key -> {
+            for (ServiceReference<GraphqlClient> clientRef : references) {
+                if (clientRef.getProperty(GraphqlClientImpl.PROP_IDENTIFIER).equals(key)) {
+                    GraphqlClient clientObj = bundleContext.getService(clientRef);
+                    referencesInUse.add(clientRef);
+                    return clientObj;
+                }
+            }
+            return null;
+        });
+
         if (client == null) {
             LOGGER.error("No GraphqlClient instance available for catalog identifier '{}'", identifier);
             return null;

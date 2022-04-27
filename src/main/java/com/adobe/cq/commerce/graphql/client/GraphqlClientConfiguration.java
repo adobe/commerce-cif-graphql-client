@@ -120,4 +120,10 @@ public @interface GraphqlClientConfiguration {
             + "TIMEOUT (Integer) : the timeout for each cache entry, in seconds.",
         type = AttributeType.STRING)
     String[] cacheConfigurations();
+
+    @AttributeDefinition(
+        name = "Ranking",
+        description = "Integer value defining the ranking of this queue configuration. If more than one GraphQL Client use the same "
+            + "identifier the one with the higher ranking will be used. Defaults to 0")
+    int service_ranking() default 0;
 }
