@@ -14,9 +14,10 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.commons.lang3.StringUtils;
@@ -25,7 +26,6 @@ import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.commons.osgi.Order;
 import org.apache.sling.commons.osgi.ServiceUtil;
-import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -55,8 +55,7 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
     protected NavigableSet<Holder> clients = new ConcurrentSkipListSet<>();
-    protected Map<String, GraphqlClient> clientsByIdentifier = new ConcurrentHashMap<>();
-    protected BundleContext bundleContext;
+    private transient Map<String, GraphqlClient> clientsByIdentifier = Collections.emptyMap();
 
     @Reference(
         service = GraphqlClient.class,
@@ -68,14 +67,24 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         String identifier = graphqlClient.getIdentifier();
         LOGGER.info("Registering GraphqlClient '{}'", identifier);
         clients.add(new Holder(graphqlClient, properties));
-        clientsByIdentifier.remove(identifier);
+        rebuildClientsByIdentifier();
     }
 
     protected void unbindGraphqlClient(GraphqlClient graphqlClient) {
         String identifier = graphqlClient.getIdentifier();
         LOGGER.info("De-registering GraphqlClient '{}'", identifier);
         clients.removeIf(holder -> holder.graphqlClient.equals(graphqlClient));
-        clientsByIdentifier.remove(identifier);
+        rebuildClientsByIdentifier();
+    }
+
+    private void rebuildClientsByIdentifier() {
+        Map<String, GraphqlClient> newClientsByIdentifier = new HashMap<>(clients.size());
+
+        for (Holder holder : clients) {
+            newClientsByIdentifier.putIfAbsent(holder.graphqlClient.getIdentifier(), holder.graphqlClient);
+        }
+
+        clientsByIdentifier = Collections.unmodifiableMap(newClientsByIdentifier);
     }
 
     @SuppressWarnings("unchecked")
@@ -99,14 +108,7 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
             return null;
         }
 
-        GraphqlClient client = clientsByIdentifier.computeIfAbsent(identifier, key -> {
-            for (Holder holder : clients) {
-                if (holder.graphqlClient.getIdentifier().equals(key)) {
-                    return holder.graphqlClient;
-                }
-            }
-            return null;
-        });
+        GraphqlClient client = clientsByIdentifier.get(identifier);
 
         if (client == null) {
             LOGGER.error("No GraphqlClient instance available for catalog identifier '{}'", identifier);
