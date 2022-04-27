@@ -14,21 +14,18 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
+import org.apache.sling.commons.osgi.Order;
+import org.apache.sling.commons.osgi.ServiceUtil;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.ServiceReference;
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -57,15 +54,9 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
-    protected NavigableSet<ServiceReference<GraphqlClient>> references = new ConcurrentSkipListSet<>(Comparator.reverseOrder());
-    protected Set<ServiceReference<GraphqlClient>> referencesInUse = new CopyOnWriteArraySet<>();
-    protected Map<String, GraphqlClient> clients = new ConcurrentHashMap<>();
+    protected List<Holder> clients = new CopyOnWriteArrayList<>();
+    protected Map<String, GraphqlClient> clientsByIdentifier = new ConcurrentHashMap<>();
     protected BundleContext bundleContext;
-
-    @Activate
-    protected void activate(BundleContext bundleContext) {
-        this.bundleContext = bundleContext;
-    }
 
     @Reference(
         service = GraphqlClient.class,
@@ -73,26 +64,19 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         unbind = "unbindGraphqlClient",
         cardinality = ReferenceCardinality.AT_LEAST_ONE,
         policy = ReferencePolicy.DYNAMIC)
-    protected void bindGraphqlClient(ServiceReference<GraphqlClient> ref) {
-        String identifier = (String) ref.getProperty(GraphqlClientImpl.PROP_IDENTIFIER);
+    protected void bindGraphqlClient(GraphqlClient graphqlClient, Map<String, Object> properties) {
+        String identifier = graphqlClient.getIdentifier();
         LOGGER.info("Registering GraphqlClient '{}'", identifier);
-        references.add(ref);
-        clients.remove(identifier);
+        clients.add(new Holder(graphqlClient, properties));
+        clients.sort(null);
+        clientsByIdentifier.remove(identifier);
     }
 
-    protected void unbindGraphqlClient(ServiceReference<GraphqlClient> ref) {
-        String identifier = (String) ref.getProperty(GraphqlClientImpl.PROP_IDENTIFIER);
+    protected void unbindGraphqlClient(GraphqlClient graphqlClient) {
+        String identifier = graphqlClient.getIdentifier();
         LOGGER.info("De-registering GraphqlClient '{}'", identifier);
-        references.remove(ref);
-        if (referencesInUse.remove(ref)) {
-            try {
-                bundleContext.ungetService(ref);
-            } catch (IllegalStateException ex) {
-                // If this BundleContext is no longer valid.
-                // Can be ignored as the framework will clean up the references
-            }
-        }
-        clients.remove(identifier);
+        clients.removeIf(holder -> holder.graphqlClient.equals(graphqlClient));
+        clientsByIdentifier.remove(identifier);
     }
 
     @SuppressWarnings("unchecked")
@@ -116,12 +100,10 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
             return null;
         }
 
-        GraphqlClient client = clients.computeIfAbsent(identifier, key -> {
-            for (ServiceReference<GraphqlClient> clientRef : references) {
-                if (clientRef.getProperty(GraphqlClientImpl.PROP_IDENTIFIER).equals(key)) {
-                    GraphqlClient clientObj = bundleContext.getService(clientRef);
-                    referencesInUse.add(clientRef);
-                    return clientObj;
+        GraphqlClient client = clientsByIdentifier.computeIfAbsent(identifier, key -> {
+            for (Holder holder : clients) {
+                if (holder.graphqlClient.getIdentifier().equals(key)) {
+                    return holder.graphqlClient;
                 }
             }
             return null;
@@ -148,4 +130,19 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         return properties.getInherited(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
     }
 
+    private static class Holder implements Comparable<Holder> {
+
+        private final GraphqlClient graphqlClient;
+        private final Comparable<Object> comparable;
+
+        public Holder(GraphqlClient graphqlClient, Map<String, Object> properties) {
+            this.graphqlClient = graphqlClient;
+            this.comparable = ServiceUtil.getComparableForServiceRanking(properties, Order.DESCENDING);
+        }
+
+        @Override
+        public int compareTo(Holder o) {
+            return comparable.compareTo(o.comparable);
+        }
+    }
 }

@@ -14,13 +14,14 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.Collections;
+
 import org.apache.sling.api.resource.Resource;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
-import org.osgi.framework.ServiceReference;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.google.common.collect.ImmutableMap;
@@ -30,7 +31,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class GraphqlClientAdapterFactoryTest {
@@ -74,15 +74,15 @@ public class GraphqlClientAdapterFactoryTest {
     @Test
     public void testReturnNullForNotExistingResolver() {
         // Remove mockClient from resolver
-        ServiceReference<GraphqlClient> ref = context.bundleContext().getServiceReference(GraphqlClient.class);
-        GraphqlAemContext.adapterFactory.unbindGraphqlClient(ref);
+        GraphqlClient client = context.getService(GraphqlClient.class);
+        GraphqlAemContext.adapterFactory.unbindGraphqlClient(client);
         Assert.assertEquals(0, GraphqlAemContext.adapterFactory.clients.size());
 
         // Get page which has the catalog identifier in its jcr:content node
         Resource res = context.resourceResolver().getResource("/content/pageA");
 
         // Adapt page to client, verify that no client can be returned
-        GraphqlClient client = res.adaptTo(GraphqlClient.class);
+        client = res.adaptTo(GraphqlClient.class);
         Assert.assertNull(client);
     }
 
@@ -109,36 +109,12 @@ public class GraphqlClientAdapterFactoryTest {
     }
 
     @Test
-    public void testServiceUnregistered() {
-        // default service ref in use
-        GraphqlClient client = context.resourceResolver().getResource("/content/pageA").adaptTo(GraphqlClient.class);
-        assertNotNull(client);
-
-        // inject a mock bundleContext to verify the ungetService() call
-        BundleContext bundleContext = mock(BundleContext.class);
-        GraphqlAemContext.adapterFactory.activate(bundleContext);
-
-        // unregister
-        ServiceReference<GraphqlClient> ref = context.bundleContext().getServiceReference(GraphqlClient.class);
-        GraphqlAemContext.adapterFactory.unbindGraphqlClient(ref);
-
-        verify(bundleContext).ungetService(ref);
-    }
-
-    @Test
     public void testErrorCases() throws Exception {
         GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
         graphqlClient.activate(new MockGraphqlClientConfiguration(), mock(BundleContext.class));
 
-        BundleContext bundleContext = mock(BundleContext.class);
-        ServiceReference<GraphqlClient> ref = mock(ServiceReference.class);
-        when(bundleContext.getService(ref)).thenReturn(graphqlClient);
-        when(ref.getProperty(GraphqlClientImpl.PROP_IDENTIFIER)).thenReturn("default");
-
         GraphqlClientAdapterFactory factory = new GraphqlClientAdapterFactory();
-        factory.activate(bundleContext);
-
-        factory.bindGraphqlClient(ref);
+        factory.bindGraphqlClient(graphqlClient, Collections.emptyMap());
 
         // Ensure that adapter returns null if not adapted from a resource
         Object target = factory.getAdapter(factory, Object.class);
