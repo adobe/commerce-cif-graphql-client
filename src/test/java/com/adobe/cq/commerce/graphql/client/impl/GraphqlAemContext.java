@@ -70,7 +70,7 @@ public final class GraphqlAemContext {
             }).build();
         GraphqlClient mockClient = mock(GraphqlClient.class);
         when(mockClient.getIdentifier()).thenReturn(CATALOG_IDENTIFIER);
-        ctx.registerService(GraphqlClient.class, mockClient);
+        ctx.registerService(GraphqlClient.class, mockClient, GraphqlClientImpl.PROP_IDENTIFIER, CATALOG_IDENTIFIER);
 
         // Add AdapterFactory
         ctx.registerInjectActivateService(GraphqlAemContext.adapterFactory);

@@ -63,6 +63,7 @@ import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.apache.http.util.VersionInfo;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -94,6 +95,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
     private static final String USER_AGENT_NAME = "Adobe-CifGraphqlClient";
+    static final String PROP_IDENTIFIER = "identifier";
 
     protected HttpClient client;
 
@@ -188,7 +190,8 @@ public class GraphqlClientImpl implements GraphqlClient {
         client = configureHttpClientBuilder().build();
 
         Hashtable<String, Object> serviceProps = new Hashtable<>();
-        serviceProps.put("identifier", configuration.identifier());
+        serviceProps.put(PROP_IDENTIFIER, configuration.identifier());
+        serviceProps.put(Constants.SERVICE_RANKING, configuration.service_ranking());
         registration = bundleContext.registerService(GraphqlClient.class, this, serviceProps);
     }
 
@@ -296,7 +299,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
-        LOGGER.debug("Executing GraphQL query: " + request.getQuery());
+        LOGGER.debug("Executing GraphQL query on endpoint '{}': {}", configuration.url(), request.getQuery());
         Runnable stopTimer = metrics.startRequestDurationTimer();
         HttpResponse httpResponse;
         try {

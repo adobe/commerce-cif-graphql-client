@@ -36,6 +36,8 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
     private String[] cacheConfigurations = new String[0];
     private int connectionKeepAlive = GraphqlClientConfiguration.DEFAULT_CONNECTION_KEEP_ALIVE;
 
+    private int serviceRanking = 0;
+
     GraphqlClientConfigurationImpl(String url) {
         this.url = url;
     }
@@ -53,6 +55,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         httpHeaders = configuration.httpHeaders() != null ? configuration.httpHeaders() : this.httpHeaders;
         cacheConfigurations = configuration.cacheConfigurations() != null ? configuration.cacheConfigurations() : this.cacheConfigurations;
         connectionKeepAlive = configuration.connectionKeepAlive();
+        serviceRanking = configuration.service_ranking();
     }
 
     @Override
@@ -166,5 +169,14 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setConnectionKeepAlive(int connectionKeepAlive) {
         this.connectionKeepAlive = connectionKeepAlive;
+    }
+
+    @Override
+    public int service_ranking() {
+        return serviceRanking;
+    }
+
+    public void setServiceRanking(int serviceRanking) {
+        this.serviceRanking = serviceRanking;
     }
 }

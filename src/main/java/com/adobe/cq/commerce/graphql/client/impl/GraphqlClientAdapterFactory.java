@@ -14,13 +14,18 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.NavigableSet;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.adapter.AdapterFactory;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
+import org.apache.sling.commons.osgi.Order;
+import org.apache.sling.commons.osgi.ServiceUtil;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -44,14 +49,13 @@ import com.day.cq.wcm.api.PageManager;
 public class GraphqlClientAdapterFactory implements AdapterFactory {
 
     protected static final String RESOURCE_CLASS_NAME = "org.apache.sling.api.resource.Resource";
-
     protected static final String GRAPHQLCLIENT_CLASS_NAME = "com.adobe.cq.commerce.graphql.client.GraphqlClient";
-
     protected static final String CONFIG_NAME = "cloudconfigs/commerce";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientAdapterFactory.class);
 
-    protected Map<String, GraphqlClient> clients = new ConcurrentHashMap<>();
+    protected NavigableSet<Holder> clients = new ConcurrentSkipListSet<>();
+    private transient Map<String, GraphqlClient> clientsByIdentifier = Collections.emptyMap();
 
     @Reference(
         service = GraphqlClient.class,
@@ -59,16 +63,28 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         unbind = "unbindGraphqlClient",
         cardinality = ReferenceCardinality.AT_LEAST_ONE,
         policy = ReferencePolicy.DYNAMIC)
-    protected void bindGraphqlClient(GraphqlClient graphqlClient, Map<?, ?> properties) {
+    protected void bindGraphqlClient(GraphqlClient graphqlClient, Map<String, Object> properties) {
         String identifier = graphqlClient.getIdentifier();
         LOGGER.info("Registering GraphqlClient '{}'", identifier);
-        clients.put(identifier, graphqlClient);
+        clients.add(new Holder(graphqlClient, properties));
+        rebuildClientsByIdentifier();
     }
 
-    protected void unbindGraphqlClient(GraphqlClient graphqlClient, Map<?, ?> properties) {
+    protected void unbindGraphqlClient(GraphqlClient graphqlClient) {
         String identifier = graphqlClient.getIdentifier();
         LOGGER.info("De-registering GraphqlClient '{}'", identifier);
-        clients.remove(identifier);
+        clients.removeIf(holder -> holder.graphqlClient.equals(graphqlClient));
+        rebuildClientsByIdentifier();
+    }
+
+    private void rebuildClientsByIdentifier() {
+        Map<String, GraphqlClient> newClientsByIdentifier = new HashMap<>(clients.size());
+
+        for (Holder holder : clients) {
+            newClientsByIdentifier.putIfAbsent(holder.graphqlClient.getIdentifier(), holder.graphqlClient);
+        }
+
+        clientsByIdentifier = Collections.unmodifiableMap(newClientsByIdentifier);
     }
 
     @SuppressWarnings("unchecked")
@@ -92,7 +108,8 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
             return null;
         }
 
-        GraphqlClient client = clients.get(identifier);
+        GraphqlClient client = clientsByIdentifier.get(identifier);
+
         if (client == null) {
             LOGGER.error("No GraphqlClient instance available for catalog identifier '{}'", identifier);
             return null;
@@ -114,4 +131,19 @@ public class GraphqlClientAdapterFactory implements AdapterFactory {
         return properties.getInherited(GraphqlClientConfiguration.CQ_GRAPHQL_CLIENT, String.class);
     }
 
+    private static class Holder implements Comparable<Holder> {
+
+        private final GraphqlClient graphqlClient;
+        private final Comparable<Object> comparable;
+
+        public Holder(GraphqlClient graphqlClient, Map<String, Object> properties) {
+            this.graphqlClient = graphqlClient;
+            this.comparable = ServiceUtil.getComparableForServiceRanking(properties, Order.DESCENDING);
+        }
+
+        @Override
+        public int compareTo(Holder o) {
+            return comparable.compareTo(o.comparable);
+        }
+    }
 }
