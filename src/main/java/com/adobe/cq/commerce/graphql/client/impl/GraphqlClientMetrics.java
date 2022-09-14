@@ -43,10 +43,8 @@ interface GraphqlClientMetrics {
             // do nothing
         }
 
-        @Override public Runnable startRequestDurationTimer() {
-            return () -> {
-                // do nothing
-            };
+        @Override public Supplier<Long> startRequestDurationTimer() {
+            return () -> null;
         }
 
         @Override public void incrementRequestErrors() {
@@ -74,7 +72,7 @@ interface GraphqlClientMetrics {
      *
      * @return
      */
-    Runnable startRequestDurationTimer();
+    Supplier<Long> startRequestDurationTimer();
 
     /**
      * Increments the generic request error count.
