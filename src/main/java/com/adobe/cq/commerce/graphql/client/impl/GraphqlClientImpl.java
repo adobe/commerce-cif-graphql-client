@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import javax.net.ssl.SSLContext;
 
@@ -309,7 +310,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query on endpoint '{}': {}", configuration.url(), request.getQuery());
-        Runnable stopTimer = metrics.startRequestDurationTimer();
+        Supplier<Long> stopTimer = metrics.startRequestDurationTimer();
         HttpResponse httpResponse;
         try {
             httpResponse = client.execute(buildRequest(request, options));
@@ -324,7 +325,10 @@ public class GraphqlClientImpl implements GraphqlClient {
             String json;
             try {
                 json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
-                stopTimer.run();
+                Long executionTime = stopTimer.get();
+                if (executionTime != null) {
+                    LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
+                }
             } catch (Exception e) {
                 metrics.incrementRequestErrors();
                 throw new RuntimeException("Failed to read HTTP response content", e);

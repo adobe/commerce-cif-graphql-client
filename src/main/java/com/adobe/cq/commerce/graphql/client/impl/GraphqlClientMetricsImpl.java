@@ -70,8 +70,8 @@ class GraphqlClientMetricsImpl implements GraphqlClientMetrics, Closeable {
     }
 
     @Override
-    public Runnable startRequestDurationTimer() {
-        return requestDurationTimer.time()::close;
+    public Supplier<Long> startRequestDurationTimer() {
+        return requestDurationTimer.time()::stop;
     }
 
     @Override
