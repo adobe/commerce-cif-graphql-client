@@ -35,23 +35,28 @@ interface GraphqlClientMetrics {
 
     GraphqlClientMetrics NOOP = new GraphqlClientMetrics() {
 
-        @Override public void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier) {
-            //do nothing
-        }
-
-        @Override public void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier) {
+        @Override
+        public void addConnectionPoolMetric(String metricName, Supplier<? extends Number> valueSupplier) {
             // do nothing
         }
 
-        @Override public Supplier<Long> startRequestDurationTimer() {
+        @Override
+        public void addCacheMetric(String metricName, String cacheName, Supplier<? extends Number> valueSupplier) {
+            // do nothing
+        }
+
+        @Override
+        public Supplier<Long> startRequestDurationTimer() {
             return () -> null;
         }
 
-        @Override public void incrementRequestErrors() {
+        @Override
+        public void incrementRequestErrors() {
             // do nothing
         }
 
-        @Override public void incrementRequestErrors(int status) {
+        @Override
+        public void incrementRequestErrors(int status) {
             // do nothing
         }
     };

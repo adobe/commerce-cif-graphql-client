@@ -365,7 +365,8 @@ public class GraphqlClientImpl implements GraphqlClient {
         // We use a pooled connection manager to support concurrent threads and connections
         RegistryBuilder<ConnectionSocketFactory> registryBuilder = RegistryBuilder.<ConnectionSocketFactory>create()
             .register("http", PlainConnectionSocketFactory.getSocketFactory()).register("https", sslsf);
-        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(registryBuilder.build());
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(
+            registryBuilder.build(), null, null, null, configuration.connectionTtl(), TimeUnit.SECONDS);
         cm.setMaxTotal(configuration.maxHttpConnections());
         cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint
 
@@ -388,9 +389,13 @@ public class GraphqlClientImpl implements GraphqlClient {
             .disableCookieManagement()
             .setUserAgent(VersionInfo.getUserAgent(USER_AGENT_NAME, "com.adobe.cq.commerce.graphql.client", this.getClass()));
 
-        if (configuration.connectionKeepAlive() >= 0) {
+        if (configuration.connectionKeepAlive() == 0 || configuration.connectionTtl() == 0) {
+            // never reuse connections
+            httpClientBuilder.setConnectionReuseStrategy((httpResponse, httpContext) -> false);
+        } else if (configuration.connectionKeepAlive() > 0) {
+            // limit the keep alive to the configured maximum
             httpClientBuilder.setKeepAliveStrategy(new ConfigurableConnectionKeepAliveStrategy(configuration.connectionKeepAlive()));
-        }
+        } // else reuse connections
 
         return httpClientBuilder;
     }
