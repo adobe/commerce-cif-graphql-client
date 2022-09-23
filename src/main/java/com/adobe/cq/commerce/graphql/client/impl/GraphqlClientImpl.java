@@ -311,45 +311,44 @@ public class GraphqlClientImpl implements GraphqlClient {
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query on endpoint '{}': {}", configuration.url(), request.getQuery());
         Supplier<Long> stopTimer = metrics.startRequestDurationTimer();
-        HttpResponse httpResponse;
+
         try {
-            httpResponse = client.execute(buildRequest(request, options));
-        } catch (Exception e) {
+            return client.execute(buildRequest(request, options), httpResponse -> {
+                StatusLine statusLine = httpResponse.getStatusLine();
+                if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
+                    HttpEntity entity = httpResponse.getEntity();
+                    String json;
+                    try {
+                        json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                        Long executionTime = stopTimer.get();
+                        if (executionTime != null) {
+                            LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
+                        }
+                    } catch (Exception e) {
+                        metrics.incrementRequestErrors();
+                        throw new RuntimeException("Failed to read HTTP response content", e);
+                    }
+
+                    Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
+                    Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
+                    GraphqlResponse<T, U> response = gson.fromJson(json, type);
+
+                    // We log GraphQL errors because they might otherwise get "silently" unnoticed
+                    if (response.getErrors() != null) {
+                        Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
+                        String errors = gson.toJson(response.getErrors(), listErrorsType);
+                        LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
+                    }
+
+                    return response;
+                } else {
+                    metrics.incrementRequestErrors(statusLine.getStatusCode());
+                    throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
+                }
+            });
+        } catch (IOException e) {
             metrics.incrementRequestErrors();
             throw new RuntimeException("Failed to send GraphQL request", e);
-        }
-
-        StatusLine statusLine = httpResponse.getStatusLine();
-        if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
-            HttpEntity entity = httpResponse.getEntity();
-            String json;
-            try {
-                json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
-                Long executionTime = stopTimer.get();
-                if (executionTime != null) {
-                    LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
-                }
-            } catch (Exception e) {
-                metrics.incrementRequestErrors();
-                throw new RuntimeException("Failed to read HTTP response content", e);
-            }
-
-            Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
-            Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
-            GraphqlResponse<T, U> response = gson.fromJson(json, type);
-
-            // We log GraphQL errors because they might otherwise get "silently" unnoticed
-            if (response.getErrors() != null) {
-                Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
-                String errors = gson.toJson(response.getErrors(), listErrorsType);
-                LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
-            }
-
-            return response;
-        } else {
-            EntityUtils.consumeQuietly(httpResponse.getEntity());
-            metrics.incrementRequestErrors(statusLine.getStatusCode());
-            throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }
 

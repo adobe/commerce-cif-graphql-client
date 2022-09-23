@@ -28,6 +28,8 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
@@ -216,7 +218,7 @@ public class GraphqlClientImplTest {
 
         // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
         HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -230,7 +232,7 @@ public class GraphqlClientImplTest {
         // Check that the query is what we expect
         String body = TestUtils.getResource("sample-graphql-request.json");
         RequestBodyMatcher matcher = new RequestBodyMatcher(body);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
 
         // Check the response data
         assertEquals("Some text", response.getData().text);
@@ -257,7 +259,7 @@ public class GraphqlClientImplTest {
     @Test
     @SuppressWarnings("unchecked")
     public void testHttpClientException() throws Exception {
-        Mockito.when(graphqlClient.client.execute(Mockito.any())).thenThrow(IOException.class);
+        when(graphqlClient.client.execute(any(HttpUriRequest.class), any(ResponseHandler.class))).thenThrow(IOException.class);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
@@ -326,7 +328,7 @@ public class GraphqlClientImplTest {
 
         // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
         HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -336,7 +338,7 @@ public class GraphqlClientImplTest {
 
         // Check that the GraphQL request is properly encoded in the URL
         GetQueryMatcher matcher = new GetQueryMatcher(dummy);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -351,7 +353,7 @@ public class GraphqlClientImplTest {
 
         // Check that the GraphQL request is properly encoded in the URL
         GetQueryMatcher matcher = new GetQueryMatcher(request);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher));
+        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test

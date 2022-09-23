@@ -19,6 +19,7 @@ import java.io.InputStream;
 
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.sling.testing.mock.osgi.MockOsgi;
@@ -138,7 +139,7 @@ public class GraphqlClientImplMetricsTest {
     @Test
     public void testRequestDurationNotTrackedOnClientError() throws IOException {
         // given
-        doThrow(new IOException()).when(graphqlClient.client).execute(any());
+        doThrow(new IOException()).when(graphqlClient.client).execute(any(), any(ResponseHandler.class));
 
         // when
         try {

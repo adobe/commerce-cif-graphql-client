@@ -30,6 +30,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
@@ -142,7 +143,6 @@ public class TestUtils {
      * @param filename The file to use for the json response.
      * @param httpClient The HTTP client for which we want to mock responses.
      * @param httpCode The http code that the mocked response will return.
-     * @param startsWith When set, the body of the GraphQL POST request must start with that String.
      * 
      * @return The JSON content of that file.
      * 
@@ -160,7 +160,10 @@ public class TestUtils {
         Mockito.when(mockedHttpEntity.getContentLength()).thenReturn(new Long(bytes.length));
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+        Mockito.doAnswer(inv -> {
+            ResponseHandler<?> responseHandler = inv.getArgumentAt(1, ResponseHandler.class);
+            return responseHandler.handleResponse(mockedHttpResponse);
+        }).when(httpClient).execute(Mockito.any(HttpUriRequest.class), Mockito.any(ResponseHandler.class));
 
         Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
         Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
@@ -176,7 +179,10 @@ public class TestUtils {
         Mockito.when(mockedHttpEntity.getContent()).thenReturn(data);
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+        Mockito.doAnswer(inv -> {
+            ResponseHandler<?> responseHandler = inv.getArgumentAt(1, ResponseHandler.class);
+            return responseHandler.handleResponse(mockedHttpResponse);
+        }).when(httpClient).execute(Mockito.any(HttpUriRequest.class), Mockito.any(ResponseHandler.class));
 
         Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(httpCode);
         Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
@@ -187,7 +193,10 @@ public class TestUtils {
         StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(null);
-        Mockito.when(httpClient.execute((HttpUriRequest) Mockito.any())).thenReturn(mockedHttpResponse);
+        Mockito.doAnswer(inv -> {
+            ResponseHandler<?> responseHandler = inv.getArgumentAt(1, ResponseHandler.class);
+            return responseHandler.handleResponse(mockedHttpResponse);
+        }).when(httpClient).execute(Mockito.any(HttpUriRequest.class), Mockito.any(ResponseHandler.class));
 
         Mockito.when(mockedStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_OK);
         Mockito.when(mockedHttpResponse.getStatusLine()).thenReturn(mockedStatusLine);
