@@ -13,6 +13,7 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.MalformedURLException;
@@ -51,6 +52,7 @@ import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeaderElementIterator;
@@ -202,6 +204,13 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
         if (registration != null) {
             registration.unregister();
+        }
+        if (client instanceof CloseableHttpClient) {
+            try {
+                ((CloseableHttpClient) client).close();
+            } catch (IOException ex) {
+                LOGGER.warn("Failed to close http client: {}", ex.getMessage(), ex);
+            }
         }
     }
 
