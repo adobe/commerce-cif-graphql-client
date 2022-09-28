@@ -108,8 +108,9 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "Connection time to live",
-        description = "The maximum number of seconds a connections is reused for. If the value is <= 0 the connection may be reused "
-            + "indefinitely, depending on the configured connection keep alive timeout. Defaults to " + DEFAULT_CONNECTION_TTL,
+        description = "The maximum number of seconds a connections is reused for. If the value is < 0, the connection may be reused "
+            + "indefinitely, depending on the configured connection keep alive timeout. If the value is 0, connections will never be "
+            + "reused. Defaults to " + DEFAULT_CONNECTION_TTL,
         type = AttributeType.INTEGER)
     int connectionTtl() default DEFAULT_CONNECTION_TTL;
 
