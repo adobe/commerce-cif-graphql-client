@@ -101,15 +101,15 @@ public @interface GraphqlClientConfiguration {
     @AttributeDefinition(
         name = "Connection keep alive timeout",
         description = "The maximum number of seconds an unused connections is kept alive in the connection pool after the last response. "
-            + "If the value is < 0 than connections are kept alive indefinitely. If the value is 0 than connection reuse is disabled. "
+            + "If the value is < 0 then connections are kept alive indefinitely. If the value is 0 then connections will never be reused. "
             + "Defaults to " + DEFAULT_CONNECTION_KEEP_ALIVE,
         type = AttributeType.INTEGER)
     int connectionKeepAlive() default DEFAULT_CONNECTION_KEEP_ALIVE;
 
     @AttributeDefinition(
         name = "Connection time to live",
-        description = "The maximum number of seconds a connections is reused for. If the value is < 0, the connection may be reused "
-            + "indefinitely, depending on the configured connection keep alive timeout. If the value is 0, connections will never be "
+        description = "The maximum number of seconds a connections is reused for. If the value is < 0 then the connection may be reused "
+            + "indefinitely, depending on the configured connection keep alive timeout. If the value is 0 then connections will never be "
             + "reused. Defaults to " + DEFAULT_CONNECTION_TTL,
         type = AttributeType.INTEGER)
     int connectionTtl() default DEFAULT_CONNECTION_TTL;
