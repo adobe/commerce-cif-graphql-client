@@ -19,6 +19,7 @@ import java.util.Collections;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
 import org.apache.http.message.BasicHeader;
 import org.junit.Before;
 import org.junit.Test;
@@ -102,7 +103,7 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was only called once
-        Mockito.verify(graphqlClient.client).execute(Mockito.any());
+        Mockito.verify(graphqlClient.client).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -126,7 +127,7 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was called twice
-        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any());
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -155,7 +156,7 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was called twice
-        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any());
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -257,6 +258,6 @@ public class GraphqlClientImplCachingTest {
         assertEquals(42, response2.getData().count.intValue());
 
         // HTTP client was called twice
-        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any());
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 }

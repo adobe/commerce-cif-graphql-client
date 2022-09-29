@@ -280,7 +280,7 @@
             <plugin>
                 <groupId>net.revelc.code.formatter</groupId>
                 <artifactId>formatter-maven-plugin</artifactId>
-                <version>2.9.0</version>
+                <version>2.16.0</version>
                 <executions>
                     <execution>
                         <id>verify-code-formatting</id>
@@ -490,7 +490,6 @@
                     <plugin>
                         <groupId>net.revelc.code.formatter</groupId>
                         <artifactId>formatter-maven-plugin</artifactId>
-                        <version>2.9.0</version>
                         <executions>
                             <execution>
                                 <id>format-code</id>

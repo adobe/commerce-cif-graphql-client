@@ -32,6 +32,7 @@ public @interface GraphqlClientConfiguration {
     int DEFAULT_SOCKET_TIMEOUT = 5000;
     int DEFAULT_REQUESTPOOL_TIMEOUT = 2000;
     int DEFAULT_CONNECTION_KEEP_ALIVE = -1;
+    int DEFAULT_CONNECTION_TTL = -1;
 
     @AttributeDefinition(
         name = "GraphQL Service Identifier",
@@ -99,10 +100,19 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "Connection keep alive timeout",
-        description = "The maximum number of seconds an unused connections is kept in the connection pool. If the value is < 0 than "
-            + "connections are kept alive indefinitely. Defaults to " + DEFAULT_CONNECTION_KEEP_ALIVE,
+        description = "The maximum number of seconds an unused connections is kept alive in the connection pool after the last response. "
+            + "If the value is < 0 then connections are kept alive indefinitely. If the value is 0 then connections will never be reused. "
+            + "Defaults to " + DEFAULT_CONNECTION_KEEP_ALIVE,
         type = AttributeType.INTEGER)
     int connectionKeepAlive() default DEFAULT_CONNECTION_KEEP_ALIVE;
+
+    @AttributeDefinition(
+        name = "Connection time to live",
+        description = "The maximum number of seconds a connections is reused for. If the value is < 0 then the connection may be reused "
+            + "indefinitely, depending on the configured connection keep alive timeout. If the value is 0 then connections will never be "
+            + "reused. Defaults to " + DEFAULT_CONNECTION_TTL,
+        type = AttributeType.INTEGER)
+    int connectionTtl() default DEFAULT_CONNECTION_TTL;
 
     @AttributeDefinition(
         name = "Default HTTP Headers",

@@ -13,6 +13,7 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.MalformedURLException;
@@ -52,6 +53,7 @@ import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeaderElementIterator;
@@ -204,6 +206,13 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (registration != null) {
             registration.unregister();
         }
+        if (client instanceof CloseableHttpClient) {
+            try {
+                ((CloseableHttpClient) client).close();
+            } catch (IOException ex) {
+                LOGGER.warn("Failed to close http client: {}", ex.getMessage(), ex);
+            }
+        }
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
@@ -302,45 +311,44 @@ public class GraphqlClientImpl implements GraphqlClient {
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query on endpoint '{}': {}", configuration.url(), request.getQuery());
         Supplier<Long> stopTimer = metrics.startRequestDurationTimer();
-        HttpResponse httpResponse;
+
         try {
-            httpResponse = client.execute(buildRequest(request, options));
-        } catch (Exception e) {
+            return client.execute(buildRequest(request, options), httpResponse -> {
+                StatusLine statusLine = httpResponse.getStatusLine();
+                if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
+                    HttpEntity entity = httpResponse.getEntity();
+                    String json;
+                    try {
+                        json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                        Long executionTime = stopTimer.get();
+                        if (executionTime != null) {
+                            LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
+                        }
+                    } catch (Exception e) {
+                        metrics.incrementRequestErrors();
+                        throw new RuntimeException("Failed to read HTTP response content", e);
+                    }
+
+                    Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
+                    Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
+                    GraphqlResponse<T, U> response = gson.fromJson(json, type);
+
+                    // We log GraphQL errors because they might otherwise get "silently" unnoticed
+                    if (response.getErrors() != null) {
+                        Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
+                        String errors = gson.toJson(response.getErrors(), listErrorsType);
+                        LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
+                    }
+
+                    return response;
+                } else {
+                    metrics.incrementRequestErrors(statusLine.getStatusCode());
+                    throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
+                }
+            });
+        } catch (IOException e) {
             metrics.incrementRequestErrors();
             throw new RuntimeException("Failed to send GraphQL request", e);
-        }
-
-        StatusLine statusLine = httpResponse.getStatusLine();
-        if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
-            HttpEntity entity = httpResponse.getEntity();
-            String json;
-            try {
-                json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
-                Long executionTime = stopTimer.get();
-                if (executionTime != null) {
-                    LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
-                }
-            } catch (Exception e) {
-                metrics.incrementRequestErrors();
-                throw new RuntimeException("Failed to read HTTP response content", e);
-            }
-
-            Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
-            Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
-            GraphqlResponse<T, U> response = gson.fromJson(json, type);
-
-            // We log GraphQL errors because they might otherwise get "silently" unnoticed
-            if (response.getErrors() != null) {
-                Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
-                String errors = gson.toJson(response.getErrors(), listErrorsType);
-                LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
-            }
-
-            return response;
-        } else {
-            EntityUtils.consumeQuietly(httpResponse.getEntity());
-            metrics.incrementRequestErrors(statusLine.getStatusCode());
-            throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
         }
     }
 
@@ -357,7 +365,8 @@ public class GraphqlClientImpl implements GraphqlClient {
         // We use a pooled connection manager to support concurrent threads and connections
         RegistryBuilder<ConnectionSocketFactory> registryBuilder = RegistryBuilder.<ConnectionSocketFactory>create()
             .register("http", PlainConnectionSocketFactory.getSocketFactory()).register("https", sslsf);
-        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(registryBuilder.build());
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager(
+            registryBuilder.build(), null, null, null, configuration.connectionTtl(), TimeUnit.SECONDS);
         cm.setMaxTotal(configuration.maxHttpConnections());
         cm.setDefaultMaxPerRoute(configuration.maxHttpConnections()); // we just have one route to the GraphQL endpoint
 
@@ -380,9 +389,13 @@ public class GraphqlClientImpl implements GraphqlClient {
             .disableCookieManagement()
             .setUserAgent(VersionInfo.getUserAgent(USER_AGENT_NAME, "com.adobe.cq.commerce.graphql.client", this.getClass()));
 
-        if (configuration.connectionKeepAlive() >= 0) {
+        if (configuration.connectionKeepAlive() == 0 || configuration.connectionTtl() == 0) {
+            // never reuse connections
+            httpClientBuilder.setConnectionReuseStrategy((httpResponse, httpContext) -> false);
+        } else if (configuration.connectionKeepAlive() > 0) {
+            // limit the keep alive to the configured maximum
             httpClientBuilder.setKeepAliveStrategy(new ConfigurableConnectionKeepAliveStrategy(configuration.connectionKeepAlive()));
-        }
+        } // else reuse connections
 
         return httpClientBuilder;
     }
