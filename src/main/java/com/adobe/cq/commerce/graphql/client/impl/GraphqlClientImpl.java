@@ -438,6 +438,21 @@ public class GraphqlClientImpl implements GraphqlClient {
         return rb.build();
     }
 
+    @Override
+    public void invalidateCaches() {
+        for (Cache<?, ?> cache : caches.values()) {
+            cache.invalidateAll();
+        }
+    }
+
+    @Override
+    public void invalidateCache(String name) {
+        Cache<?, ?> cache = caches.get(name);
+        if (cache != null) {
+            cache.invalidateAll();
+        }
+    }
+
     static class ConfigurableConnectionKeepAliveStrategy implements ConnectionKeepAliveStrategy {
         private int defaultConnectionKeepAlive;
 

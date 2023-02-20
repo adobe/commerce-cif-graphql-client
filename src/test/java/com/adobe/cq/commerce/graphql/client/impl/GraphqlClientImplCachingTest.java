@@ -34,6 +34,7 @@ import com.adobe.cq.commerce.graphql.client.RequestOptions;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 
 public class GraphqlClientImplCachingTest {
 
@@ -104,6 +105,31 @@ public class GraphqlClientImplCachingTest {
 
         // HTTP client was only called once
         Mockito.verify(graphqlClient.client).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testInvalidateCache() throws Exception {
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy);
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+        // cached
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+        Mockito.verify(graphqlClient.client).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+        // invalidate
+        graphqlClient.invalidateCache(MY_CACHE);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+        Mockito.verify(graphqlClient.client, times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+        // invalidate all
+        graphqlClient.invalidateCaches();
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+        Mockito.verify(graphqlClient.client, times(3)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 
     @Test
