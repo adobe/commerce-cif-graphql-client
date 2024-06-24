@@ -156,7 +156,7 @@ public class TestUtils {
         StatusLine mockedStatusLine = Mockito.mock(StatusLine.class);
 
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        Mockito.when(mockedHttpEntity.getContent()).thenReturn(new ByteArrayInputStream(bytes));
+        Mockito.when(mockedHttpEntity.getContent()).then(inv -> new ByteArrayInputStream(bytes));
         Mockito.when(mockedHttpEntity.getContentLength()).thenReturn(new Long(bytes.length));
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
