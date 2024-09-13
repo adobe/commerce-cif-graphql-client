@@ -112,4 +112,9 @@ public interface GraphqlClient {
      */
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeOfU, RequestOptions options);
 
+    /**
+     * Deletes all the entries for in-memory cache.
+     */
+    public void flushCache();
+
 }

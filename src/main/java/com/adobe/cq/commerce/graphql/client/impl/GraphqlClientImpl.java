@@ -92,7 +92,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-@Component(service = {})
+@Component(service = { GraphqlClient.class })
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
 
@@ -288,6 +288,16 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
         }
         return executeImpl(request, typeOfT, typeofU, options);
+    }
+
+    @Override
+    public void flushCache() {
+
+        LOGGER.info("Flushing cache... {} entries will be deleted", caches.size());
+
+        caches.clear();
+
+        LOGGER.info("Cache flushed successfully");
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
