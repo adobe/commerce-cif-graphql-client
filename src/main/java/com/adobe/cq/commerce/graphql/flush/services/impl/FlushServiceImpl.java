@@ -14,9 +14,7 @@
 
 package com.adobe.cq.commerce.graphql.flush.services.impl;
 
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import javax.jcr.Session;
 
@@ -26,6 +24,8 @@ import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +41,6 @@ import com.day.cq.replication.Replicator;
 public class FlushServiceImpl implements FlushService {
 
     @Reference
-    private GraphqlClient graphqlClient;
-
-    @Reference
     private ConfigService configService;
 
     @Reference
@@ -53,13 +50,18 @@ public class FlushServiceImpl implements FlushService {
     private ServiceUserService serviceUserService;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FlushServiceImpl.class);
+    private Collection<ClientHolder> clients = new ArrayList<>();
 
     @Override
     public void flush() {
-
         LOGGER.info("Flushing graphql client");
-        graphqlClient.flushCache();
-
+        for (ClientHolder clientHolder : clients) {
+            GraphqlClient graphqlClient = clientHolder.graphqlClient;
+            Map<String, Object> properties = clientHolder.properties;
+            String identifier = (String) properties.get("identifier");
+            LOGGER.info("Flushing graphql client with identifier: {}", identifier);
+            graphqlClient.flushCache();
+        }
     }
 
     @Override
@@ -160,5 +162,29 @@ public class FlushServiceImpl implements FlushService {
         }
 
         return nodeName;
+    }
+
+    @Reference(
+        service = GraphqlClient.class,
+        bind = "bindGraphqlClient",
+        unbind = "unbindGraphqlClient",
+        cardinality = ReferenceCardinality.MULTIPLE,
+        policy = ReferencePolicy.DYNAMIC)
+    void bindGraphqlClient(GraphqlClient graphqlClient, Map<String, Object> properties) {
+        clients.add(new ClientHolder(graphqlClient, properties));
+    }
+
+    void unbindGraphqlClient(GraphqlClient graphqlClient, Map<?, ?> properties) {
+        clients.removeIf(holder -> holder.graphqlClient.equals(graphqlClient));
+    }
+
+    private static class ClientHolder {
+        private final GraphqlClient graphqlClient;
+        private final Map<String, Object> properties;
+
+        ClientHolder(GraphqlClient graphqlClient, Map<String, Object> properties) {
+            this.graphqlClient = graphqlClient;
+            this.properties = properties;
+        }
     }
 }
