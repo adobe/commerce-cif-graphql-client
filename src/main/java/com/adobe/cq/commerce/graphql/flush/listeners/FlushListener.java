@@ -54,7 +54,7 @@ public class FlushListener implements ResourceChangeListener {
                 if (path.startsWith(FlushService.FLUSH_WORKING_AREA)) {
 
                     LOGGER.info("Flush Listener triggering CIF Cache Flush");
-                    flushService.flush();
+                    flushService.flush(path);
 
                 } else {
                     LOGGER.error("Invalid path: {}", path);

@@ -56,11 +56,19 @@ public class FlushServlet extends SlingAllMethodsServlet {
         if (!configService.isAuthor()) {
             LOGGER.error("Operation is only supported for author");
             response.sendError(SlingHttpServletResponse.SC_FORBIDDEN);
-        } else {
-
-            flushService.triggerFlush();
-
+            return;
         }
+
+        String graphqlClientId = request.getParameter("graphqlClientId");
+        if (graphqlClientId == null || graphqlClientId.isEmpty()) {
+            LOGGER.error("Missing required parameter: graphqlClientId");
+            response.sendError(SlingHttpServletResponse.SC_BAD_REQUEST, "Missing required parameter: graphqlClientId");
+            return;
+        }
+
+        String cacheEntriesParam = request.getParameter("cacheEntries");
+        String[] cacheEntries = cacheEntriesParam != null ? cacheEntriesParam.split(",") : null;
+        flushService.triggerFlush(graphqlClientId, cacheEntries);
 
     }
 

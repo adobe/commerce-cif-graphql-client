@@ -20,8 +20,8 @@ public interface FlushService {
     String NODE_NAME_BASE = "flush_entry";
     String SERVICE_USER = "cif-flush";
 
-    void flush();
+    void flush(String path);
 
-    void triggerFlush();
+    void triggerFlush(String graphqlClientId, String[] cacheEntries);
 
 }

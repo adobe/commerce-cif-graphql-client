@@ -291,13 +291,28 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
-    public void flushCache() {
+    public void flushCache(String[] cacheEntries) {
+        if (caches == null) {
+            LOGGER.warn("No caches configured to flush.");
+            return;
+        }
 
-        LOGGER.info("Flushing cache... {} entries will be deleted", caches.size());
+        if (cacheEntries == null || cacheEntries.length == 0) {
+            LOGGER.info("Invalidating all caches...");
+            caches.values().forEach(Cache::invalidateAll);
+        } else {
+            for (String cacheName : cacheEntries) {
+                Cache<CacheKey, GraphqlResponse<?, ?>> cache = caches.get(cacheName);
+                if (cache != null) {
+                    LOGGER.info("Invalidating cache: {}", cacheName);
+                    cache.invalidateAll();
+                } else {
+                    LOGGER.warn("Cache not found: {}", cacheName);
+                }
+            }
+        }
 
-        caches.clear();
-
-        LOGGER.info("Cache flushed successfully");
+        LOGGER.info("Cache invalidation completed.");
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
