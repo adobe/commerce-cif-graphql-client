@@ -55,13 +55,40 @@ public class FlushServiceImpl implements FlushService {
     @Override
     public void flush(String path) {
         LOGGER.info("Flushing graphql client");
+        try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
+
+            Resource resource = resourceResolver.getResource(path);
+            if (resource != null) {
+                String graphqlClientId = resource.getValueMap().get("graphqlClientId", String.class);
+                String cacheEntriesStr = resource.getValueMap().get("cacheEntries", String.class);
+                String[] cacheEntries = cacheEntriesStr != null ? cacheEntriesStr.split(",") : null;
+
+                LOGGER.info("Flushing graphql client");
+                GraphqlClient client = this.getClient(graphqlClientId);
+                if (client != null) {
+                    LOGGER.info("Flushing graphql client with identifier: {}", graphqlClientId);
+                    client.flushCache(cacheEntries);
+                } else {
+                    LOGGER.error("GraphqlClient with ID '{}' not found", graphqlClientId);
+                }
+            } else {
+                LOGGER.error("Resource not found at path: {}", path);
+            }
+        } catch (LoginException e) {
+            LOGGER.error("Error getting service user: {}", e.getMessage(), e);
+        }
+    }
+
+    private GraphqlClient getClient(String graphqlClientId) {
         for (ClientHolder clientHolder : clients) {
             GraphqlClient graphqlClient = clientHolder.graphqlClient;
             Map<String, Object> properties = clientHolder.properties;
             String identifier = (String) properties.get("identifier");
-            LOGGER.info("Flushing graphql client with identifier: {}", identifier);
-            graphqlClient.flushCache(null);
+            if (identifier.equals(graphqlClientId)) {
+                return graphqlClient;
+            }
         }
+        return null;
     }
 
     @Override
@@ -73,7 +100,7 @@ public class FlushServiceImpl implements FlushService {
 
                 createFlushWorkingAreaIfNotExists(resourceResolver);
 
-                Resource flushEntryResource = createFlushEntry(resourceResolver);
+                Resource flushEntryResource = createFlushEntry(resourceResolver, graphqlClientId, cacheEntries);
 
                 Session session = resourceResolver.adaptTo(Session.class);
                 replicator.replicate(session, ReplicationActionType.ACTIVATE, flushEntryResource.getPath());
@@ -123,7 +150,8 @@ public class FlushServiceImpl implements FlushService {
         }
     }
 
-    private Resource createFlushEntry(ResourceResolver resourceResolver) throws PersistenceException {
+    private Resource createFlushEntry(ResourceResolver resourceResolver, String graphqlClientId, String[] cacheEntries)
+            throws PersistenceException {
 
         // Retrieve the parent resource where the flush_entry node will be created
         Resource flushWorkingArea = resourceResolver.getResource(FLUSH_WORKING_AREA);
@@ -139,6 +167,10 @@ public class FlushServiceImpl implements FlushService {
         Map<String, Object> nodeProperties = new HashMap<>();
         nodeProperties.put("jcr:primaryType", "nt:unstructured");
         nodeProperties.put("flushDate", Calendar.getInstance());
+        nodeProperties.put("graphqlClientId", graphqlClientId);
+        if (cacheEntries != null) {
+            nodeProperties.put("cacheEntries", String.join(",", cacheEntries));
+        }
 
         // Create the new node
         Resource flushEntryResource = resourceResolver.create(flushWorkingArea, newNodeName, nodeProperties);
