@@ -53,19 +53,19 @@ public class FlushServiceImpl implements FlushService {
     private Collection<ClientHolder> clients = new ArrayList<>();
 
     @Override
-    public void flush() {
+    public void flush(String path) {
         LOGGER.info("Flushing graphql client");
         for (ClientHolder clientHolder : clients) {
             GraphqlClient graphqlClient = clientHolder.graphqlClient;
             Map<String, Object> properties = clientHolder.properties;
             String identifier = (String) properties.get("identifier");
             LOGGER.info("Flushing graphql client with identifier: {}", identifier);
-            graphqlClient.flushCache();
+            graphqlClient.flushCache(null);
         }
     }
 
     @Override
-    public void triggerFlush() {
+    public void triggerFlush(String graphqlClientId, String[] cacheEntries) {
 
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
 
