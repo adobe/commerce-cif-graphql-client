@@ -23,6 +23,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 
 @Component(
@@ -39,6 +40,9 @@ public class InvalidateCacheListener implements ResourceChangeListener {
     @Reference
     InvalidateCacheService invalidateCacheService;
 
+    @Reference
+    ConfigService configService;
+
     @Override
     public void onChange(List<ResourceChange> changes) {
 
@@ -53,8 +57,12 @@ public class InvalidateCacheListener implements ResourceChangeListener {
 
                 if (path.startsWith(InvalidateCacheService.INVALIDATE_WORKING_AREA)) {
 
-                    LOGGER.info("Invalidate Cache Listener triggering CIF Cache Invalidation");
-                    invalidateCacheService.invalidateCache(path);
+                    if (configService.isPublish()) {
+                        LOGGER.info("Invalidate Cache Listener triggering CIF Cache Invalidation");
+                        invalidateCacheService.invalidateCache(path);
+                    } else {
+                        LOGGER.info("Current instance is not a publish instance. Skipping cache invalidation.");
+                    }
 
                 } else {
                     LOGGER.error("Invalid path: {}", path);
