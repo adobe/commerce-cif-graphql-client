@@ -33,8 +33,10 @@ import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.FlushService;
 import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
+import com.day.cq.replication.AgentConfig;
 import com.day.cq.replication.ReplicationActionType;
 import com.day.cq.replication.ReplicationException;
+import com.day.cq.replication.ReplicationOptions;
 import com.day.cq.replication.Replicator;
 
 @Component(service = FlushService.class, immediate = true)
@@ -103,7 +105,10 @@ public class FlushServiceImpl implements FlushService {
                 Resource flushEntryResource = createFlushEntry(resourceResolver, graphqlClientId, cacheEntries);
 
                 Session session = resourceResolver.adaptTo(Session.class);
-                replicator.replicate(session, ReplicationActionType.ACTIVATE, flushEntryResource.getPath());
+
+                this.replicateToPublishInstances(session, flushEntryResource.getPath());
+
+                this.replicateToAuthorInstances(session, flushEntryResource.getPath());
 
             }
 
@@ -114,7 +119,20 @@ public class FlushServiceImpl implements FlushService {
         } catch (LoginException e) {
             LOGGER.error("Error getting service user: {}", e.getMessage(), e);
         }
+    }
 
+    private void replicateToPublishInstances(Session session, String path) throws ReplicationException {
+        replicator.replicate(session, ReplicationActionType.ACTIVATE, path);
+    }
+
+    private void replicateToAuthorInstances(Session session, String path) throws ReplicationException {
+        ReplicationOptions replicationOptions = new ReplicationOptions();
+        replicationOptions.setFilter(agent -> {
+            AgentConfig config = agent.getConfiguration();
+            return config.getTransportURI().contains("author");
+        });
+
+        replicator.replicate(session, ReplicationActionType.ACTIVATE, path, replicationOptions);
     }
 
     private void createFlushWorkingAreaIfNotExists(ResourceResolver resourceResolver) throws PersistenceException {
@@ -151,7 +169,7 @@ public class FlushServiceImpl implements FlushService {
     }
 
     private Resource createFlushEntry(ResourceResolver resourceResolver, String graphqlClientId, String[] cacheEntries)
-            throws PersistenceException {
+        throws PersistenceException {
 
         // Retrieve the parent resource where the flush_entry node will be created
         Resource flushWorkingArea = resourceResolver.getResource(FLUSH_WORKING_AREA);
