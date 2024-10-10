@@ -14,14 +14,14 @@
 
 package com.adobe.cq.commerce.graphql.flush.services;
 
-public interface FlushService {
+public interface InvalidateCacheService {
 
-    String FLUSH_WORKING_AREA = "/var/cif";
-    String NODE_NAME_BASE = "flush_entry";
+    String INVALIDATE_WORKING_AREA = "/var/cif";
+    String NODE_NAME_BASE = "invalidate_entry";
     String SERVICE_USER = "cif-flush";
 
-    void flush(String path);
+    void invalidateCache(String path);
 
-    void triggerFlush(String graphqlClientId, String[] cacheEntries);
+    void triggerCacheInvalidation(String graphqlClientId, String[] cacheEntries);
 
 }

@@ -30,46 +30,53 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
-import com.adobe.cq.commerce.graphql.flush.services.FlushService;
+import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 
 @Component(
     service = { Servlet.class },
     immediate = true,
     property = {
-        Constants.SERVICE_DESCRIPTION + "=CIF Flush Servlet",
+        Constants.SERVICE_DESCRIPTION + "=CIF Invalidate Cache Servlet",
         "sling.servlet.methods=" + HttpConstants.METHOD_POST,
-        "sling.servlet.paths=" + "/bin/cif/flush"
+        "sling.servlet.paths=" + "/bin/cif/invalidate-cache"
     })
-public class FlushServlet extends SlingAllMethodsServlet {
+public class InvalidateCacheServlet extends SlingAllMethodsServlet {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FlushServlet.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheServlet.class);
 
     @Reference
     private ConfigService configService;
 
     @Reference
-    private FlushService flushService;
+    private InvalidateCacheService invalidateCacheService;
 
     @Override
     protected void doPost(SlingHttpServletRequest request, SlingHttpServletResponse response) throws ServletException, IOException {
 
         if (!configService.isAuthor()) {
             LOGGER.error("Operation is only supported for author");
-            response.sendError(SlingHttpServletResponse.SC_FORBIDDEN);
+            sendJsonResponse(response, SlingHttpServletResponse.SC_FORBIDDEN, "Operation is only supported for author");
             return;
         }
 
         String graphqlClientId = request.getParameter("graphqlClientId");
         if (graphqlClientId == null || graphqlClientId.isEmpty()) {
             LOGGER.error("Missing required parameter: graphqlClientId");
-            response.sendError(SlingHttpServletResponse.SC_BAD_REQUEST, "Missing required parameter: graphqlClientId");
+            sendJsonResponse(response, SlingHttpServletResponse.SC_BAD_REQUEST, "Missing required parameter: graphqlClientId");
             return;
         }
 
         String cacheEntriesParam = request.getParameter("cacheEntries");
         String[] cacheEntries = cacheEntriesParam != null ? cacheEntriesParam.split(",") : null;
-        flushService.triggerFlush(graphqlClientId, cacheEntries);
+        invalidateCacheService.triggerCacheInvalidation(graphqlClientId, cacheEntries);
 
+        sendJsonResponse(response, SlingHttpServletResponse.SC_OK, "Invalidate cache triggered successfully");
     }
 
+    private void sendJsonResponse(SlingHttpServletResponse response, int statusCode, String message) throws IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.setStatus(statusCode);
+        response.getWriter().write("{\"message\": \"" + message + "\"}");
+    }
 }

@@ -31,16 +31,14 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
-import com.adobe.cq.commerce.graphql.flush.services.FlushService;
+import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
-import com.day.cq.replication.AgentConfig;
 import com.day.cq.replication.ReplicationActionType;
 import com.day.cq.replication.ReplicationException;
-import com.day.cq.replication.ReplicationOptions;
 import com.day.cq.replication.Replicator;
 
-@Component(service = FlushService.class, immediate = true)
-public class FlushServiceImpl implements FlushService {
+@Component(service = InvalidateCacheService.class, immediate = true)
+public class InvalidateCacheImpl implements InvalidateCacheService {
 
     @Reference
     private ConfigService configService;
@@ -51,12 +49,11 @@ public class FlushServiceImpl implements FlushService {
     @Reference
     private ServiceUserService serviceUserService;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FlushServiceImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheImpl.class);
     private Collection<ClientHolder> clients = new ArrayList<>();
 
     @Override
-    public void flush(String path) {
-        LOGGER.info("Flushing graphql client");
+    public void invalidateCache(String path) {
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
 
             Resource resource = resourceResolver.getResource(path);
@@ -65,11 +62,11 @@ public class FlushServiceImpl implements FlushService {
                 String cacheEntriesStr = resource.getValueMap().get("cacheEntries", String.class);
                 String[] cacheEntries = cacheEntriesStr != null ? cacheEntriesStr.split(",") : null;
 
-                LOGGER.info("Flushing graphql client");
+                LOGGER.info("Invalidating graphql client cache");
                 GraphqlClient client = this.getClient(graphqlClientId);
                 if (client != null) {
-                    LOGGER.info("Flushing graphql client with identifier: {}", graphqlClientId);
-                    client.flushCache(cacheEntries);
+                    LOGGER.info("Invalidating graphql client cache with identifier: {}", graphqlClientId);
+                    client.invalidateCache(cacheEntries);
                 } else {
                     LOGGER.error("GraphqlClient with ID '{}' not found", graphqlClientId);
                 }
@@ -94,21 +91,19 @@ public class FlushServiceImpl implements FlushService {
     }
 
     @Override
-    public void triggerFlush(String graphqlClientId, String[] cacheEntries) {
+    public void triggerCacheInvalidation(String graphqlClientId, String[] cacheEntries) {
 
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
 
             if (configService.isAuthor()) {
 
-                createFlushWorkingAreaIfNotExists(resourceResolver);
+                createInvalidateWorkingAreaIfNotExists(resourceResolver);
 
-                Resource flushEntryResource = createFlushEntry(resourceResolver, graphqlClientId, cacheEntries);
+                Resource invalidateEntryResource = createInvalidateEntry(resourceResolver, graphqlClientId, cacheEntries);
 
                 Session session = resourceResolver.adaptTo(Session.class);
 
-                this.replicateToPublishInstances(session, flushEntryResource.getPath());
-
-                this.replicateToAuthorInstances(session, flushEntryResource.getPath());
+                this.replicateToPublishInstances(session, invalidateEntryResource.getPath());
 
             }
 
@@ -122,23 +117,14 @@ public class FlushServiceImpl implements FlushService {
     }
 
     private void replicateToPublishInstances(Session session, String path) throws ReplicationException {
+        LOGGER.error("Replicate to publish instances");
         replicator.replicate(session, ReplicationActionType.ACTIVATE, path);
     }
 
-    private void replicateToAuthorInstances(Session session, String path) throws ReplicationException {
-        ReplicationOptions replicationOptions = new ReplicationOptions();
-        replicationOptions.setFilter(agent -> {
-            AgentConfig config = agent.getConfiguration();
-            return config.getTransportURI().contains("author");
-        });
-
-        replicator.replicate(session, ReplicationActionType.ACTIVATE, path, replicationOptions);
-    }
-
-    private void createFlushWorkingAreaIfNotExists(ResourceResolver resourceResolver) throws PersistenceException {
+    private void createInvalidateWorkingAreaIfNotExists(ResourceResolver resourceResolver) throws PersistenceException {
 
         // Check if the resource already exists
-        Resource folderResource = resourceResolver.getResource(FLUSH_WORKING_AREA);
+        Resource folderResource = resourceResolver.getResource(INVALIDATE_WORKING_AREA);
 
         if (folderResource == null) {
 
@@ -168,37 +154,37 @@ public class FlushServiceImpl implements FlushService {
         }
     }
 
-    private Resource createFlushEntry(ResourceResolver resourceResolver, String graphqlClientId, String[] cacheEntries)
+    private Resource createInvalidateEntry(ResourceResolver resourceResolver, String graphqlClientId, String[] cacheEntries)
         throws PersistenceException {
 
-        // Retrieve the parent resource where the flush_entry node will be created
-        Resource flushWorkingArea = resourceResolver.getResource(FLUSH_WORKING_AREA);
+        // Retrieve the parent resource where the invalidate_entry node will be created
+        Resource invalidateWorkingArea = resourceResolver.getResource(INVALIDATE_WORKING_AREA);
 
-        if (flushWorkingArea == null) {
-            throw new IllegalStateException("Flush working area does not exist: " + FLUSH_WORKING_AREA);
+        if (invalidateWorkingArea == null) {
+            throw new IllegalStateException("Invalidate working area does not exist: " + INVALIDATE_WORKING_AREA);
         }
 
-        // Generate unique node name if flush_entry already exists
-        String newNodeName = getUniqueNodeName(flushWorkingArea);
+        // Generate unique node name if invalidate_entry already exists
+        String newNodeName = getUniqueNodeName(invalidateWorkingArea);
 
         // Prepare the properties for the new node
         Map<String, Object> nodeProperties = new HashMap<>();
         nodeProperties.put("jcr:primaryType", "nt:unstructured");
-        nodeProperties.put("flushDate", Calendar.getInstance());
+        nodeProperties.put("invalidateDate", Calendar.getInstance());
         nodeProperties.put("graphqlClientId", graphqlClientId);
         if (cacheEntries != null) {
             nodeProperties.put("cacheEntries", String.join(",", cacheEntries));
         }
 
         // Create the new node
-        Resource flushEntryResource = resourceResolver.create(flushWorkingArea, newNodeName, nodeProperties);
+        Resource invalidateEntryResource = resourceResolver.create(invalidateWorkingArea, newNodeName, nodeProperties);
 
         // Commit changes to persist the new node
         resourceResolver.commit();
 
-        LOGGER.info("Node {} created successfully under " + FLUSH_WORKING_AREA, newNodeName);
+        LOGGER.info("Node {} created successfully under " + INVALIDATE_WORKING_AREA, newNodeName);
 
-        return flushEntryResource;
+        return invalidateEntryResource;
     }
 
     // Method to generate a unique node name by appending an incremental index if necessary

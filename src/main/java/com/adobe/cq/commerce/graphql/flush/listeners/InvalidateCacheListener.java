@@ -23,21 +23,21 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.flush.services.FlushService;
+import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 
 @Component(
     service = ResourceChangeListener.class,
     immediate = true,
     property = {
-        ResourceChangeListener.PATHS + "=" + FlushService.FLUSH_WORKING_AREA,
+        ResourceChangeListener.PATHS + "=" + InvalidateCacheService.INVALIDATE_WORKING_AREA,
         ResourceChangeListener.CHANGES + "=ADDED"
     })
-public class FlushListener implements ResourceChangeListener {
+public class InvalidateCacheListener implements ResourceChangeListener {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FlushListener.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheListener.class);
 
     @Reference
-    FlushService flushService;
+    InvalidateCacheService invalidateCacheService;
 
     @Override
     public void onChange(List<ResourceChange> changes) {
@@ -51,10 +51,10 @@ public class FlushListener implements ResourceChangeListener {
                 String path = change.getPath();
                 LOGGER.info("Node created at path: {}", path);
 
-                if (path.startsWith(FlushService.FLUSH_WORKING_AREA)) {
+                if (path.startsWith(InvalidateCacheService.INVALIDATE_WORKING_AREA)) {
 
-                    LOGGER.info("Flush Listener triggering CIF Cache Flush");
-                    flushService.flush(path);
+                    LOGGER.info("Invalidate Cache Listener triggering CIF Cache Invalidation");
+                    invalidateCacheService.invalidateCache(path);
 
                 } else {
                     LOGGER.error("Invalid path: {}", path);
@@ -62,8 +62,6 @@ public class FlushListener implements ResourceChangeListener {
             } else {
                 LOGGER.error("Change Type not supported: {}", changeType);
             }
-
         }
-
     }
 }

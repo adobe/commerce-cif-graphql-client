@@ -291,9 +291,9 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
-    public void flushCache(String[] cacheEntries) {
+    public void invalidateCache(String[] cacheEntries) {
         if (caches == null) {
-            LOGGER.warn("No caches configured to flush.");
+            LOGGER.warn("No caches configured to invalidate.");
             return;
         }
 
