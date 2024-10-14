@@ -27,19 +27,15 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 
 @Component(service = EventListener.class, immediate = true)
-public class AuthorInvalidateCacheEventListener implements EventListener {
+public class InvalidateCacheEventListener implements EventListener {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AuthorInvalidateCacheEventListener.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheEventListener.class);
 
     @Reference
     private InvalidateCacheService invalidateCacheService;
-
-    @Reference
-    private ConfigService configService;
 
     @Reference
     private SlingRepository repository;
@@ -71,7 +67,7 @@ public class AuthorInvalidateCacheEventListener implements EventListener {
             Event event = events.nextEvent();
             try {
                 String path = event.getPath();
-                if (configService.isAuthor() && path.startsWith(InvalidateCacheService.INVALIDATE_WORKING_AREA)) {
+                if (path.startsWith(InvalidateCacheService.INVALIDATE_WORKING_AREA)) {
                     LOGGER.info("Cache invalidation event detected: {}", path);
                     invalidateCacheService.invalidateCache(path);
                 } else {
