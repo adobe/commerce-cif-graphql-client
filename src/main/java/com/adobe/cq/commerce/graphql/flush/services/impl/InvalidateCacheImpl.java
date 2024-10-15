@@ -15,12 +15,11 @@
 package com.adobe.cq.commerce.graphql.flush.services.impl;
 
 import java.util.*;
-
 import javax.jcr.Session;
-
 import org.apache.sling.api.resource.LoginException;
 import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.ModifiableValueMap;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -60,9 +59,10 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
             if (resource != null) {
                 String graphqlClientId = resource.getValueMap().get("graphqlClientId", String.class);
                 String cacheEntriesStr = resource.getValueMap().get("cacheEntries", String.class);
+                String invalidateDate = resource.getValueMap().get("invalidateDate", String.class);
                 String[] cacheEntries = cacheEntriesStr != null ? cacheEntriesStr.split(",") : null;
 
-                LOGGER.info("Invalidating graphql client cache");
+                LOGGER.info("Invalidating graphql client cache: {}", invalidateDate);
                 GraphqlClient client = this.getClient(graphqlClientId);
                 if (client != null) {
                     LOGGER.info("Invalidating graphql client cache with identifier: {}", graphqlClientId);
@@ -164,40 +164,37 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
             throw new IllegalStateException("Invalidate working area does not exist: " + INVALIDATE_WORKING_AREA);
         }
 
-        // Generate unique node name if invalidate_entry already exists
-        String newNodeName = getUniqueNodeName(invalidateWorkingArea);
+        Resource invalidateEntryResource = invalidateWorkingArea.getChild(NODE_NAME_BASE);
 
         // Prepare the properties for the new node
         Map<String, Object> nodeProperties = new HashMap<>();
         nodeProperties.put("jcr:primaryType", "nt:unstructured");
-        nodeProperties.put("invalidateDate", Calendar.getInstance());
+        nodeProperties.put(PROPERTY_NAME, Calendar.getInstance());
         nodeProperties.put("graphqlClientId", graphqlClientId);
         if (cacheEntries != null) {
             nodeProperties.put("cacheEntries", String.join(",", cacheEntries));
         }
 
-        // Create the new node
-        Resource invalidateEntryResource = resourceResolver.create(invalidateWorkingArea, newNodeName, nodeProperties);
+        if (invalidateEntryResource != null) {
+            // Update the properties
+            ModifiableValueMap properties = invalidateEntryResource.adaptTo(ModifiableValueMap.class);
+            if (properties != null) {
+                properties.putAll(nodeProperties);
+            } else {
+                LOGGER.error("Failed to adapt child resource to ModifiableValueMap.");
+            }
+        } else {
+            // Create the new node
+            invalidateEntryResource = resourceResolver.create(invalidateWorkingArea, NODE_NAME_BASE, nodeProperties);
+            LOGGER.error("Child resource not found at path: {}/{}", INVALIDATE_WORKING_AREA, NODE_NAME_BASE);
+        }
 
         // Commit changes to persist the new node
         resourceResolver.commit();
 
-        LOGGER.info("Node {} created successfully under " + INVALIDATE_WORKING_AREA, newNodeName);
+        LOGGER.info("Node {} created successfully under " + INVALIDATE_WORKING_AREA, NODE_NAME_BASE);
 
         return invalidateEntryResource;
-    }
-
-    // Method to generate a unique node name by appending an incremental index if necessary
-    private String getUniqueNodeName(Resource parentResource) {
-        int index = 0;
-        String nodeName = NODE_NAME_BASE;
-
-        while (parentResource.getChild(nodeName) != null) {
-            index++;
-            nodeName = NODE_NAME_BASE + "_" + index;
-        }
-
-        return nodeName;
     }
 
     @Reference(

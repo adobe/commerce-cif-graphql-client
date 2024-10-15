@@ -48,7 +48,7 @@ public class InvalidateCacheEventListener implements EventListener {
             ObservationManager observationManager = session.getWorkspace().getObservationManager();
             observationManager.addEventListener(
                 this,
-                Event.NODE_ADDED,
+                Event.NODE_ADDED | Event.PROPERTY_CHANGED,
                 InvalidateCacheService.INVALIDATE_WORKING_AREA,
                 true,
                 null,
@@ -68,6 +68,11 @@ public class InvalidateCacheEventListener implements EventListener {
             try {
                 String path = event.getPath();
                 if (path.startsWith(InvalidateCacheService.INVALIDATE_WORKING_AREA)) {
+                    if (event.getType() == Event.PROPERTY_CHANGED && path.contains(InvalidateCacheService.PROPERTY_NAME)) {
+                        path = path.substring(0, path.lastIndexOf('/'));
+                    } else {
+                        continue;
+                    }
                     LOGGER.info("Cache invalidation event detected: {}", path);
                     invalidateCacheService.invalidateCache(path);
                 } else {
