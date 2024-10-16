@@ -67,14 +67,15 @@ public class InvalidateCacheEventListener implements EventListener {
             Event event = events.nextEvent();
             try {
                 String path = event.getPath();
-                if (path.startsWith(InvalidateCacheService.INVALIDATE_WORKING_AREA)) {
+                String actualPath = InvalidateCacheService.INVALIDATE_WORKING_AREA + "/" + InvalidateCacheService.NODE_NAME_BASE;
+                if (path.startsWith(actualPath)) {
                     if (event.getType() == Event.PROPERTY_CHANGED && path.contains(InvalidateCacheService.PROPERTY_NAME)) {
                         path = path.substring(0, path.lastIndexOf('/'));
-                    } else {
-                        continue;
                     }
-                    LOGGER.info("Cache invalidation event detected: {}", path);
-                    invalidateCacheService.invalidateCache(path);
+                    if (path.equals(actualPath)) {
+                        LOGGER.info("Cache invalidation event detected: {} and {}", path, event.getType());
+                        invalidateCacheService.invalidateCache(path);
+                    }
                 } else {
                     LOGGER.error("Invalid path: {}", path);
                 }
