@@ -92,7 +92,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-@Component(service = {})
+@Component(service = { GraphqlClient.class })
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
 
@@ -288,6 +288,31 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
         }
         return executeImpl(request, typeOfT, typeofU, options);
+    }
+
+    @Override
+    public void invalidateCache(String[] cacheEntries) {
+        if (caches == null) {
+            LOGGER.warn("No caches configured to invalidate.");
+            return;
+        }
+
+        if (cacheEntries == null || cacheEntries.length == 0) {
+            LOGGER.info("Invalidating all caches...");
+            caches.values().forEach(Cache::invalidateAll);
+        } else {
+            for (String cacheName : cacheEntries) {
+                Cache<CacheKey, GraphqlResponse<?, ?>> cache = caches.get(cacheName);
+                if (cache != null) {
+                    LOGGER.info("Invalidating cache: {}", cacheName);
+                    cache.invalidateAll();
+                } else {
+                    LOGGER.warn("Cache not found: {}", cacheName);
+                }
+            }
+        }
+
+        LOGGER.info("Cache invalidation completed.");
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
