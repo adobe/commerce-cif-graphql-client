@@ -112,4 +112,11 @@ public interface GraphqlClient {
      */
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeOfU, RequestOptions options);
 
+    /**
+     * Delete cache entries for in-memory cache based on the cache entries.
+     *
+     * @param cacheEntries cache entries which needs to be cleared if null then clear all cache.
+     */
+    public void invalidateCache(String[] cacheEntries);
+
 }
