@@ -15,11 +15,15 @@
 package com.adobe.cq.commerce.graphql.flush.services.impl;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
 import javax.jcr.Session;
+
 import org.apache.sling.api.resource.LoginException;
+import org.apache.sling.api.resource.ModifiableValueMap;
 import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
-import org.apache.sling.api.resource.ModifiableValueMap;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -29,12 +33,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
+import com.adobe.cq.commerce.graphql.flush.common.MissingArgumentException;
+import com.adobe.cq.commerce.graphql.flush.common.TypeProperties;
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
 import com.day.cq.replication.ReplicationActionType;
 import com.day.cq.replication.ReplicationException;
 import com.day.cq.replication.Replicator;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 @Component(service = InvalidateCacheService.class, immediate = true)
 public class InvalidateCacheImpl implements InvalidateCacheService {
@@ -63,10 +72,10 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
                 String[] cacheEntries = cacheEntriesStr != null ? cacheEntriesStr.split(",") : null;
 
                 LOGGER.info("Invalidating graphql client cache: {}", invalidateDate);
-                GraphqlClient client = this.getClient(graphqlClientId);
+                GraphqlClient client = getClient(graphqlClientId);
                 if (client != null) {
                     LOGGER.info("Invalidating graphql client cache with identifier: {}", graphqlClientId);
-                    client.invalidateCache(cacheEntries);
+                    client.invalidateCache(cacheEntries, "specificCache", null);
                 } else {
                     LOGGER.error("GraphqlClient with ID '{}' not found", graphqlClientId);
                 }
@@ -87,7 +96,92 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
                 return graphqlClient;
             }
         }
-        return null;
+        throw new IllegalStateException("GraphqlClient with ID '" + graphqlClientId + "' not found");
+    }
+
+    @Override
+    public void triggerCacheInvalidationBasedOnPatterns(JsonObject jsonObject) throws Exception {
+
+        // Check the required fields are present
+        checksMandatoryFields(jsonObject, null, TypeProperties.REQUIRED_ATTRIBUTES);
+
+        String graphqlClientId = jsonObject.get(TypeProperties.PARAMETER_GRAPHQL_CLIENT_ID).getAsString();
+        GraphqlClient client = this.getClient(graphqlClientId);
+        String type = jsonObject.get(TypeProperties.PARAMETER_TYPE).getAsString();
+        String[] listOfCacheToSearch = jsonObject.has(TypeProperties.PARAMETER_LIST_OF_CACHE_TO_SEARCH)
+            ? convertJsonArrayToStringArray(jsonObject.getAsJsonArray(TypeProperties.PARAMETER_LIST_OF_CACHE_TO_SEARCH))
+            : null;
+        String[] cachePatterns;
+
+        // Check the required fields based on type
+        checksMandatoryFields(jsonObject, type, null);
+
+        switch (type) {
+            case TypeProperties.TYPE_SKU:
+                cachePatterns = getProductAttributePatterns(jsonObject.getAsJsonArray(TypeProperties.PARAMETER_INVALID_CACHE_ENTRIES),
+                    "sku");
+                client.invalidateCache(cachePatterns, "pattern", listOfCacheToSearch);
+                break;
+            case TypeProperties.TYPE_UUIDS:
+                cachePatterns = getProductAttributePatterns(jsonObject.getAsJsonArray(TypeProperties.PARAMETER_INVALID_CACHE_ENTRIES),
+                    "id");
+                client.invalidateCache(cachePatterns, "pattern", listOfCacheToSearch);
+                break;
+            case TypeProperties.TYPE_ATTRIBUTE:
+                String attribute = jsonObject.get(TypeProperties.PARAMETER_ATTRIBUTE).getAsString();
+                cachePatterns = getProductAttributePatterns(jsonObject.getAsJsonArray(TypeProperties.PARAMETER_INVALID_CACHE_ENTRIES),
+                    attribute);
+                client.invalidateCache(cachePatterns, "pattern", listOfCacheToSearch);
+            case TypeProperties.TYPE_ClEAR_SPECIFIC_CACHE:
+                cachePatterns = convertJsonArrayToStringArray(
+                    jsonObject.getAsJsonArray(TypeProperties.PARAMETER_INVALID_CACHE_ENTRIES));
+                client.invalidateCache(cachePatterns, "specificCache", null);
+                break;
+            case TypeProperties.TYPE_CLEAR_ALL:
+                client.invalidateCache(null, null, null);
+                break;
+            default:
+                LOGGER.warn("Unknown cache type: {}", type);
+                throw new IllegalStateException("Unknown cache type" + type);
+        }
+    }
+
+    private String[] getProductAttributePatterns(JsonArray jsonArray, String attribute) {
+        String attributeString = StreamSupport.stream(jsonArray.spliterator(), false)
+            .map(JsonElement::getAsString)
+            .collect(Collectors.joining("|"));
+        return new String[] { "\"" + attribute + "\":\\s*\"(" + attributeString + ")\"" };
+    }
+
+    private String[] convertJsonArrayToStringArray(JsonArray jsonArray) {
+        return StreamSupport.stream(jsonArray.spliterator(), false)
+            .map(JsonElement::getAsString)
+            .toArray(String[]::new);
+    }
+
+    private void checksMandatoryFields(JsonObject jsonObject, String type, List<String> requiredFields) {
+        Map<String, Map<String, List<String>>> properties = TypeProperties.PROPERTIES;
+        if (requiredFields == null) {
+            requiredFields = properties.containsKey(type) && properties.get(type).containsKey("requiredFields")
+                ? properties.get(type).get("requiredFields")
+                : new ArrayList<>();
+        }
+        boolean flag = false;
+        for (String field : requiredFields) {
+            if (!jsonObject.has(field)) {
+                throw new MissingArgumentException("Missing required parameter : " + field);
+            } else {
+                if (jsonObject.get(field).isJsonArray()) {
+                    JsonArray jsonArray = jsonObject.getAsJsonArray(field);
+                    flag = jsonArray.size() == 0;
+                } else if (jsonObject.get(field).getAsString() == null || jsonObject.get(field).getAsString().isEmpty()) {
+                    flag = true;
+                }
+            }
+            if (flag) {
+                throw new MissingArgumentException("Empty required parameter : " + field);
+            }
+        }
     }
 
     @Override

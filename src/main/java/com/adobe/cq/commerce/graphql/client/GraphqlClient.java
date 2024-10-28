@@ -115,8 +115,6 @@ public interface GraphqlClient {
     /**
      * Delete cache entries for in-memory cache based on the cache entries.
      *
-     * @param cacheEntries cache entries which needs to be cleared if null then clear all cache.
      */
-    public void invalidateCache(String[] cacheEntries);
-
+    public void invalidateCache(String[] invalidateCachePatterns, String type, String[] listOfCacheToSearch);
 }

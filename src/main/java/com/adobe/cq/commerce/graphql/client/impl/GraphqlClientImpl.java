@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 
@@ -87,6 +89,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.codahale.metrics.MetricRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -112,6 +115,8 @@ public class GraphqlClientImpl implements GraphqlClient {
     private GraphqlClientMetrics metrics;
     private GraphqlClientConfigurationImpl configuration;
     private ServiceRegistration<?> registration;
+
+    private final ObjectMapper objectMapper = new ObjectMapper(); // For JSON parsing
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration, BundleContext bundleContext)
@@ -291,28 +296,59 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
-    public void invalidateCache(String[] cacheEntries) {
-        if (caches == null) {
-            LOGGER.warn("No caches configured to invalidate.");
-            return;
-        }
+    public void invalidateCache(String[] invalidateCachePatterns, String type, String[] listOfCacheToSearch) {
 
-        if (cacheEntries == null || cacheEntries.length == 0) {
-            LOGGER.info("Invalidating all caches...");
-            caches.values().forEach(Cache::invalidateAll);
+        if (invalidateCachePatterns == null || invalidateCachePatterns.length == 0) {
+            invalidateFullCache();
         } else {
-            for (String cacheName : cacheEntries) {
-                Cache<CacheKey, GraphqlResponse<?, ?>> cache = caches.get(cacheName);
-                if (cache != null) {
-                    LOGGER.info("Invalidating cache: {}", cacheName);
-                    cache.invalidateAll();
-                } else {
-                    LOGGER.warn("Cache not found: {}", cacheName);
+            if (type.equals("specificCache")) {
+                invalidateSpecificCaches(invalidateCachePatterns);
+            } else {
+                for (String pattern : invalidateCachePatterns) {
+                    invalidateCacheBasedOnPattern(pattern, listOfCacheToSearch);
                 }
             }
         }
+    }
 
-        LOGGER.info("Cache invalidation completed.");
+    private void invalidateFullCache() {
+        LOGGER.info("Invalidating all caches...");
+        caches.values().forEach(Cache::invalidateAll);
+    }
+
+    private void invalidateSpecificCaches(String[] cacheEntries) {
+        for (String cacheName : cacheEntries) {
+            Cache<CacheKey, GraphqlResponse<?, ?>> cache = caches.get(cacheName);
+            if (cache != null) {
+                LOGGER.info("Invalidating cache: {}", cacheName);
+                cache.invalidateAll();
+            } else {
+                LOGGER.warn("Cache not found: {}", cacheName);
+            }
+        }
+    }
+
+    private void invalidateCacheBasedOnPattern(String pattern, String[] listOfCacheToSearch) {
+        Pattern regex = Pattern.compile(pattern);
+        caches.forEach((cacheName, cache) -> {
+            if (listOfCacheToSearch != null
+                && !Arrays.asList(listOfCacheToSearch).contains(cacheName)) {
+                return;
+            }
+            cache.asMap().entrySet().stream()
+                .filter(entry -> {
+                    GraphqlResponse<?, ?> value = entry.getValue();
+                    String jsonResponse = gson.toJson(value);
+                    // Replace \\u003d with = in the JSON string
+                    jsonResponse = jsonResponse.replace("\\u003d", "=");
+                    Matcher matcher = regex.matcher(jsonResponse);
+                    return matcher.find();
+                })
+                .forEach(entry -> {
+                    LOGGER.info("Invalidating key: {} in cache: {}", entry.getKey(), cacheName);
+                    cache.invalidate(entry.getKey());
+                });
+        });
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {

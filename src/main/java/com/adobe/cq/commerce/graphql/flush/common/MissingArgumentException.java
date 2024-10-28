@@ -1,6 +1,6 @@
 /*******************************************************************************
  *
- *    Copyright 2019 Adobe. All rights reserved.
+ *    Copyright 2024 Adobe. All rights reserved.
  *    This file is licensed to you under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License. You may obtain a copy
  *    of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -12,21 +12,10 @@
  *
  ******************************************************************************/
 
-package com.adobe.cq.commerce.graphql.flush.services;
+package com.adobe.cq.commerce.graphql.flush.common;
 
-import com.google.gson.JsonObject;
-
-public interface InvalidateCacheService {
-
-    String INVALIDATE_WORKING_AREA = "/var/cif";
-    String NODE_NAME_BASE = "invalidate_entry";
-    String SERVICE_USER = "cif-flush";
-    String PROPERTY_NAME = "invalidateDate";
-
-    void invalidateCache(String path);
-
-    void triggerCacheInvalidation(String graphqlClientId, String[] cacheEntries);
-
-    void triggerCacheInvalidationBasedOnPatterns(JsonObject jsonObject) throws Exception;
-
+public class MissingArgumentException extends RuntimeException {
+    public MissingArgumentException(String message) {
+        super(message);
+    }
 }

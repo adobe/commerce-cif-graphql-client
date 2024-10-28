@@ -15,6 +15,7 @@
 package com.adobe.cq.commerce.graphql.flush.servlets;
 
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -29,8 +30,11 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.adobe.cq.commerce.graphql.flush.common.MissingArgumentException;
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 @Component(
     service = { Servlet.class },
@@ -59,18 +63,40 @@ public class InvalidateCacheServlet extends SlingAllMethodsServlet {
             return;
         }
 
-        String graphqlClientId = request.getParameter("graphqlClientId");
-        if (graphqlClientId == null || graphqlClientId.isEmpty()) {
-            LOGGER.error("Missing required parameter: graphqlClientId");
-            sendJsonResponse(response, SlingHttpServletResponse.SC_BAD_REQUEST, "Missing required parameter: graphqlClientId");
-            return;
+        try {
+            JsonObject jsonRequestObject = covertToJsonRequest(request);
+            invalidateCacheService.triggerCacheInvalidationBasedOnPatterns(jsonRequestObject);
+            sendJsonResponse(response, SlingHttpServletResponse.SC_OK, "Invalidate cache triggered successfully");
+        } catch (MissingArgumentException e) {
+            LOGGER.error(e.getMessage());
+            sendJsonResponse(response, SlingHttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (Exception e) {
+            LOGGER.error("Error invalidating cache", e);
+            sendJsonResponse(response, SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error invalidating cache " + e.getMessage());
         }
+    }
 
-        String cacheEntriesParam = request.getParameter("cacheEntries");
-        String[] cacheEntries = cacheEntriesParam != null ? cacheEntriesParam.split(",") : null;
-        invalidateCacheService.triggerCacheInvalidation(graphqlClientId, cacheEntries);
+    private JsonObject covertToJsonRequest(SlingHttpServletRequest request) throws IOException {
+        // Convert the request to JSON
+        final JsonObject jsonObject;
+        String contentType = request.getContentType();
 
-        sendJsonResponse(response, SlingHttpServletResponse.SC_OK, "Invalidate cache triggered successfully");
+        if (contentType == null || contentType.contains("application/json")) {
+            String requestBody = request.getReader().lines().collect(Collectors.joining());
+            // Parse the request body to JSON
+            jsonObject = new Gson().fromJson(requestBody, JsonObject.class);
+        } else {
+            jsonObject = new JsonObject();
+            request.getParameterMap().forEach((key, values) -> {
+                if (values.length == 1) {
+                    jsonObject.addProperty(key, values[0]);
+                } else {
+                    jsonObject.add(key, new Gson().toJsonTree(values));
+                }
+            });
+
+        }
+        return jsonObject;
     }
 
     private void sendJsonResponse(SlingHttpServletResponse response, int statusCode, String message) throws IOException {
