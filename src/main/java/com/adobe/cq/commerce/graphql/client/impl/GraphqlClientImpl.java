@@ -296,7 +296,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
-    public void invalidateCache(String[] invalidateCachePatterns, String type, String[] listOfCacheToSearch) {
+    public void invalidateCache(String[] invalidateCachePatterns, String type, String storeView, String[] listOfCacheToSearch) {
 
         if (invalidateCachePatterns == null || invalidateCachePatterns.length == 0) {
             invalidateFullCache();
@@ -305,7 +305,7 @@ public class GraphqlClientImpl implements GraphqlClient {
                 invalidateSpecificCaches(invalidateCachePatterns);
             } else {
                 for (String pattern : invalidateCachePatterns) {
-                    invalidateCacheBasedOnPattern(pattern, listOfCacheToSearch);
+                    invalidateCacheBasedOnPattern(pattern, storeView, listOfCacheToSearch);
                 }
             }
         }
@@ -328,7 +328,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
     }
 
-    private void invalidateCacheBasedOnPattern(String pattern, String[] listOfCacheToSearch) {
+    private void invalidateCacheBasedOnPattern(String pattern, String storeView, String[] listOfCacheToSearch) {
         Pattern regex = Pattern.compile(pattern);
         caches.forEach((cacheName, cache) -> {
             if (listOfCacheToSearch != null
@@ -337,6 +337,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
             cache.asMap().entrySet().stream()
                 .filter(entry -> {
+                    if (!checkIfStorePresent(storeView, entry.getKey())) {
+                        return false;
+                    }
                     GraphqlResponse<?, ?> value = entry.getValue();
                     String jsonResponse = gson.toJson(value);
                     // Replace \\u003d with = in the JSON string
@@ -349,6 +352,14 @@ public class GraphqlClientImpl implements GraphqlClient {
                     cache.invalidate(entry.getKey());
                 });
         });
+    }
+
+    private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) {
+        List<Header> headers = cacheKey.getRequestOptions().getHeaders();
+        return headers.stream()
+            .anyMatch(
+                header -> "Store".equalsIgnoreCase(header.getName())
+                    && storeView.equalsIgnoreCase(header.getValue()));
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
