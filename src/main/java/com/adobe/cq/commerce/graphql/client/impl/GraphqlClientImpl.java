@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 
@@ -117,6 +115,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private ServiceRegistration<?> registration;
 
     private final ObjectMapper objectMapper = new ObjectMapper(); // For JSON parsing
+    private CacheInvalidator cacheInvalidator;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration, BundleContext bundleContext)
@@ -195,6 +194,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             : GraphqlClientMetrics.NOOP;
 
         configureCaches(configuration);
+        if (caches != null) {
+            cacheInvalidator = new CacheInvalidator(caches);
+        }
         client = configureHttpClientBuilder().build();
 
         Hashtable<String, Object> serviceProps = new Hashtable<>();
@@ -296,70 +298,10 @@ public class GraphqlClientImpl implements GraphqlClient {
     }
 
     @Override
-    public void invalidateCache(String[] invalidateCachePatterns, String type, String storeView, String[] listOfCacheToSearch) {
-
-        if (invalidateCachePatterns == null || invalidateCachePatterns.length == 0) {
-            invalidateFullCache();
-        } else {
-            if (type.equals("specificCache")) {
-                invalidateSpecificCaches(invalidateCachePatterns);
-            } else {
-                for (String pattern : invalidateCachePatterns) {
-                    invalidateCacheBasedOnPattern(pattern, storeView, listOfCacheToSearch);
-                }
-            }
+    public void invalidateCache(String storeView, String[] cacheNames, String[] patterns) {
+        if (cacheInvalidator != null) {
+            cacheInvalidator.invalidateCache(storeView, cacheNames, patterns);
         }
-    }
-
-    private void invalidateFullCache() {
-        LOGGER.info("Invalidating all caches...");
-        caches.values().forEach(Cache::invalidateAll);
-    }
-
-    private void invalidateSpecificCaches(String[] cacheEntries) {
-        for (String cacheName : cacheEntries) {
-            Cache<CacheKey, GraphqlResponse<?, ?>> cache = caches.get(cacheName);
-            if (cache != null) {
-                LOGGER.info("Invalidating cache: {}", cacheName);
-                cache.invalidateAll();
-            } else {
-                LOGGER.warn("Cache not found: {}", cacheName);
-            }
-        }
-    }
-
-    private void invalidateCacheBasedOnPattern(String pattern, String storeView, String[] listOfCacheToSearch) {
-        Pattern regex = Pattern.compile(pattern);
-        caches.forEach((cacheName, cache) -> {
-            if (listOfCacheToSearch != null
-                && !Arrays.asList(listOfCacheToSearch).contains(cacheName)) {
-                return;
-            }
-            cache.asMap().entrySet().stream()
-                .filter(entry -> {
-                    if (!checkIfStorePresent(storeView, entry.getKey())) {
-                        return false;
-                    }
-                    GraphqlResponse<?, ?> value = entry.getValue();
-                    String jsonResponse = gson.toJson(value);
-                    // Replace \\u003d with = in the JSON string
-                    jsonResponse = jsonResponse.replace("\\u003d", "=");
-                    Matcher matcher = regex.matcher(jsonResponse);
-                    return matcher.find();
-                })
-                .forEach(entry -> {
-                    LOGGER.info("Invalidating key: {} in cache: {}", entry.getKey(), cacheName);
-                    cache.invalidate(entry.getKey());
-                });
-        });
-    }
-
-    private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) {
-        List<Header> headers = cacheKey.getRequestOptions().getHeaders();
-        return headers.stream()
-            .anyMatch(
-                header -> "Store".equalsIgnoreCase(header.getName())
-                    && storeView.equalsIgnoreCase(header.getValue()));
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {
