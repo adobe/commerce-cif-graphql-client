@@ -71,7 +71,7 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
                 GraphqlClient client = getClient(graphqlClientId);
                 if (client != null) {
                     LOGGER.info("Invalidating graphql client cache with identifier: {}", graphqlClientId);
-                    client.invalidateCache(cacheEntries, "specificCache", null, null);
+                    client.invalidateCache(null, null, cacheEntries);
                 } else {
                     LOGGER.error("GraphqlClient with ID '{}' not found", graphqlClientId);
                 }
@@ -118,22 +118,22 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         switch (type) {
             case Utilities.TYPE_SKU:
                 cachePatterns = Utilities.getProductAttributePatterns(invalidCacheEntries, "sku");
-                client.invalidateCache(cachePatterns, "pattern", storeView, listOfCacheToSearch);
+                client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                 break;
             case Utilities.TYPE_UUIDS:
                 cachePatterns = Utilities.getProductAttributePatterns(invalidCacheEntries, "uuid");
-                client.invalidateCache(cachePatterns, "pattern", storeView, listOfCacheToSearch);
+                client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                 break;
             case Utilities.TYPE_ATTRIBUTE:
                 String attribute = jsonObject.get(Utilities.PARAMETER_ATTRIBUTE).getAsString();
                 cachePatterns = Utilities.getProductAttributePatterns(invalidCacheEntries, attribute);
-                client.invalidateCache(cachePatterns, "pattern", storeView, listOfCacheToSearch);
+                client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
             case Utilities.TYPE_ClEAR_SPECIFIC_CACHE:
-                cachePatterns = Utilities.convertJsonArrayToStringArray(invalidCacheEntries);
-                client.invalidateCache(cachePatterns, "specificCache", storeView, null);
+                String[] cacheNames = Utilities.convertJsonArrayToStringArray(invalidCacheEntries);
+                client.invalidateCache(storeView, cacheNames, null);
                 break;
             case Utilities.TYPE_CLEAR_ALL:
-                client.invalidateCache(null, null, storeView, null);
+                client.invalidateCache(storeView, null, null);
                 break;
             default:
                 LOGGER.warn("Unknown cache type: {}", type);
