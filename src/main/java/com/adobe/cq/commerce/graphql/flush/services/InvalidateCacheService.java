@@ -25,8 +25,6 @@ public interface InvalidateCacheService {
 
     void invalidateCache(String path);
 
-    void triggerCacheInvalidation(String graphqlClientId, String[] cacheEntries);
-
-    void triggerCacheInvalidationBasedOnPatterns(JsonObject jsonObject) throws Exception;
+    void triggerCacheInvalidation(JsonObject jsonObject);
 
 }

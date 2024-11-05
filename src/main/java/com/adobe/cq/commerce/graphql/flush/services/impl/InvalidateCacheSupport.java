@@ -12,20 +12,19 @@
  *
  ******************************************************************************/
 
-package com.adobe.cq.commerce.graphql.flush.common;
+package com.adobe.cq.commerce.graphql.flush.services.impl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-public class Utilities {
+public class InvalidateCacheSupport {
 
     public static final String PARAMETER_GRAPHQL_CLIENT_ID = "graphqlClientId";
     public static final String PARAMETER_STORE_VIEW = "storeView";
@@ -52,8 +51,7 @@ public class Utilities {
         Map<String, List<String>> skuProperties = new HashMap<>();
         skuProperties.put("requiredFields", new ArrayList<>(
             List.of(
-                PARAMETER_INVALID_CACHE_ENTRIES,
-                PARAMETER_STORE_VIEW)));
+                PARAMETER_INVALID_CACHE_ENTRIES)));
         // To-do list
         // skuProperties.put("process", new ArrayList<>(
         // List.of(
@@ -66,8 +64,7 @@ public class Utilities {
         Map<String, List<String>> uuidProperties = new HashMap<>();
         uuidProperties.put("requiredFields", new ArrayList<>(
             List.of(
-                PARAMETER_INVALID_CACHE_ENTRIES,
-                PARAMETER_STORE_VIEW)));
+                PARAMETER_INVALID_CACHE_ENTRIES)));
         jsonData.put(TYPE_UUIDS, uuidProperties);
 
         // Add property for type "attribute"
@@ -75,7 +72,6 @@ public class Utilities {
         attributeProperties.put("requiredFields", new ArrayList<>(
             List.of(
                 PARAMETER_INVALID_CACHE_ENTRIES,
-                PARAMETER_STORE_VIEW,
                 PARAMETER_ATTRIBUTE)));
         jsonData.put(TYPE_ATTRIBUTE, attributeProperties);
 
@@ -108,10 +104,8 @@ public class Utilities {
         return requiredFields;
     }
 
-    public static String[] getProductAttributePatterns(JsonArray jsonArray, String attribute) {
-        String attributeString = StreamSupport.stream(jsonArray.spliterator(), false)
-            .map(JsonElement::getAsString)
-            .collect(Collectors.joining("|"));
+    public static String[] getProductAttributePatterns(String[] patterns, String attribute) {
+        String attributeString = String.join("|", patterns);
         return new String[] { getRegexBasedOnAttribute(attribute) + "(" + attributeString + ")\"" };
     }
 
@@ -122,7 +116,7 @@ public class Utilities {
     }
 
     public static void checksMandatoryFields(JsonObject jsonObject, String type, List<String> requiredFields) {
-        Map<String, Map<String, List<String>>> properties = Utilities.PROPERTIES;
+        Map<String, Map<String, List<String>>> properties = PROPERTIES;
         if (requiredFields == null) {
             requiredFields = properties.containsKey(type) && properties.get(type).containsKey("requiredFields")
                 ? properties.get(type).get("requiredFields")

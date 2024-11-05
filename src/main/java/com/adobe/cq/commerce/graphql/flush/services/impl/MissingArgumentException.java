@@ -12,7 +12,7 @@
  *
  ******************************************************************************/
 
-package com.adobe.cq.commerce.graphql.flush.common;
+package com.adobe.cq.commerce.graphql.flush.services.impl;
 
 public class MissingArgumentException extends RuntimeException {
     public MissingArgumentException(String message) {

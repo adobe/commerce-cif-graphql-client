@@ -11,7 +11,7 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-package com.adobe.cq.commerce.graphql.flush.listeners;
+package com.adobe.cq.commerce.graphql.flush.services.impl;
 
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
@@ -72,7 +72,7 @@ public class InvalidateCacheEventListener implements EventListener {
                     if (event.getType() == Event.PROPERTY_CHANGED && path.contains(InvalidateCacheService.PROPERTY_NAME)) {
                         path = path.substring(0, path.lastIndexOf('/'));
                     }
-                    if (path.equals(actualPath)) {
+                    if (path.contains(actualPath)) {
                         LOGGER.info("Cache invalidation event detected: {} and {}", path, event.getType());
                         invalidateCacheService.invalidateCache(path);
                     }

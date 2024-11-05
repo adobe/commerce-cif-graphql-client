@@ -30,9 +30,9 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.flush.common.MissingArgumentException;
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
+import com.adobe.cq.commerce.graphql.flush.services.impl.MissingArgumentException;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -65,7 +65,7 @@ public class InvalidateCacheServlet extends SlingAllMethodsServlet {
 
         try {
             JsonObject jsonRequestObject = covertToJsonRequest(request);
-            invalidateCacheService.triggerCacheInvalidationBasedOnPatterns(jsonRequestObject);
+            invalidateCacheService.triggerCacheInvalidation(jsonRequestObject);
             sendJsonResponse(response, SlingHttpServletResponse.SC_OK, "Invalidate cache triggered successfully");
         } catch (MissingArgumentException e) {
             LOGGER.error(e.getMessage());

@@ -15,11 +15,13 @@
 package com.adobe.cq.commerce.graphql.flush.services.impl;
 
 import java.util.*;
+import java.util.stream.StreamSupport;
 
+import javax.jcr.Node;
+import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 
 import org.apache.sling.api.resource.LoginException;
-import org.apache.sling.api.resource.ModifiableValueMap;
 import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
@@ -31,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
-import com.adobe.cq.commerce.graphql.flush.common.Utilities;
 import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
 import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
@@ -39,6 +40,7 @@ import com.day.cq.replication.ReplicationActionType;
 import com.day.cq.replication.ReplicationException;
 import com.day.cq.replication.Replicator;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 @Component(service = InvalidateCacheService.class, immediate = true)
@@ -56,24 +58,47 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
     private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheImpl.class);
     private Collection<ClientHolder> clients = new ArrayList<>();
 
+    private static final long MINUTES_LIMIT_IN_MILLIS = 5 * 60 * 1000;
+    private static final int NODE_CREATION_LIMIT = 10;
+
     @Override
     public void invalidateCache(String path) {
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
-
             Resource resource = resourceResolver.getResource(path);
             if (resource != null) {
-                String graphqlClientId = resource.getValueMap().get("graphqlClientId", String.class);
-                String cacheEntriesStr = resource.getValueMap().get("cacheEntries", String.class);
-                String invalidateDate = resource.getValueMap().get("invalidateDate", String.class);
-                String[] cacheEntries = cacheEntriesStr != null ? cacheEntriesStr.split(",") : null;
+                String graphqlClientId = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_GRAPHQL_CLIENT_ID, String.class);
+                String[] invalidCacheEntries = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_INVALID_CACHE_ENTRIES,
+                    String[].class);
+                String[] listOfCacheToSearch = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_LIST_OF_CACHE_TO_SEARCH,
+                    String[].class);
+                String storeView = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_STORE_VIEW, String.class);
+                String type = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_TYPE, String.class);
+                String attribute = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_ATTRIBUTE, String.class);
+                String[] cachePatterns;
 
-                LOGGER.info("Invalidating graphql client cache: {}", invalidateDate);
                 GraphqlClient client = getClient(graphqlClientId);
-                if (client != null) {
-                    LOGGER.info("Invalidating graphql client cache with identifier: {}", graphqlClientId);
-                    client.invalidateCache(null, null, cacheEntries);
-                } else {
-                    LOGGER.error("GraphqlClient with ID '{}' not found", graphqlClientId);
+
+                switch (Objects.requireNonNull(type)) {
+                    case InvalidateCacheSupport.TYPE_SKU:
+                        cachePatterns = InvalidateCacheSupport.getProductAttributePatterns(invalidCacheEntries, "sku");
+                        client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
+                        break;
+                    case InvalidateCacheSupport.TYPE_UUIDS:
+                        cachePatterns = InvalidateCacheSupport.getProductAttributePatterns(invalidCacheEntries, "uuid");
+                        client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
+                        break;
+                    case InvalidateCacheSupport.TYPE_ATTRIBUTE:
+                        cachePatterns = InvalidateCacheSupport.getProductAttributePatterns(invalidCacheEntries, attribute);
+                        client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
+                    case InvalidateCacheSupport.TYPE_ClEAR_SPECIFIC_CACHE:
+                        client.invalidateCache(storeView, invalidCacheEntries, null);
+                        break;
+                    case InvalidateCacheSupport.TYPE_CLEAR_ALL:
+                        client.invalidateCache(storeView, null, null);
+                        break;
+                    default:
+                        LOGGER.warn("Unknown cache type: {}", type);
+                        throw new IllegalStateException("Unknown cache type" + type);
                 }
             } else {
                 LOGGER.error("Resource not found at path: {}", path);
@@ -95,75 +120,49 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         throw new IllegalStateException("GraphqlClient with ID '" + graphqlClientId + "' not found");
     }
 
-    @Override
-    public void triggerCacheInvalidationBasedOnPatterns(JsonObject jsonObject) throws Exception {
+    private void checksMandatoryFieldsPresent(JsonObject jsonObject) throws Exception {
 
         // Check the required fields are present
-        Utilities.checksMandatoryFields(jsonObject, null, Utilities.REQUIRED_ATTRIBUTES);
-
-        String graphqlClientId = jsonObject.get(Utilities.PARAMETER_GRAPHQL_CLIENT_ID).getAsString();
-        GraphqlClient client = this.getClient(graphqlClientId);
-        String type = jsonObject.get(Utilities.PARAMETER_TYPE).getAsString();
-
+        InvalidateCacheSupport.checksMandatoryFields(jsonObject, null, InvalidateCacheSupport.REQUIRED_ATTRIBUTES);
+        String type = jsonObject.get(InvalidateCacheSupport.PARAMETER_TYPE).getAsString();
         // Check the required fields based on type
-        Utilities.checksMandatoryFields(jsonObject, type, null);
-        String[] listOfCacheToSearch = jsonObject.has(Utilities.PARAMETER_LIST_OF_CACHE_TO_SEARCH)
-            ? Utilities.convertJsonArrayToStringArray(jsonObject.getAsJsonArray(Utilities.PARAMETER_LIST_OF_CACHE_TO_SEARCH))
-            : null;
-        JsonArray invalidCacheEntries = jsonObject.getAsJsonArray(Utilities.PARAMETER_INVALID_CACHE_ENTRIES);
-        String storeView = jsonObject.has(Utilities.PARAMETER_STORE_VIEW) ? jsonObject.get(Utilities.PARAMETER_STORE_VIEW)
-            .getAsString() : null;
-        String[] cachePatterns;
-
-        switch (type) {
-            case Utilities.TYPE_SKU:
-                cachePatterns = Utilities.getProductAttributePatterns(invalidCacheEntries, "sku");
-                client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
-                break;
-            case Utilities.TYPE_UUIDS:
-                cachePatterns = Utilities.getProductAttributePatterns(invalidCacheEntries, "uuid");
-                client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
-                break;
-            case Utilities.TYPE_ATTRIBUTE:
-                String attribute = jsonObject.get(Utilities.PARAMETER_ATTRIBUTE).getAsString();
-                cachePatterns = Utilities.getProductAttributePatterns(invalidCacheEntries, attribute);
-                client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
-            case Utilities.TYPE_ClEAR_SPECIFIC_CACHE:
-                String[] cacheNames = Utilities.convertJsonArrayToStringArray(invalidCacheEntries);
-                client.invalidateCache(storeView, cacheNames, null);
-                break;
-            case Utilities.TYPE_CLEAR_ALL:
-                client.invalidateCache(storeView, null, null);
-                break;
-            default:
-                LOGGER.warn("Unknown cache type: {}", type);
-                throw new IllegalStateException("Unknown cache type" + type);
-        }
+        InvalidateCacheSupport.checksMandatoryFields(jsonObject, type, null);
     }
 
     @Override
-    public void triggerCacheInvalidation(String graphqlClientId, String[] cacheEntries) {
-
+    public void triggerCacheInvalidation(JsonObject jsonObject) {
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
-
             if (configService.isAuthor()) {
+
+                checksMandatoryFieldsPresent(jsonObject);
+
+                // checks the graphql client id exists
+                String graphqlClientId = jsonObject.get(InvalidateCacheSupport.PARAMETER_GRAPHQL_CLIENT_ID).getAsString();
+                getClient(graphqlClientId);
 
                 createInvalidateWorkingAreaIfNotExists(resourceResolver);
 
-                Resource invalidateEntryResource = createInvalidateEntry(resourceResolver, graphqlClientId, cacheEntries);
+                Resource invalidateEntryResource = createInvalidateEntry(resourceResolver, jsonObject);
 
                 Session session = resourceResolver.adaptTo(Session.class);
 
                 this.replicateToPublishInstances(session, invalidateEntryResource.getPath());
 
+            } else {
+                throw new Exception("Operation is only supported for author");
             }
 
         } catch (PersistenceException e) {
             LOGGER.error("Error during node creation: {}", e.getMessage(), e);
+            throw new RuntimeException("Error during node creation");
         } catch (ReplicationException e) {
             LOGGER.error("Error during node replication: {}", e.getMessage(), e);
+            throw new RuntimeException("Error during node replication");
         } catch (LoginException e) {
             LOGGER.error("Error getting service user: {}", e.getMessage(), e);
+            throw new RuntimeException("Error getting service user");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -199,14 +198,34 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
             } else {
                 LOGGER.error("Parent /var does not exist.");
             }
-
         } else {
             LOGGER.info("Folder /var/cif already exists.");
         }
     }
 
-    private Resource createInvalidateEntry(ResourceResolver resourceResolver, String graphqlClientId, String[] cacheEntries)
-        throws PersistenceException {
+    private Map<String, Object> getNodeProperties(JsonObject jsonObject) {
+        Map<String, Object> nodeProperties = new HashMap<>();
+        nodeProperties.put("jcr:primaryType", "nt:unstructured");
+        nodeProperties.put(PROPERTY_NAME, Calendar.getInstance());
+        for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
+            JsonElement value = entry.getValue();
+            if (value != null) {
+                if (value.isJsonArray()) {
+                    JsonArray jsonArray = value.getAsJsonArray();
+                    String[] values = StreamSupport.stream(jsonArray.spliterator(), false)
+                        .map(JsonElement::getAsString)
+                        .toArray(String[]::new);
+                    nodeProperties.put(entry.getKey(), values);
+                } else {
+                    nodeProperties.put(entry.getKey(), value.getAsString());
+                }
+            }
+        }
+        return nodeProperties;
+    }
+
+    private Resource createInvalidateEntry(ResourceResolver resourceResolver, JsonObject jsonObject)
+        throws PersistenceException, RepositoryException {
 
         // Retrieve the parent resource where the invalidate_entry node will be created
         Resource invalidateWorkingArea = resourceResolver.getResource(INVALIDATE_WORKING_AREA);
@@ -215,30 +234,18 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
             throw new IllegalStateException("Invalidate working area does not exist: " + INVALIDATE_WORKING_AREA);
         }
 
-        Resource invalidateEntryResource = invalidateWorkingArea.getChild(NODE_NAME_BASE);
+        // Generate a unique node name
+        String nodeName = getUniqueNodeName(resourceResolver, invalidateWorkingArea);
+
+        if (nodeName == null) {
+            throw new IllegalStateException("Number of request been reached. Please try again later.");
+        }
 
         // Prepare the properties for the new node
-        Map<String, Object> nodeProperties = new HashMap<>();
-        nodeProperties.put("jcr:primaryType", "nt:unstructured");
-        nodeProperties.put(PROPERTY_NAME, Calendar.getInstance());
-        nodeProperties.put("graphqlClientId", graphqlClientId);
-        if (cacheEntries != null) {
-            nodeProperties.put("cacheEntries", String.join(",", cacheEntries));
-        }
+        Map<String, Object> nodeProperties = getNodeProperties(jsonObject);
 
-        if (invalidateEntryResource != null) {
-            // Update the properties
-            ModifiableValueMap properties = invalidateEntryResource.adaptTo(ModifiableValueMap.class);
-            if (properties != null) {
-                properties.putAll(nodeProperties);
-            } else {
-                LOGGER.error("Failed to adapt child resource to ModifiableValueMap.");
-            }
-        } else {
-            // Create the new node
-            invalidateEntryResource = resourceResolver.create(invalidateWorkingArea, NODE_NAME_BASE, nodeProperties);
-            LOGGER.error("Child resource not found at path: {}/{}", INVALIDATE_WORKING_AREA, NODE_NAME_BASE);
-        }
+        // Create the new node
+        Resource invalidateEntryResource = resourceResolver.create(invalidateWorkingArea, nodeName, nodeProperties);
 
         // Commit changes to persist the new node
         resourceResolver.commit();
@@ -246,6 +253,38 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         LOGGER.info("Node {} created successfully under " + INVALIDATE_WORKING_AREA, NODE_NAME_BASE);
 
         return invalidateEntryResource;
+    }
+
+    // Method to generate a unique node name by appending an incremental index if necessary
+    private String getUniqueNodeName(ResourceResolver resourceResolver, Resource parentResource) throws RepositoryException,
+        PersistenceException {
+        int index = 0;
+        String nodeName = NODE_NAME_BASE;
+        boolean doLoopFlag = true;
+
+        while (doLoopFlag) {
+            Resource invalidateEntryResource = parentResource.getChild(nodeName);
+            if (invalidateEntryResource == null) {
+                return nodeName;
+            } else {
+                Node node = invalidateEntryResource.adaptTo(Node.class);
+                if (node != null) {
+                    Calendar created = node.getProperty("invalidateDate").getDate();
+                    long nodeAge = Calendar.getInstance().getTimeInMillis() - created.getTimeInMillis();
+                    if (nodeAge > MINUTES_LIMIT_IN_MILLIS) {
+                        node.remove();
+                        resourceResolver.commit();
+                        return nodeName;
+                    }
+                }
+                if (index >= NODE_CREATION_LIMIT) {
+                    doLoopFlag = false;
+                }
+                index++;
+                nodeName = NODE_NAME_BASE + "_" + index;
+            }
+        }
+        return null;
     }
 
     @Reference(

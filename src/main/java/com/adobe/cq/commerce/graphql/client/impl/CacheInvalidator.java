@@ -42,7 +42,7 @@ class CacheInvalidator {
         if (StringUtils.isBlank(storeView) && (cacheNames == null || cacheNames.length == 0) &&
             (patterns == null || patterns.length == 0)) {
             invalidateAll();
-        } else if (!StringUtils.isBlank(storeView) && (cacheNames == null && cacheNames.length == 0) &&
+        } else if (!StringUtils.isBlank(storeView) && (cacheNames == null || cacheNames.length == 0) &&
             (patterns == null || patterns.length == 0)) {
             invalidateStoreView(storeView);
         } else if (StringUtils.isBlank(storeView) && (cacheNames != null && cacheNames.length > 0) &&
