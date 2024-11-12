@@ -20,6 +20,8 @@ import javax.jcr.observation.EventIterator;
 import javax.jcr.observation.EventListener;
 import javax.jcr.observation.ObservationManager;
 
+import org.apache.sling.api.resource.LoginException;
+import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -28,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
+import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
 
 @Component(service = EventListener.class, immediate = true)
 public class InvalidateCacheEventListener implements EventListener {
@@ -40,6 +43,9 @@ public class InvalidateCacheEventListener implements EventListener {
     @Reference
     private SlingRepository repository;
 
+    @Reference
+    private ServiceUserService serviceUserService;
+
     @Activate
     protected void activate() {
         try {
@@ -48,7 +54,7 @@ public class InvalidateCacheEventListener implements EventListener {
             ObservationManager observationManager = session.getWorkspace().getObservationManager();
             observationManager.addEventListener(
                 this,
-                Event.NODE_ADDED | Event.PROPERTY_CHANGED,
+                Event.NODE_ADDED,
                 InvalidateCacheService.INVALIDATE_WORKING_AREA,
                 true,
                 null,
@@ -69,18 +75,19 @@ public class InvalidateCacheEventListener implements EventListener {
                 String path = event.getPath();
                 String actualPath = InvalidateCacheService.INVALIDATE_WORKING_AREA + "/" + InvalidateCacheService.NODE_NAME_BASE;
                 if (path.startsWith(actualPath)) {
-                    if (event.getType() == Event.PROPERTY_CHANGED && path.contains(InvalidateCacheService.PROPERTY_NAME)) {
-                        path = path.substring(0, path.lastIndexOf('/'));
+                    LOGGER.info("Cache invalidation event detected: {} and {}", path, event.getType());
+                    invalidateCacheService.invalidateCache(path);
+                    ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(
+                        InvalidateCacheService.SERVICE_USER);
+                    if (resourceResolver != null) {
+                        LOGGER.info("Invalidating dispatcher cache for store: {}", path);
+                        DispatcherCacheInvalidator.invalidateDispatcherCache(resourceResolver, path);
                     }
-                    if (path.contains(actualPath)) {
-                        LOGGER.info("Cache invalidation event detected: {} and {}", path, event.getType());
-                        invalidateCacheService.invalidateCache(path);
-                    }
-                } else {
-                    LOGGER.error("Invalid path: {}", path);
                 }
             } catch (RepositoryException e) {
                 LOGGER.error("Error processing JCR event: {}", e.getMessage(), e);
+            } catch (LoginException e) {
+                throw new RuntimeException(e);
             }
         }
     }

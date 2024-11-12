@@ -14,12 +14,16 @@
 
 package com.adobe.cq.commerce.graphql.flush.services.impl;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.UUID;
 import java.util.stream.StreamSupport;
 
 import javax.jcr.Node;
-import javax.jcr.RepositoryException;
 import javax.jcr.Session;
+import javax.jcr.query.Query;
+import javax.jcr.query.QueryResult;
+import javax.jcr.query.RowIterator;
 
 import org.apache.sling.api.resource.LoginException;
 import org.apache.sling.api.resource.PersistenceException;
@@ -58,42 +62,60 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
     private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheImpl.class);
     private Collection<ClientHolder> clients = new ArrayList<>();
 
-    private static final long MINUTES_LIMIT_IN_MILLIS = 5 * 60 * 1000;
-    private static final int NODE_CREATION_LIMIT = 10;
+    public static final String PARAMETER_GRAPHQL_CLIENT_ID = "graphqlClientId";
+    public static final String PARAMETER_STORE_VIEW = "storeView";
+    public static final String PARAMETER_TYPE = "type";
+    public static final String PARAMETER_STORE_PATH = "storePath";
+    public static final String PARAMETER_INVALID_CACHE_ENTRIES = "invalidCacheEntries";
+    public static final String PARAMETER_ATTRIBUTE = "attribute";
+    public static final String PARAMETER_LIST_OF_CACHE_TO_SEARCH = "listOfCacheToSearch";
+    public static final String TYPE_SKU = "skus";
+    public static final String TYPE_UUIDS = "uuids";
+    public static final String TYPE_ClEAR_SPECIFIC_CACHE = "clearSpecificCache";
+    public static final String TYPE_ATTRIBUTE = "attribute";
+    public static final String TYPE_CLEAR_ALL = "clearAll";
+    private static final int MINUTES_LIMIT = -5;
+    private static final int NODE_CREATION_LIMIT = 100;
+
+    // Define the JSON-like structure as a constant
+    public static final Map<String, Map<String, List<String>>> PROPERTIES = createJsonData();
+
+    // Define the JSON-like structure as a constant
+    public static final List<String> REQUIRED_ATTRIBUTES = getInitialRequiredAttributes();
 
     @Override
     public void invalidateCache(String path) {
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
             Resource resource = resourceResolver.getResource(path);
             if (resource != null) {
-                String graphqlClientId = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_GRAPHQL_CLIENT_ID, String.class);
-                String[] invalidCacheEntries = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_INVALID_CACHE_ENTRIES,
+                String graphqlClientId = resource.getValueMap().get(PARAMETER_GRAPHQL_CLIENT_ID, String.class);
+                String[] invalidCacheEntries = resource.getValueMap().get(PARAMETER_INVALID_CACHE_ENTRIES,
                     String[].class);
-                String[] listOfCacheToSearch = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_LIST_OF_CACHE_TO_SEARCH,
+                String[] listOfCacheToSearch = resource.getValueMap().get(PARAMETER_LIST_OF_CACHE_TO_SEARCH,
                     String[].class);
-                String storeView = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_STORE_VIEW, String.class);
-                String type = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_TYPE, String.class);
-                String attribute = resource.getValueMap().get(InvalidateCacheSupport.PARAMETER_ATTRIBUTE, String.class);
+                String storeView = resource.getValueMap().get(PARAMETER_STORE_VIEW, String.class);
+                String type = resource.getValueMap().get(PARAMETER_TYPE, String.class);
+                String attribute = resource.getValueMap().get(PARAMETER_ATTRIBUTE, String.class);
                 String[] cachePatterns;
 
                 GraphqlClient client = getClient(graphqlClientId);
 
                 switch (Objects.requireNonNull(type)) {
-                    case InvalidateCacheSupport.TYPE_SKU:
-                        cachePatterns = InvalidateCacheSupport.getProductAttributePatterns(invalidCacheEntries, "sku");
+                    case TYPE_SKU:
+                        cachePatterns = getProductAttributePatterns(invalidCacheEntries, "sku");
                         client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                         break;
-                    case InvalidateCacheSupport.TYPE_UUIDS:
-                        cachePatterns = InvalidateCacheSupport.getProductAttributePatterns(invalidCacheEntries, "uuid");
+                    case TYPE_UUIDS:
+                        cachePatterns = getProductAttributePatterns(invalidCacheEntries, "uuid");
                         client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                         break;
-                    case InvalidateCacheSupport.TYPE_ATTRIBUTE:
-                        cachePatterns = InvalidateCacheSupport.getProductAttributePatterns(invalidCacheEntries, attribute);
+                    case TYPE_ATTRIBUTE:
+                        cachePatterns = getProductAttributePatterns(invalidCacheEntries, attribute);
                         client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
-                    case InvalidateCacheSupport.TYPE_ClEAR_SPECIFIC_CACHE:
+                    case TYPE_ClEAR_SPECIFIC_CACHE:
                         client.invalidateCache(storeView, invalidCacheEntries, null);
                         break;
-                    case InvalidateCacheSupport.TYPE_CLEAR_ALL:
+                    case TYPE_CLEAR_ALL:
                         client.invalidateCache(storeView, null, null);
                         break;
                     default:
@@ -105,6 +127,31 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
             }
         } catch (LoginException e) {
             LOGGER.error("Error getting service user: {}", e.getMessage(), e);
+        }
+    }
+
+    public static void checksMandatoryFields(JsonObject jsonObject, String type, List<String> requiredFields) {
+        Map<String, Map<String, List<String>>> properties = PROPERTIES;
+        if (requiredFields == null) {
+            requiredFields = properties.containsKey(type) && properties.get(type).containsKey("requiredFields")
+                ? properties.get(type).get("requiredFields")
+                : new ArrayList<>();
+        }
+        boolean flag = false;
+        for (String field : requiredFields) {
+            if (!jsonObject.has(field)) {
+                throw new MissingArgumentException("Missing required parameter : " + field);
+            } else {
+                if (jsonObject.get(field).isJsonArray()) {
+                    JsonArray jsonArray = jsonObject.getAsJsonArray(field);
+                    flag = jsonArray.size() == 0;
+                } else if (jsonObject.get(field).getAsString() == null || jsonObject.get(field).getAsString().isEmpty()) {
+                    flag = true;
+                }
+            }
+            if (flag) {
+                throw new MissingArgumentException("Empty required parameter : " + field);
+            }
         }
     }
 
@@ -123,35 +170,33 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
     private void checksMandatoryFieldsPresent(JsonObject jsonObject) throws Exception {
 
         // Check the required fields are present
-        InvalidateCacheSupport.checksMandatoryFields(jsonObject, null, InvalidateCacheSupport.REQUIRED_ATTRIBUTES);
-        String type = jsonObject.get(InvalidateCacheSupport.PARAMETER_TYPE).getAsString();
+        checksMandatoryFields(jsonObject, null, REQUIRED_ATTRIBUTES);
+        String type = jsonObject.get(PARAMETER_TYPE).getAsString();
         // Check the required fields based on type
-        InvalidateCacheSupport.checksMandatoryFields(jsonObject, type, null);
+        checksMandatoryFields(jsonObject, type, null);
     }
 
     @Override
     public void triggerCacheInvalidation(JsonObject jsonObject) {
         try (ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(SERVICE_USER)) {
-            if (configService.isAuthor()) {
+            Session session = resourceResolver.adaptTo(Session.class);
+            if (configService.isAuthor() && session != null) {
 
                 checksMandatoryFieldsPresent(jsonObject);
 
                 // checks the graphql client id exists
-                String graphqlClientId = jsonObject.get(InvalidateCacheSupport.PARAMETER_GRAPHQL_CLIENT_ID).getAsString();
+                String graphqlClientId = jsonObject.get(PARAMETER_GRAPHQL_CLIENT_ID).getAsString();
                 getClient(graphqlClientId);
 
                 createInvalidateWorkingAreaIfNotExists(resourceResolver);
 
-                Resource invalidateEntryResource = createInvalidateEntry(resourceResolver, jsonObject);
+                Resource invalidateEntryResource = createInvalidateEntry(session, resourceResolver, jsonObject);
 
-                Session session = resourceResolver.adaptTo(Session.class);
-
-                this.replicateToPublishInstances(session, invalidateEntryResource.getPath());
+                replicateToPublishInstances(session, invalidateEntryResource.getPath(), ReplicationActionType.ACTIVATE);
 
             } else {
                 throw new Exception("Operation is only supported for author");
             }
-
         } catch (PersistenceException e) {
             LOGGER.error("Error during node creation: {}", e.getMessage(), e);
             throw new RuntimeException("Error during node creation");
@@ -166,9 +211,10 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         }
     }
 
-    private void replicateToPublishInstances(Session session, String path) throws ReplicationException {
+    private void replicateToPublishInstances(Session session, String path, ReplicationActionType replicationType)
+        throws ReplicationException {
         LOGGER.error("Replicate to publish instances");
-        replicator.replicate(session, ReplicationActionType.ACTIVATE, path);
+        replicator.replicate(session, replicationType, path);
     }
 
     private void createInvalidateWorkingAreaIfNotExists(ResourceResolver resourceResolver) throws PersistenceException {
@@ -206,7 +252,7 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
     private Map<String, Object> getNodeProperties(JsonObject jsonObject) {
         Map<String, Object> nodeProperties = new HashMap<>();
         nodeProperties.put("jcr:primaryType", "nt:unstructured");
-        nodeProperties.put(PROPERTY_NAME, Calendar.getInstance());
+        nodeProperties.put(PROPERTY_INVALID_DATE, Calendar.getInstance());
         for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
             JsonElement value = entry.getValue();
             if (value != null) {
@@ -224,8 +270,8 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         return nodeProperties;
     }
 
-    private Resource createInvalidateEntry(ResourceResolver resourceResolver, JsonObject jsonObject)
-        throws PersistenceException, RepositoryException {
+    private Resource createInvalidateEntry(Session session, ResourceResolver resourceResolver, JsonObject jsonObject)
+        throws Exception {
 
         // Retrieve the parent resource where the invalidate_entry node will be created
         Resource invalidateWorkingArea = resourceResolver.getResource(INVALIDATE_WORKING_AREA);
@@ -235,7 +281,7 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         }
 
         // Generate a unique node name
-        String nodeName = getUniqueNodeName(resourceResolver, invalidateWorkingArea);
+        String nodeName = getUniqueNodeName(session);
 
         if (nodeName == null) {
             throw new IllegalStateException("Number of request been reached. Please try again later.");
@@ -255,36 +301,117 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         return invalidateEntryResource;
     }
 
-    // Method to generate a unique node name by appending an incremental index if necessary
-    private String getUniqueNodeName(ResourceResolver resourceResolver, Resource parentResource) throws RepositoryException,
-        PersistenceException {
-        int index = 0;
-        String nodeName = NODE_NAME_BASE;
-        boolean doLoopFlag = true;
+    private String getNodesWithInvalidDatePassed(Session session, String dynamicPath) throws Exception {
+        // Calculate the date and time 5 minutes ago
+        Calendar fiveMinutesAgo = Calendar.getInstance();
+        fiveMinutesAgo.add(Calendar.MINUTE, MINUTES_LIMIT);
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
+        String fiveMinutesAgoStr = dateFormat.format(fiveMinutesAgo.getTime());
 
-        while (doLoopFlag) {
-            Resource invalidateEntryResource = parentResource.getChild(nodeName);
-            if (invalidateEntryResource == null) {
-                return nodeName;
-            } else {
-                Node node = invalidateEntryResource.adaptTo(Node.class);
-                if (node != null) {
-                    Calendar created = node.getProperty("invalidateDate").getDate();
-                    long nodeAge = Calendar.getInstance().getTimeInMillis() - created.getTimeInMillis();
-                    if (nodeAge > MINUTES_LIMIT_IN_MILLIS) {
-                        node.remove();
-                        resourceResolver.commit();
-                        return nodeName;
-                    }
-                }
-                if (index >= NODE_CREATION_LIMIT) {
-                    doLoopFlag = false;
-                }
-                index++;
-                nodeName = NODE_NAME_BASE + "_" + index;
-            }
+        // Construct the query
+        String queryStr = "SELECT [jcr:path] FROM [nt:unstructured] AS node WHERE ISDESCENDANTNODE([" + dynamicPath + "])"
+            + " AND [invalidateDate] < CAST('" + fiveMinutesAgoStr + "' AS DATE)";
+        Query query = session.getWorkspace().getQueryManager().createQuery(queryStr, Query.JCR_SQL2);
+        // Set the limit on the number of nodes to return
+        query.setLimit(1);
+        QueryResult result = query.execute();
+        RowIterator rowIterator = result.getRows();
+        if (rowIterator.hasNext()) {
+            return rowIterator.nextRow().getPath();
+        } else {
+            return null; // No rows found
         }
-        return null;
+    }
+
+    private int getNodeCount(Session session, String dynamicPath) throws Exception {
+        String countQuery = "SELECT [jcr:path] FROM [nt:unstructured] AS node WHERE ISDESCENDANTNODE([" + dynamicPath + "])";
+        Query query = session.getWorkspace().getQueryManager().createQuery(countQuery, Query.JCR_SQL2);
+        QueryResult result = query.execute();
+
+        // Directly get the count of nodes
+        return (int) result.getRows().getSize();
+    }
+
+    // Method to generate a unique node name by appending an UUID to the base name
+    private String getUniqueNodeName(Session session) throws Exception {
+
+        int nodeSize = getNodeCount(session, INVALIDATE_WORKING_AREA);
+        String nodeName = NODE_NAME_BASE + "_" + UUID.randomUUID().toString();
+        if (nodeSize <= NODE_CREATION_LIMIT) {
+            String path = getNodesWithInvalidDatePassed(session, INVALIDATE_WORKING_AREA);
+            if (path != null) {
+                Node node = session.getNode(path);
+                node.remove();
+                session.save();
+                // Replicate the removal to the publish instance
+                replicateToPublishInstances(session, path, ReplicationActionType.DELETE);
+            }
+            if (nodeSize == NODE_CREATION_LIMIT && path == null) {
+                throw new IllegalStateException("Number of request been reached. Please try again later.");
+            }
+        } else {
+            throw new IllegalStateException("Number of request been reached. Please try again later.");
+        }
+        return nodeName;
+    }
+
+    private static String getRegexBasedOnAttribute(String attribute) {
+        String regex;
+        switch (attribute) {
+            case "uuid":
+                regex = "\"uid\"\\s*:\\s*\\{\"id\"\\s*:\\s*\"";
+                break;
+            default:
+                regex = "\"" + attribute + "\":\\s*\"";
+        }
+        return regex;
+    }
+
+    private static String[] getProductAttributePatterns(String[] patterns, String attribute) {
+        String attributeString = String.join("|", patterns);
+        return new String[] { getRegexBasedOnAttribute(attribute) + "(" + attributeString + ")\"" };
+    }
+
+    private static Map<String, Map<String, List<String>>> createJsonData() {
+        Map<String, Map<String, List<String>>> jsonData = new HashMap<>();
+
+        // Add property for type "sku"
+        Map<String, List<String>> skuProperties = new HashMap<>();
+        skuProperties.put("requiredFields", new ArrayList<>(
+            List.of(
+                PARAMETER_INVALID_CACHE_ENTRIES)));
+        jsonData.put(TYPE_SKU, skuProperties);
+
+        // Add property for type "uuid"
+        Map<String, List<String>> uuidProperties = new HashMap<>();
+        uuidProperties.put("requiredFields", new ArrayList<>(
+            List.of(
+                PARAMETER_INVALID_CACHE_ENTRIES)));
+        jsonData.put(TYPE_UUIDS, uuidProperties);
+
+        // Add property for type "attribute"
+        Map<String, List<String>> attributeProperties = new HashMap<>();
+        attributeProperties.put("requiredFields", new ArrayList<>(
+            List.of(
+                PARAMETER_INVALID_CACHE_ENTRIES,
+                PARAMETER_ATTRIBUTE)));
+        jsonData.put(TYPE_ATTRIBUTE, attributeProperties);
+
+        // Add property for type "clearSpecificCache"
+        Map<String, List<String>> clearSpecificCacheProperties = new HashMap<>();
+        clearSpecificCacheProperties.put("requiredFields", new ArrayList<>(
+            List.of(
+                PARAMETER_INVALID_CACHE_ENTRIES)));
+        jsonData.put(TYPE_ClEAR_SPECIFIC_CACHE, clearSpecificCacheProperties);
+
+        return jsonData;
+    }
+
+    private static List<String> getInitialRequiredAttributes() {
+        List<String> requiredFields = new ArrayList<>();
+        requiredFields.add(PARAMETER_GRAPHQL_CLIENT_ID);
+        requiredFields.add(PARAMETER_TYPE);
+        return requiredFields;
     }
 
     @Reference(

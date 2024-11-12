@@ -21,7 +21,7 @@ public interface InvalidateCacheService {
     String INVALIDATE_WORKING_AREA = "/var/cif";
     String NODE_NAME_BASE = "invalidate_entry";
     String SERVICE_USER = "cif-flush";
-    String PROPERTY_NAME = "invalidateDate";
+    String PROPERTY_INVALID_DATE = "invalidateDate";
 
     void invalidateCache(String path);
 
