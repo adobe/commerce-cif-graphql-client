@@ -20,8 +20,6 @@ import javax.jcr.observation.EventIterator;
 import javax.jcr.observation.EventListener;
 import javax.jcr.observation.ObservationManager;
 
-import org.apache.sling.api.resource.LoginException;
-import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -30,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
+import com.adobe.cq.commerce.graphql.flush.services.InvalidateDispatcherService;
 import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
 
 @Component(service = EventListener.class, immediate = true)
@@ -39,6 +38,9 @@ public class InvalidateCacheEventListener implements EventListener {
 
     @Reference
     private InvalidateCacheService invalidateCacheService;
+
+    @Reference
+    private InvalidateDispatcherService invalidateDispatcherService;
 
     @Reference
     private SlingRepository repository;
@@ -77,17 +79,10 @@ public class InvalidateCacheEventListener implements EventListener {
                 if (path.startsWith(actualPath)) {
                     LOGGER.info("Cache invalidation event detected: {} and {}", path, event.getType());
                     invalidateCacheService.invalidateCache(path);
-                    ResourceResolver resourceResolver = serviceUserService.getServiceUserResourceResolver(
-                        InvalidateCacheService.SERVICE_USER);
-                    if (resourceResolver != null) {
-                        LOGGER.info("Invalidating dispatcher cache for store: {}", path);
-                        DispatcherCacheInvalidator.invalidateDispatcherCache(resourceResolver, path);
-                    }
+                    invalidateDispatcherService.invalidateCache(path);
                 }
             } catch (RepositoryException e) {
                 LOGGER.error("Error processing JCR event: {}", e.getMessage(), e);
-            } catch (LoginException e) {
-                throw new RuntimeException(e);
             }
         }
     }

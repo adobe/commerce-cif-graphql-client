@@ -60,7 +60,7 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
     private ServiceUserService serviceUserService;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheImpl.class);
-    private Collection<ClientHolder> clients = new ArrayList<>();
+    private final Collection<ClientHolder> clients = new ArrayList<>();
 
     public static final String PARAMETER_GRAPHQL_CLIENT_ID = "graphqlClientId";
     public static final String PARAMETER_STORE_VIEW = "storeView";
@@ -70,6 +70,7 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
     public static final String PARAMETER_ATTRIBUTE = "attribute";
     public static final String PARAMETER_LIST_OF_CACHE_TO_SEARCH = "listOfCacheToSearch";
     public static final String TYPE_SKU = "skus";
+    public static final String TYPE_CATEGORY = "categories";
     public static final String TYPE_UUIDS = "uuids";
     public static final String TYPE_ClEAR_SPECIFIC_CACHE = "clearSpecificCache";
     public static final String TYPE_ATTRIBUTE = "attribute";
@@ -102,15 +103,16 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
 
                 switch (Objects.requireNonNull(type)) {
                     case TYPE_SKU:
-                        cachePatterns = getProductAttributePatterns(invalidCacheEntries, "sku");
+                        cachePatterns = getAttributePatterns(invalidCacheEntries, "sku");
                         client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                         break;
+                    case TYPE_CATEGORY:
                     case TYPE_UUIDS:
-                        cachePatterns = getProductAttributePatterns(invalidCacheEntries, "uuid");
+                        cachePatterns = getAttributePatterns(invalidCacheEntries, "uuid");
                         client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                         break;
                     case TYPE_ATTRIBUTE:
-                        cachePatterns = getProductAttributePatterns(invalidCacheEntries, attribute);
+                        cachePatterns = getAttributePatterns(invalidCacheEntries, attribute);
                         client.invalidateCache(storeView, listOfCacheToSearch, cachePatterns);
                     case TYPE_ClEAR_SPECIFIC_CACHE:
                         client.invalidateCache(storeView, invalidCacheEntries, null);
@@ -367,7 +369,7 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
         return regex;
     }
 
-    private static String[] getProductAttributePatterns(String[] patterns, String attribute) {
+    private static String[] getAttributePatterns(String[] patterns, String attribute) {
         String attributeString = String.join("|", patterns);
         return new String[] { getRegexBasedOnAttribute(attribute) + "(" + attributeString + ")\"" };
     }
@@ -388,6 +390,13 @@ public class InvalidateCacheImpl implements InvalidateCacheService {
             List.of(
                 PARAMETER_INVALID_CACHE_ENTRIES)));
         jsonData.put(TYPE_UUIDS, uuidProperties);
+
+        // Add property for type "category"
+        Map<String, List<String>> categoryProperties = new HashMap<>();
+        categoryProperties.put("requiredFields", new ArrayList<>(
+            List.of(
+                PARAMETER_INVALID_CACHE_ENTRIES)));
+        jsonData.put(TYPE_CATEGORY, categoryProperties);
 
         // Add property for type "attribute"
         Map<String, List<String>> attributeProperties = new HashMap<>();
