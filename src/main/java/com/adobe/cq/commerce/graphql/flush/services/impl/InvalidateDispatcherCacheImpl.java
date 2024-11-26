@@ -35,6 +35,7 @@ import org.apache.sling.api.resource.LoginException;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.resource.ValueMap;
+import org.apache.sling.settings.SlingSettingsService;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -45,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
-import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
 import com.adobe.cq.commerce.graphql.flush.services.InvalidateDispatcherService;
 import com.adobe.cq.commerce.graphql.flush.services.ServiceUserService;
 import com.google.gson.reflect.TypeToken;
@@ -54,7 +54,7 @@ import com.google.gson.reflect.TypeToken;
 public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherService {
 
     @Reference
-    private ConfigService configService;
+    private SlingSettingsService slingSettingsService;
 
     @Reference
     private ServiceUserService serviceUserService;
@@ -65,7 +65,7 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
 
     @Override
     public void invalidateCache(String path) {
-        if (!configService.isAuthor()) {
+        if (!slingSettingsService.getRunModes().contains("author")) {
             LOGGER.error("Operation is only supported for author");
             return;
         }
@@ -74,33 +74,36 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
             Session session = resourceResolver.adaptTo(Session.class);
             if (resource != null && session != null) {
                 ValueMap properties = resource.getValueMap();
-                String storePath = getPropertiesValue(properties, InvalidateCacheImpl.PARAMETER_STORE_PATH, String.class);
-                if (isValid(properties, resourceResolver, storePath)) {
-
-                    String graphqlClientId = getPropertiesValue(properties, InvalidateCacheImpl.PARAMETER_GRAPHQL_CLIENT_ID, String.class);
-                    String[] invalidCacheEntries = getPropertiesValue(properties, InvalidateCacheImpl.PARAMETER_INVALID_CACHE_ENTRIES,
+                String storePath = getPropertiesValue(properties, PROPERTIES_STORE_PATH, String.class);
+                Node commerceNode = getCommerceNode(resourceResolver, storePath);
+                if (commerceNode != null && isValid(properties, resourceResolver, commerceNode, storePath)) {
+                    String graphqlClientId = commerceNode.hasProperty(PROPERTIES_GRAPHQL_CLIENT_ID) ? commerceNode.getProperty(
+                        PROPERTIES_GRAPHQL_CLIENT_ID).getString() : null;
+                    String[] invalidCacheEntries = getPropertiesValue(properties, PROPERTIES_INVALID_CACHE_ENTRIES,
                         String[].class);
-                    String type = getPropertiesValue(properties, InvalidateCacheImpl.PARAMETER_TYPE, String.class);
+                    String type = getPropertiesValue(properties, PROPERTIES_TYPE, String.class);
+
                     GraphqlClient client = getClient(graphqlClientId);
+
                     String dataString = formatList(invalidCacheEntries, ", ", "\"%s\"");
 
                     String[] invalidateDispatcherPagePaths = new String[0];
                     String[] correspondingPaths = new String[0];
 
-                    if (type.equals(InvalidateCacheImpl.TYPE_SKU)) {
+                    if (type.equals(TYPE_SKU)) {
                         invalidateDispatcherPagePaths = getCorrespondingProductsPageBasedOnSku(session, storePath, invalidCacheEntries);
 
                         String query = generateSkuQuery(dataString);
                         Map<String, Object> data = getGraphqlResponseData(client, query);
                         if (data != null && data.get("products") != null) {
-                            correspondingPaths = getSkuBasedInvalidPaths(resourceResolver, data, storePath);
+                            correspondingPaths = getSkuBasedInvalidPaths(resourceResolver, data, commerceNode, storePath);
                         }
-                    } else if (type.equals(InvalidateCacheImpl.TYPE_CATEGORY)) {
+                    } else if (type.equals(TYPE_CATEGORY)) {
                         invalidateDispatcherPagePaths = getCorrespondingCategoryPageBasedOnUid(session, storePath, invalidCacheEntries);
                         String query = generateCategoryQuery(dataString);
                         Map<String, Object> data = getGraphqlResponseData(client, query);
                         if (data != null && data.get("categoryList") != null) {
-                            correspondingPaths = getCategoryBasedInvalidPaths(resourceResolver, data, storePath);
+                            correspondingPaths = getCategoryBasedInvalidPaths(resourceResolver, data, commerceNode, storePath);
                         }
                     }
                     String[] allPaths = Stream.concat(Arrays.stream(invalidateDispatcherPagePaths), Arrays.stream(correspondingPaths))
@@ -120,14 +123,27 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         }
     }
 
-    private static String[] getSkuBasedInvalidPaths(ResourceResolver resourceResolver, Map<String, Object> data, String storePath)
+    private static Node getCommerceNode(ResourceResolver resourceResolver, String storePath) {
+        try {
+            String commerceConfigPath = getValueFromNodeOrParent(resourceResolver, storePath, "cq:conf");
+            if (commerceConfigPath != null) {
+                return getCommerceDataNode(resourceResolver, commerceConfigPath);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return null;
+    }
+
+    private static String[] getSkuBasedInvalidPaths(ResourceResolver resourceResolver, Map<String, Object> data, Node commerceNode,
+        String storePath)
         throws RepositoryException {
         // Create Type objects for the generic types T and U
         Set<String> uniquePagePaths = new HashSet<>();
         String categoryPath = getCorrespondingPagePath(resourceResolver, storePath, "cq:cifCategoryPage");
         String productPath = getCorrespondingPagePath(resourceResolver, storePath, "cq:cifProductPage");
-        String productPageUrlFormat = getPageFormatUrl(resourceResolver, storePath, "productPageUrlFormat");
-        String categoryPageUrlFormat = getPageFormatUrl(resourceResolver, storePath, "categoryPageUrlFormat");
+        String productPageUrlFormat = getPageFormatUrl(commerceNode, "productPageUrlFormat");
+        String categoryPageUrlFormat = getPageFormatUrl(commerceNode, "categoryPageUrlFormat");
 
         int productPageIndex = productPageUrlFormat.lastIndexOf(".html");
         productPageUrlFormat = (productPageIndex != -1) ? productPageUrlFormat.substring(0, productPageIndex + 5) : productPageUrlFormat;
@@ -166,15 +182,17 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         return uniquePagePaths.toArray(new String[0]);
     }
 
-    private static String[] getCategoryBasedInvalidPaths(ResourceResolver resourceResolver, Map<String, Object> data, String storePath)
+    private static String[] getCategoryBasedInvalidPaths(ResourceResolver resourceResolver, Map<String, Object> data, Node commerceNode,
+        String storePath)
         throws RepositoryException {
         // Create Type objects for the generic types T and U
         Set<String> uniquePagePaths = new HashSet<>();
 
         String productPath = getCorrespondingPagePath(resourceResolver, storePath, "cq:cifProductPage");
-        String productPageUrlFormat = getPageFormatUrl(resourceResolver, storePath, "productPageUrlFormat");
+        String productPageUrlFormat = getPageFormatUrl(commerceNode, "productPageUrlFormat");
+
         String categoryPath = getCorrespondingPagePath(resourceResolver, storePath, "cq:cifCategoryPage");
-        String categoryPageUrlFormat = getPageFormatUrl(resourceResolver, storePath, "categoryPageUrlFormat");
+        String categoryPageUrlFormat = getPageFormatUrl(commerceNode, "categoryPageUrlFormat");
 
         int productPageIndex = productPageUrlFormat.lastIndexOf(".html");
         productPageUrlFormat = (productPageIndex != -1) ? productPageUrlFormat.substring(0, productPageIndex) : productPageUrlFormat;
@@ -213,7 +231,7 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         return null;
     }
 
-    private static boolean isValid(ValueMap valueMap, ResourceResolver resourceResolver, String storePath) {
+    private static boolean isValid(ValueMap valueMap, ResourceResolver resourceResolver, Node commerceNode, String storePath) {
         Map<String, Map<String, Object>> jsonData = createJsonData();
         for (Map.Entry<String, Map<String, Object>> entry : jsonData.entrySet()) {
             Map<String, Object> properties = entry.getValue();
@@ -223,9 +241,18 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
                 String methodName = (String) properties.get("method");
                 String propertyName = (String) properties.get("propertyName");
                 try {
-                    Method method = InvalidateDispatcherCacheImpl.class.getDeclaredMethod(methodName, ResourceResolver.class, String.class,
-                        String.class);
-                    Object result = method.invoke(null, resourceResolver, storePath, propertyName);
+                    Method method;
+                    Object result;
+                    if ("getCorrespondingPagePath".equals(methodName)) {
+                        method = InvalidateDispatcherCacheImpl.class.getDeclaredMethod("getCorrespondingPagePath", ResourceResolver.class,
+                            String.class, String.class);
+                        result = method.invoke(null, resourceResolver, storePath, propertyName);
+                    } else if ("getPageFormatUrl".equals(methodName)) {
+                        method = InvalidateDispatcherCacheImpl.class.getDeclaredMethod("getPageFormatUrl", Node.class, String.class);
+                        result = method.invoke(null, commerceNode, propertyName);
+                    } else {
+                        throw new IllegalArgumentException("Unknown method name: " + methodName);
+                    }
                     if (result == null) {
                         return false;
                     }
@@ -257,25 +284,25 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         Map<String, Object> graphqlClientId = new HashMap<>();
         graphqlClientId.put("isFunction", false);
         graphqlClientId.put("class", String.class);
-        jsonData.put(InvalidateCacheImpl.PARAMETER_GRAPHQL_CLIENT_ID, graphqlClientId);
+        jsonData.put(PROPERTIES_GRAPHQL_CLIENT_ID, graphqlClientId);
 
         // Add property for type "invalidCacheEntries"
         Map<String, Object> invalidCacheEntries = new HashMap<>();
         invalidCacheEntries.put("isFunction", false);
         invalidCacheEntries.put("class", String[].class);
-        jsonData.put(InvalidateCacheImpl.PARAMETER_INVALID_CACHE_ENTRIES, invalidCacheEntries);
+        jsonData.put(PROPERTIES_INVALID_CACHE_ENTRIES, invalidCacheEntries);
 
         // Add property for type "storePath"
         Map<String, Object> storePath = new HashMap<>();
         storePath.put("isFunction", false);
         storePath.put("class", String.class);
-        jsonData.put(InvalidateCacheImpl.PARAMETER_STORE_PATH, storePath);
+        jsonData.put(PROPERTIES_STORE_PATH, storePath);
 
         // Add property for type "type"
         Map<String, Object> type = new HashMap<>();
         type.put("isFunction", false);
         type.put("class", String.class);
-        jsonData.put(InvalidateCacheImpl.PARAMETER_TYPE, type);
+        jsonData.put(PROPERTIES_TYPE, type);
 
         // Add property for type "categoryPath"
         Map<String, Object> categoryPath = new HashMap<>();
@@ -304,7 +331,7 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         productPageUrlFormat.put("propertyName", "productPageUrlFormat");
         productPageUrlFormat.put("args",
             new ArrayList<>(
-                List.of("resourceResolver", "storePath", "propertyName")));
+                List.of("commerceNode", "propertyName")));
         jsonData.put("productPageUrlFormat", productPageUrlFormat);
 
         // Add property for type "categoryPageUrlFormat"
@@ -314,7 +341,7 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         categoryPageUrlFormat.put("propertyName", "categoryPageUrlFormat");
         categoryPageUrlFormat.put("args",
             new ArrayList<>(
-                List.of("resourceResolver", "storePath", "propertyName")));
+                List.of("commerceNode", "propertyName")));
         jsonData.put("categoryPageUrlFormat", categoryPageUrlFormat);
 
         return jsonData;
@@ -450,29 +477,17 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
         return jcrContentIndex != -1 ? fullPath.substring(0, jcrContentIndex) : fullPath;
     }
 
-    private static String getPageFormatUrl(ResourceResolver resourceResolver, String storePath, String propertyName) {
-        try {
-            String commerceConfigPath = getValueFromNodeOrParent(resourceResolver, storePath, "cq:conf");
-            if (commerceConfigPath != null) {
-                return getCommerceDataForSpecificProperty(resourceResolver, commerceConfigPath, propertyName);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return null;
+    private static String getPageFormatUrl(Node commerceNode, String propertyName)
+        throws RepositoryException {
+        return commerceNode.hasProperty(propertyName) ? commerceNode.getProperty(propertyName).getString() : null;
     }
 
-    private static String getCommerceDataForSpecificProperty(ResourceResolver resourceResolver, String path, String propertyName)
+    private static Node getCommerceDataNode(ResourceResolver resourceResolver, String path)
         throws RepositoryException {
         String specificPath = path + "/settings/cloudconfigs/commerce/jcr:content";
         Resource pathResource = resourceResolver.getResource(specificPath);
         if (pathResource != null && pathResource.adaptTo(Node.class) != null) {
-            Node specificNode = pathResource.adaptTo(Node.class);
-            if (specificNode != null && specificNode.hasProperty(propertyName)) {
-                return specificNode.getProperty(propertyName).getString();
-            } else {
-                return "default";
-            }
+            return pathResource.adaptTo(Node.class);
         }
         return null;
     }

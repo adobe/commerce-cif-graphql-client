@@ -17,6 +17,17 @@ package com.adobe.cq.commerce.graphql.flush.services;
 public interface InvalidateDispatcherService {
 
     String SERVICE_USER = "cif-flush";
+    String PROPERTIES_GRAPHQL_CLIENT_ID = "cq:catalogIdentifier";
+    String PROPERTIES_TYPE = "type";
+    String PROPERTIES_STORE_PATH = "storePath";
+    String PROPERTIES_INVALID_CACHE_ENTRIES = "invalidCacheEntries";
+    String PROPERTIES_ATTRIBUTE = "attribute";
+    String TYPE_SKU = "skus";
+    String TYPE_CATEGORY = "categories";
+    String TYPE_UUIDS = "uuids";
+    String TYPE_ClEAR_SPECIFIC_CACHE = "clearSpecificCache";
+    String TYPE_ATTRIBUTE = "attribute";
+    String TYPE_CLEAR_ALL = "clearAll";
 
     void invalidateCache(String path);
 }

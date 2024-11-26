@@ -14,25 +14,29 @@
 
 package com.adobe.cq.commerce.graphql.flush.services;
 
-public interface InvalidateCacheService {
+import com.google.gson.JsonObject;
+
+public interface InvalidateCacheNotificationService {
 
     String INVALIDATE_WORKING_AREA = "/var/cif";
     String NODE_NAME_BASE = "invalidate_entry";
     String SERVICE_USER = "cif-flush";
-    String PROPERTIES_GRAPHQL_CLIENT_ID = "cq:catalogIdentifier";
-    String PROPERTIES_STORE_VIEW = "magentoStore";
-    String PROPERTIES_TYPE = "type";
-    String PROPERTIES_STORE_PATH = "storePath";
-    String PROPERTIES_INVALID_CACHE_ENTRIES = "invalidCacheEntries";
-    String PROPERTIES_ATTRIBUTE = "attribute";
-    String PROPERTIES_LIST_OF_CACHE_TO_SEARCH = "listOfCacheToSearch";
+    String PROPERTY_INVALID_DATE = "invalidateDate";
+    String PARAMETER_GRAPHQL_CLIENT_ID = "graphqlClientId";
+    String PARAMETER_STORE_VIEW = "storeView";
+    String PARAMETER_TYPE = "type";
+    String PARAMETER_STORE_PATH = "storePath";
+    String PARAMETER_INVALID_CACHE_ENTRIES = "invalidCacheEntries";
+    String PARAMETER_ATTRIBUTE = "attribute";
+    String PARAMETER_LIST_OF_CACHE_TO_SEARCH = "listOfCacheToSearch";
     String TYPE_SKU = "skus";
     String TYPE_CATEGORY = "categories";
     String TYPE_UUIDS = "uuids";
     String TYPE_ClEAR_SPECIFIC_CACHE = "clearSpecificCache";
     String TYPE_ATTRIBUTE = "attribute";
-    String TYPE_CLEAR_ALL = "clearAll";
+    int MINUTES_LIMIT = -5;
+    int NODE_CREATION_LIMIT = 100;
 
-    void invalidateCache(String path);
+    void triggerCacheNotification(JsonObject jsonObject);
 
 }

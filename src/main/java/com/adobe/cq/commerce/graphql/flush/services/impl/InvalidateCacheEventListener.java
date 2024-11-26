@@ -80,6 +80,7 @@ public class InvalidateCacheEventListener implements EventListener {
                     LOGGER.info("Cache invalidation event detected: {} and {}", path, event.getType());
                     invalidateCacheService.invalidateCache(path);
                     invalidateDispatcherService.invalidateCache(path);
+
                 }
             } catch (RepositoryException e) {
                 LOGGER.error("Error processing JCR event: {}", e.getMessage(), e);

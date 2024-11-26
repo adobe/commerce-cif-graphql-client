@@ -24,14 +24,14 @@ import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.HttpConstants;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
+import org.apache.sling.settings.SlingSettingsService;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.flush.services.ConfigService;
-import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheService;
+import com.adobe.cq.commerce.graphql.flush.services.InvalidateCacheNotificationService;
 import com.adobe.cq.commerce.graphql.flush.services.impl.MissingArgumentException;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -49,15 +49,15 @@ public class InvalidateCacheServlet extends SlingAllMethodsServlet {
     private static final Logger LOGGER = LoggerFactory.getLogger(InvalidateCacheServlet.class);
 
     @Reference
-    private ConfigService configService;
+    private SlingSettingsService slingSettingsService;
 
     @Reference
-    private InvalidateCacheService invalidateCacheService;
+    private InvalidateCacheNotificationService invalidateCacheNotificationService;
 
     @Override
     protected void doPost(SlingHttpServletRequest request, SlingHttpServletResponse response) throws ServletException, IOException {
 
-        if (!configService.isAuthor()) {
+        if (!slingSettingsService.getRunModes().contains("author")) {
             LOGGER.error("Operation is only supported for author");
             sendJsonResponse(response, SlingHttpServletResponse.SC_FORBIDDEN, "Operation is only supported for author");
             return;
@@ -65,7 +65,8 @@ public class InvalidateCacheServlet extends SlingAllMethodsServlet {
 
         try {
             JsonObject jsonRequestObject = covertToJsonRequest(request);
-            invalidateCacheService.triggerCacheInvalidation(jsonRequestObject);
+            invalidateCacheNotificationService.triggerCacheNotification(jsonRequestObject);
+
             sendJsonResponse(response, SlingHttpServletResponse.SC_OK, "Invalidate cache triggered successfully");
         } catch (MissingArgumentException e) {
             LOGGER.error(e.getMessage());
