@@ -503,6 +503,7 @@ public class InvalidateDispatcherCacheImpl implements InvalidateDispatcherServic
             PostMethod post = new PostMethod("http://" + server + uri);
             post.setRequestHeader("CQ-Action", "Delete");
             post.setRequestHeader("CQ-Handle", handle);
+            post.setRequestHeader("CQ-Action-Scope", "ResourceOnly");
 
             client.executeMethod(post);
             System.out.println("Response: " + post.getResponseBodyAsString());
