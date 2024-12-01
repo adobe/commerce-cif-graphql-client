@@ -116,5 +116,7 @@ public interface GraphqlClient {
      * Delete cache entries for in-memory cache based on the cache entries.
      *
      */
-    public void invalidateCache(String storeView, String[] cacheNames, String[] patterns);
+    default void invalidateCache(String storeView, String[] cacheNames, String[] patterns) {
+        // Default implementation does nothing
+    }
 }
