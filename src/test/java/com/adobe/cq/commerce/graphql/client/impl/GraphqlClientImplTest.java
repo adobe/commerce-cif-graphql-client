@@ -17,10 +17,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Dictionary;
-import java.util.List;
+import java.util.*;
 
 import org.apache.http.Header;
 import org.apache.http.HeaderIterator;
@@ -50,6 +47,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
+import com.adobe.cq.commerce.graphql.client.CachingStrategy;
 import com.adobe.cq.commerce.graphql.client.GraphqlClient;
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
@@ -65,6 +63,7 @@ import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
+import com.google.gson.reflect.TypeToken;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -412,6 +411,289 @@ public class GraphqlClientImplTest {
         // with keep alive header timeout larger than custom
         prepareResponse(httpResponse, "15");
         assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+    }
+
+    @Test
+    public void testInvalidateCacheAll() throws Exception {
+
+        // Create a cache
+        graphqlClient = createGraphqlForCacheRequest();
+
+        // Mock the HTTP client
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        // Create a new RequestOptions object with the specified caching strategy
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+
+        // Use the requestOptions in a GraphQL request
+        Type typeOfT = new TypeToken<Map<String, Object>>() {}.getType();
+        Type typeOfU = new TypeToken<Map<String, Object>>() {}.getType();
+
+        // Call execute once for same request options
+        GraphqlRequest requestOne = new GraphqlRequest("{dummy-1}");
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestOne, typeOfT, typeOfU, requestOptions);
+
+        // Call execute different request options
+        RequestOptions requestOptionsTwo = getRequestOptions("testPdpCacheTwo", "CACHE_FIRST", headers);
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestOne, typeOfT, typeOfU, requestOptionsTwo);
+
+        graphqlClient.execute(requestOne, typeOfT, typeOfU, requestOptions);
+        graphqlClient.execute(requestOne, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is being used if call been executed only once
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+        // Will clear all the cache
+        graphqlClient.invalidateCache(null, null, null);
+
+        // Verify all the cache entries are invalidated & call graphqlClient.execute again
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestOne, typeOfT, typeOfU, requestOptions);
+
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestOne, typeOfT, typeOfU, requestOptionsTwo);
+
+        Mockito.verify(graphqlClient.client, Mockito.times(4)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+    }
+
+    @Test
+    public void testInvalidateCacheBasedOnStoreView() throws Exception {
+
+        // Create a cache
+        graphqlClient = createGraphqlForCacheRequest();
+
+        // Mock the HTTP client
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        // Create a new RequestOptions object with the specified caching strategy
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+
+        // Use the requestOptions in a GraphQL request
+        Type typeOfT = new TypeToken<Map<String, Object>>() {}.getType();
+        Type typeOfU = new TypeToken<Map<String, Object>>() {}.getType();
+
+        // Call execute once for same request options
+        GraphqlRequest requestOne = new GraphqlRequest("{dummy-1}");
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Call execute different request options
+        // Create a new RequestOptions object with the specified caching strategy
+        List<Header> headersTwo = Collections.singletonList(new BasicHeader("Store", "default-test"));
+        RequestOptions requestOptionsTwo = getRequestOptions("testPdpCacheTwo", "CACHE_FIRST", headersTwo);
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptionsTwo);
+
+        // Trigger the graphqlClient.execute method for different store view
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is being used if call been executed only two times
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+        // Invalidate the cache
+        graphqlClient.invalidateCache("default", null, null);
+
+        // Call graphqlClient.execute again for the default store view
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // This is will not be invalidate as the store view is different
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is invalidated for the default store view only
+        Mockito.verify(graphqlClient.client, Mockito.times(3)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+    }
+
+    @Test
+    public void testInvalidateCacheBasedOnSpecificCache() throws Exception {
+        // Create a cache
+        graphqlClient = createGraphqlForCacheRequest();
+
+        // Mock the HTTP client
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        // Use the requestOptions in a GraphQL request
+        Type typeOfT = new TypeToken<Map<String, Object>>() {}.getType();
+        Type typeOfU = new TypeToken<Map<String, Object>>() {}.getType();
+
+        // Trigger the graphqlClient.execute method for testPdpCache
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Trigger the graphqlClient.execute method for testPdpCacheTwo
+        GraphqlRequest requestTwo = new GraphqlRequest("{dummy-2}");
+        List<Header> headersTwo = Collections.singletonList(new BasicHeader("Store", "default-test"));
+        RequestOptions requestOptionsTwo = getRequestOptions("testPdpCacheTwo", "CACHE_FIRST", headersTwo);
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // Trigger the graphqlClient.execute method for testPdpCache again
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // This will verify the cache is being used
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+        // Invalidate the cache for testPdpCache only
+        graphqlClient.invalidateCache(null, new String[] { "testPdpCache" }, null);
+
+        // call graphqlClient.execute again for testPdpCache
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // call graphqlClient.execute again for testPdpCacheTwo
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is invalidated for testPdpCache only
+        Mockito.verify(graphqlClient.client, Mockito.times(3)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+    }
+
+    @Test
+    public void testInvalidateCacheBasedOnOneSkuPattern() throws Exception {
+
+        // Create a cache
+        graphqlClient = createGraphqlForCacheRequest();
+
+        // Mock the HTTP client
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        // Create a new RequestOptions object with the specified caching strategy
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+
+        // Use the requestOptions in a GraphQL request
+        Type typeOfT = new TypeToken<Map<String, Object>>() {}.getType();
+        Type typeOfU = new TypeToken<Map<String, Object>>() {}.getType();
+
+        // Call execute once for same request options
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Call execute twice
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Call execute different request options
+        GraphqlRequest requestTwo = new GraphqlRequest("{dummy-2}");
+        RequestOptions requestOptionsTwo = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+        TestUtils.setupHttpResponse("sample-pdp2-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is being used if call been executed only twice
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+        // Invalidate the cache for the product VP02
+        graphqlClient.invalidateCache("default", null, new String[] { "\"sku\":\\s*\"(VP02)\"" });
+
+        // Call graphqlClient.execute again for teh product VP02
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Call graphqlClient.execute again for the product VP03
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is invalidated for the product VP02 only
+        Mockito.verify(graphqlClient.client, Mockito.times(3)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+    }
+
+    @Test
+    public void testInvalidateCacheBasedOnMultipleSkuPattern() throws Exception {
+
+        // Create a cache
+        graphqlClient = createGraphqlForCacheRequest();
+
+        // Mock the HTTP client
+        graphqlClient.client = Mockito.mock(HttpClient.class);
+
+        // Create a new RequestOptions object with the specified caching strategy
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+
+        // Use the requestOptions in a GraphQL request
+        Type typeOfT = new TypeToken<Map<String, Object>>() {}.getType();
+        Type typeOfU = new TypeToken<Map<String, Object>>() {}.getType();
+
+        // Call execute for the product VP02
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Call execute for the product VP03
+        GraphqlRequest requestTwo = new GraphqlRequest("{dummy-2}");
+        RequestOptions requestOptionsTwo = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+        TestUtils.setupHttpResponse("sample-pdp2-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // Call execute for the product VP02 & VP03
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is being used if call been executed twice
+        Mockito.verify(graphqlClient.client, Mockito.times(2)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+        // Invalidate the cache for the product VP02 & VP03
+        graphqlClient.invalidateCache("default", null, new String[] { "\"sku\":\\s*\"(VP02|VP03)\"" });
+
+        // Call graphqlClient.execute again for the product VP02
+        TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
+
+        // Call graphqlClient.execute again for the product VP03
+        TestUtils.setupHttpResponse("sample-pdp2-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        graphqlClient.execute(requestTwo, typeOfT, typeOfU, requestOptionsTwo);
+
+        // This will verify the cache is invalidated for both the product VP02 & VP03
+        Mockito.verify(graphqlClient.client, Mockito.times(4)).execute(Mockito.any(HttpUriRequest.class), Mockito.any(
+            ResponseHandler.class));
+
+    }
+
+    private RequestOptions getRequestOptions(String cacheName, String dataFetchingPolicy, List<Header> headers) {
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(cacheName)
+            .withDataFetchingPolicy(CachingStrategy.DataFetchingPolicy.valueOf(dataFetchingPolicy));
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy);
+        if (headers != null && !headers.isEmpty()) {
+            requestOptions.withHeaders(headers);
+        }
+        return requestOptions;
+    }
+
+    private GraphqlClientImpl createGraphqlForCacheRequest() throws Exception {
+
+        graphqlClient = new GraphqlClientImpl();
+        mockConfig = new MockGraphqlClientConfiguration();
+
+        // Modify the mockConfig to add the additional header
+        mockConfig.setHttpHeaders("Store: default");
+        mockConfig.setCacheConfigurations(
+            "testPdpCache:true:1000:3000",
+            "testPdpCacheTwo:true:1000:3000",
+            "testCategoryCache:true:1000:3000",
+            "testCategoryCacheTwo:true:1000:3000");
+
+        // Activate the graphqlClient again with the updated mockConfig
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
+
+        return graphqlClient;
     }
 
     private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {

@@ -111,9 +111,12 @@ class CacheInvalidator {
 
     private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) {
         List<Header> headers = cacheKey.getRequestOptions().getHeaders();
-        return headers.stream()
-            .anyMatch(
-                header -> "Store".equalsIgnoreCase(header.getName())
-                    && storeView.equalsIgnoreCase(header.getValue()));
+        if (headers != null) {
+            return headers.stream()
+                .anyMatch(
+                    header -> "Store".equalsIgnoreCase(header.getName())
+                        && storeView.equalsIgnoreCase(header.getValue()));
+        }
+        return false;
     }
 }

@@ -114,7 +114,10 @@ public interface GraphqlClient {
 
     /**
      * Delete cache entries for in-memory cache based on the cache entries.
-     *
+     * 
+     * @param storeView The store view to invalidate cache for.
+     * @param cacheNames The cache names to invalidate.
+     * @param patterns The patterns to invalidate cache for.
      */
     default void invalidateCache(String storeView, String[] cacheNames, String[] patterns) {
         // Default implementation does nothing
