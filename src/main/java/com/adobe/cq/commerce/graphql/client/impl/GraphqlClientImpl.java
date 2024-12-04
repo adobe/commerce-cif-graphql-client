@@ -87,7 +87,6 @@ import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.codahale.metrics.MetricRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -114,7 +113,6 @@ public class GraphqlClientImpl implements GraphqlClient {
     private GraphqlClientConfigurationImpl configuration;
     private ServiceRegistration<?> registration;
 
-    private final ObjectMapper objectMapper = new ObjectMapper(); // For JSON parsing
     private CacheInvalidator cacheInvalidator;
 
     @Activate
