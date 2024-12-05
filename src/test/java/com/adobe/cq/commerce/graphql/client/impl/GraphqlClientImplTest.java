@@ -804,8 +804,7 @@ public class GraphqlClientImplTest {
         Type typeOfU = new TypeToken<Map<String, Object>>() {}.getType();
 
         // Trigger the graphqlClient.execute method for testPdpCache
-        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
-        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", headers);
+        RequestOptions requestOptions = getRequestOptions("testPdpCache", "CACHE_FIRST", null);
         TestUtils.setupHttpResponse("sample-pdp-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
         graphqlClient.execute(dummy, typeOfT, typeOfU, requestOptions);
 
