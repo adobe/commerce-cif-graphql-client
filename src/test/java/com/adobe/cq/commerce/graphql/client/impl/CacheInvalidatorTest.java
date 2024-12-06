@@ -66,11 +66,13 @@ public class CacheInvalidatorTest {
         RequestOptions options1 = new RequestOptions().withHeaders(headers1);
         List<Header> headers2 = Collections.singletonList(new BasicHeader("Store", "defaultTest"));
         RequestOptions options2 = new RequestOptions().withHeaders(headers2);
+        List<Header> headersWithDifferentHeaders = Collections.singletonList(new BasicHeader("test", "default"));
+        RequestOptions optionsWithDifferentHeaders = new RequestOptions().withHeaders(headersWithDifferentHeaders);
         RequestOptions optionsWithNoHeader = new RequestOptions();
-
         CacheKey cacheKey1 = new CacheKey(request1, options1);
         CacheKey cacheKey2 = new CacheKey(request2, options2);
         CacheKey cacheKey3 = new CacheKey(request3, options1);
+        CacheKey cacheKeyWithDifferentHeader = new CacheKey(request1, optionsWithDifferentHeaders);
         CacheKey cacheKeyWithNoHeader = new CacheKey(request1, optionsWithNoHeader);
 
         // Define the responses
@@ -86,6 +88,7 @@ public class CacheInvalidatorTest {
         cache1.put(cacheKey2, response2);
         cache1.put(cacheKey3, response2);
         cache1.put(cacheKeyWithNoHeader, response1);
+        cache1.put(cacheKeyWithDifferentHeader, response1);
         cache1.put(cacheKey3, response2);
         cache2.put(cacheKey2, response2);
         cache2.put(cacheKey1, response1);
@@ -110,6 +113,17 @@ public class CacheInvalidatorTest {
     public void testInvalidateAll() {
         // Call the invalidateCache method with parameters that trigger invalidateAll
         cacheInvalidator.invalidateCache(null, null, null);
+
+        // Verify the caches were invalidated
+        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
+            assertTrue(cache.asMap().isEmpty());
+        }
+    }
+
+    @Test
+    public void testInvalidateAllWithEmptyArray() {
+        // Call the invalidateCache method with parameters that trigger invalidateAll
+        cacheInvalidator.invalidateCache(null, new String[] {}, new String[] {});
 
         // Verify the caches were invalidated
         for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
