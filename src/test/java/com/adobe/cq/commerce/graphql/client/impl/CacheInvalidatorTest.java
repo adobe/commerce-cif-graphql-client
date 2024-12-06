@@ -95,7 +95,7 @@ public class CacheInvalidatorTest {
         checkIfStorePresentMethod.setAccessible(true);
 
         // Store the initial count of entries in each cache
-       initialCounts = new HashMap<>();
+        initialCounts = new HashMap<>();
         for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
             initialCounts.put(entry.getKey(), entry.getValue().asMap().size());
         }
@@ -159,7 +159,7 @@ public class CacheInvalidatorTest {
     @Test
     public void testNoCacheWithInvalidCacheNames() {
         // This will not clear any cache as the cache names are invalid
-        cacheInvalidator.invalidateCache(null, new String[] { "cachetest1"}, null);
+        cacheInvalidator.invalidateCache(null, new String[] { "cachetest1" }, null);
 
         // Verify that the count of entries in each cache is the same as before
         for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
