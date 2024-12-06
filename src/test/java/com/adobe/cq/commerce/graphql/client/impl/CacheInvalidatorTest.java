@@ -37,6 +37,8 @@ public class CacheInvalidatorTest {
 
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
 
+    private Map<String, Integer> initialCounts;
+
     private Method checkIfStorePresentMethod;
 
     private static class Data {
@@ -92,6 +94,12 @@ public class CacheInvalidatorTest {
         checkIfStorePresentMethod = CacheInvalidator.class.getDeclaredMethod("checkIfStorePresent", String.class, CacheKey.class);
         checkIfStorePresentMethod.setAccessible(true);
 
+        // Store the initial count of entries in each cache
+       initialCounts = new HashMap<>();
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+            initialCounts.put(entry.getKey(), entry.getValue().asMap().size());
+        }
+
     }
 
     @Test
@@ -146,7 +154,17 @@ public class CacheInvalidatorTest {
                 assertFalse(entry.getValue().asMap().isEmpty());
             }
         }
+    }
 
+    @Test
+    public void testNoCacheWithInvalidCacheNames() {
+        // This will not clear any cache as the cache names are invalid
+        cacheInvalidator.invalidateCache(null, new String[] { "cachetest1"}, null);
+
+        // Verify that the count of entries in each cache is the same as before
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+            assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
+        }
     }
 
     @Test
@@ -252,8 +270,18 @@ public class CacheInvalidatorTest {
         }
     }
 
+    @Test
+    public void testNoCacheWithStoreViewNotExistsForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
+
+        String storeView = "default2";
+        cacheInvalidator.invalidateCache(storeView, null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" });
+        // Verify that the count of entries in each cache is the same as before
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+            assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
+        }
+    }
+
     private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) throws InvocationTargetException, IllegalAccessException {
         return (boolean) checkIfStorePresentMethod.invoke(cacheInvalidator, storeView, cacheKey);
     }
-
 }
