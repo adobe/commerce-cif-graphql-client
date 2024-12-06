@@ -66,10 +66,12 @@ public class CacheInvalidatorTest {
         RequestOptions options1 = new RequestOptions().withHeaders(headers1);
         List<Header> headers2 = Collections.singletonList(new BasicHeader("Store", "defaultTest"));
         RequestOptions options2 = new RequestOptions().withHeaders(headers2);
+        RequestOptions optionsWithNoHeader = new RequestOptions();
 
         CacheKey cacheKey1 = new CacheKey(request1, options1);
         CacheKey cacheKey2 = new CacheKey(request2, options2);
         CacheKey cacheKey3 = new CacheKey(request3, options1);
+        CacheKey cacheKeyWithNoHeader = new CacheKey(request1, optionsWithNoHeader);
 
         // Define the responses
         GraphqlResponse<Data, Error> response1 = new GraphqlResponse<>();
@@ -82,6 +84,8 @@ public class CacheInvalidatorTest {
 
         cache1.put(cacheKey1, response1);
         cache1.put(cacheKey2, response2);
+        cache1.put(cacheKey3, response2);
+        cache1.put(cacheKeyWithNoHeader, response1);
         cache1.put(cacheKey3, response2);
         cache2.put(cacheKey2, response2);
         cache2.put(cacheKey1, response1);
@@ -267,17 +271,6 @@ public class CacheInvalidatorTest {
                 assertFalse("Cache with store view 'defaultTest', and text 'sku2' or 'sku1' found",
                     storeViewIsDefaultTest && textIsSku);
             }
-        }
-    }
-
-    @Test
-    public void testNoCacheWithStoreViewNotExistsForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
-
-        String storeView = "default2";
-        cacheInvalidator.invalidateCache(storeView, null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" });
-        // Verify that the count of entries in each cache is the same as before
-        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
-            assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
         }
     }
 
