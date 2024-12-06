@@ -96,6 +96,7 @@ public class GraphqlClientImplTest {
     private GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
     private MockGraphqlClientConfiguration mockConfig;
     private CacheInvalidator cacheInvalidator;
+    private Field cacheInvalidatorField;
 
     @Before
     public void setUp() throws Exception {
@@ -110,13 +111,10 @@ public class GraphqlClientImplTest {
 
         graphqlClient.activate(mockConfig, mock(BundleContext.class));
         graphqlClient.client = Mockito.mock(HttpClient.class);
-
-        cacheInvalidator = mock(CacheInvalidator.class);
-
         // Use reflection to set the private cacheInvalidator field
-        Field cacheInvalidatorField = GraphqlClientImpl.class.getDeclaredField("cacheInvalidator");
+        cacheInvalidator = mock(CacheInvalidator.class);
+        cacheInvalidatorField = GraphqlClientImpl.class.getDeclaredField("cacheInvalidator");
         cacheInvalidatorField.setAccessible(true);
-        cacheInvalidatorField.set(graphqlClient, cacheInvalidator);
     }
 
     @Test
@@ -420,14 +418,21 @@ public class GraphqlClientImplTest {
     }
 
     @Test
-    public void testInvalidateCache() {
+    public void testInvalidateCache() throws NoSuchFieldException, IllegalAccessException {
         String storeView = "default";
         String[] cacheNames = { "cache1", "cache2" };
         String[] patterns = { "pattern1", "pattern2" };
 
-        graphqlClient.invalidateCache(storeView, cacheNames, patterns);
+        cacheInvalidatorField.set(graphqlClient, cacheInvalidator);
 
+        graphqlClient.invalidateCache(storeView, cacheNames, patterns);
         verify(cacheInvalidator).invalidateCache(storeView, cacheNames, patterns);
+    }
+
+    @Test
+    public void testInvalidateCacheWhenCacheInvalidatorAsNull() throws NoSuchFieldException, IllegalAccessException {
+        cacheInvalidatorField.set(graphqlClient, null);
+        verify(cacheInvalidator, never()).invalidateCache(anyString(), any(), any());
     }
 
     private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {
