@@ -432,6 +432,7 @@ public class GraphqlClientImplTest {
     @Test
     public void testInvalidateCacheWhenCacheInvalidatorAsNull() throws NoSuchFieldException, IllegalAccessException {
         cacheInvalidatorField.set(graphqlClient, null);
+        graphqlClient.invalidateCache(null, null, null);
         verify(cacheInvalidator, never()).invalidateCache(anyString(), any(), any());
     }
 
