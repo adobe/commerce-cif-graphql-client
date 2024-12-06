@@ -115,9 +115,7 @@ public class CacheInvalidatorTest {
         cacheInvalidator.invalidateCache(null, null, null);
 
         // Verify the caches were invalidated
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            assertTrue(cache.asMap().isEmpty());
-        }
+        assertCachesInvalidated();
     }
 
     @Test
@@ -126,56 +124,44 @@ public class CacheInvalidatorTest {
         cacheInvalidator.invalidateCache(null, new String[] {}, new String[] {});
 
         // Verify the caches were invalidated
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            assertTrue(cache.asMap().isEmpty());
-        }
+        assertCachesInvalidated();
     }
 
     @Test
     public void testInvalidateStoreView() throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
         cacheInvalidator.invalidateCache("default", null, null);
-
         // Verify that the cache was invalidated for the store view, were it has been set as default
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            for (CacheKey key : cache.asMap().keySet()) {
-                List<Header> headers = key.getRequestOptions().getHeaders();
-                boolean storeViewExists = checkIfStorePresent("default", key);
-                assertFalse("Store view default not found in headers", storeViewExists);
-            }
-        }
+        assertInvalidateStoreView();
+    }
+
+    @Test
+    public void testInvalidateStoreViewWithEmptyArray() throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
+        cacheInvalidator.invalidateCache("default", new String[] {}, new String[] {});
+        // Verify that the cache was invalidated for the store view, were it has been set as default
+        assertInvalidateStoreView();
     }
 
     @Test
     public void testInvalidateCacheBasedOnSpecificCacheName() {
         cacheInvalidator.invalidateCache(null, new String[] { "cache1" }, null);
-
-        // Verify that other caches are not empty
-        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
-            if (!entry.getKey().equals("cache1")) {
-                assertFalse(entry.getValue().asMap().isEmpty());
-            } else {
-                assertTrue(entry.getValue().asMap().isEmpty());
-            }
-        }
+        assertInvalidateSpecificCaches("cache1");
     }
 
     @Test
-    public void testNoCacheWithMultipleCacheNames() {
+    public void testInvalidateCacheBasedOnSpecificCacheNameWithEmptyArray() {
+        cacheInvalidator.invalidateCache(null, new String[] { "cache1" }, new String[] {});
+        assertInvalidateSpecificCaches("cache1");
+    }
+
+    @Test
+    public void testInvalidateCacheWithMultipleCacheNames() {
         // This will clear cache1 and cache2 i.e all the caches
         cacheInvalidator.invalidateCache(null, new String[] { "cache1", "cache2" }, null);
-
-        // Verify that other caches are not empty
-        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
-            if (entry.getKey().equals("cache1") || entry.getKey().equals("cache2")) {
-                assertTrue(entry.getValue().asMap().isEmpty());
-            } else {
-                assertFalse(entry.getValue().asMap().isEmpty());
-            }
-        }
+        assertInvalidateSpecificCaches("cache1", "cache2");
     }
 
     @Test
-    public void testNoCacheWithInvalidCacheNames() {
+    public void testInvalidateCacheWithInvalidCacheNames() {
         // This will not clear any cache as the cache names are invalid
         cacheInvalidator.invalidateCache(null, new String[] { "cachetest1" }, null);
 
@@ -186,104 +172,70 @@ public class CacheInvalidatorTest {
     }
 
     @Test
-    public void testNoCacheWithStoreViewDefaultAndTextSku1() throws InvocationTargetException, IllegalAccessException,
-        NoSuchMethodException {
-        cacheInvalidator.invalidateCache("default", null, new String[] { "\"text\":\\s*\"(sku1)\"" });
-
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            for (Map.Entry<CacheKey, GraphqlResponse<?, ?>> entry : cache.asMap().entrySet()) {
-                CacheKey key = entry.getKey();
-                GraphqlResponse<?, ?> response = entry.getValue();
-
-                boolean storeViewIsDefault = checkIfStorePresent("default", key);
-                boolean textIsSku1 = response.getData() != null && "sku1".equals(((Data) response.getData()).text);
-
-                assertFalse("Cache with store view 'default' and text 'sku1' found", storeViewIsDefault && textIsSku1);
-            }
-        }
+    public void testInvalidateCacheInMultipleCacheListForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
+        assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
     }
 
     @Test
-    public void testNoCacheInMultipleCacheListForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
-
-        // This will invalidate the cache from cache1 and cache2 with text 'sku2'
-        String storeView = "default";
-        cacheInvalidator.invalidateCache(storeView, null, new String[] { "\"text\":\\s*\"(sku2)\"" });
-
-        //
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            for (Map.Entry<CacheKey, GraphqlResponse<?, ?>> entry : cache.asMap().entrySet()) {
-                CacheKey key = entry.getKey();
-                GraphqlResponse<?, ?> response = entry.getValue();
-
-                boolean storeViewIsDefault = checkIfStorePresent(storeView, key);
-                boolean textIsSku = response.getData() != null && "sku2".equals(((Data) response.getData()).text);
-
-                assertFalse("Cache with store view 'defaultTest' & text 'sku2' found", storeViewIsDefault && textIsSku);
-            }
-        }
-    }
-
-    @Test
-    public void testNoCacheWithStoreViewDefaultTestAndCacheNameCache2AndTextSku2() throws InvocationTargetException,
+    public void testInvalidateCacheWithStoreViewDefaultTestAndCacheNameCache2AndTextSku2() throws InvocationTargetException,
         IllegalAccessException {
+        assertCacheInvalidation("defaultTest", new String[] { "cache2" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
+    }
 
-        String storeView = "defaultTest";
-        cacheInvalidator.invalidateCache(storeView, new String[] { "cache2" }, new String[] { "\"text\":\\s*\"(sku2)\"" });
+    @Test
+    public void testInvalidateCacheWithStoreViewDefaultTestAndMultipleStringPatterns() throws InvocationTargetException,
+        IllegalAccessException {
+        assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2)\"", "\"text\":\\s*\"(sku1)\"" }, "sku2", "sku1");
+    }
+
+    private void assertCacheInvalidation(String storeView, String[] cacheNames, String[] patterns, String... expectedTexts)
+        throws InvocationTargetException, IllegalAccessException {
+        cacheInvalidator.invalidateCache(storeView, cacheNames, patterns);
 
         for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
             for (Map.Entry<CacheKey, GraphqlResponse<?, ?>> entry : cache.asMap().entrySet()) {
                 CacheKey key = entry.getKey();
                 GraphqlResponse<?, ?> response = entry.getValue();
 
-                boolean storeViewIsDefaultTest = checkIfStorePresent(storeView, key);
-                boolean cacheNameIsCache2 = "cache2".equals(cache);
-                boolean textIsSku2 = response.getData() != null && "sku2".equals(((Data) response.getData()).text);
+                boolean storeViewMatches = storeView == null || checkIfStorePresent(storeView, key);
+                boolean cacheNameMatches = cacheNames == null || Arrays.asList(cacheNames).contains(cache);
+                boolean textMatches = response.getData() != null && Arrays.stream(expectedTexts).anyMatch(text -> text.equals(
+                    ((Data) response.getData()).text));
 
-                assertFalse("Cache with store view 'defaultTest', cache name 'cache2' and text 'sku2' found",
-                    storeViewIsDefaultTest && cacheNameIsCache2 && textIsSku2);
+                assertFalse("Cache with specified criteria found", storeViewMatches && cacheNameMatches && textMatches);
             }
         }
     }
 
     @Test
-    public void testNoCacheWithStoreViewDefaultTestAndMultipleStringPatterns() throws InvocationTargetException, IllegalAccessException {
+    public void testInvalidateCacheWithStoreViewDefaultTestAndComplexStringPattern() throws InvocationTargetException,
+        IllegalAccessException {
+        assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" }, "sku2", "sku1");
+    }
 
-        String storeView = "default";
-        cacheInvalidator.invalidateCache(storeView, null, new String[] { "\"text\":\\s*\"(sku2)\"", "\"text\":\\s*\"(sku1)\"" });
-
+    private void assertCachesInvalidated() {
         for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            for (Map.Entry<CacheKey, GraphqlResponse<?, ?>> entry : cache.asMap().entrySet()) {
-                CacheKey key = entry.getKey();
-                GraphqlResponse<?, ?> response = entry.getValue();
+            assertTrue(cache.asMap().isEmpty());
+        }
+    }
 
-                boolean storeViewIsDefaultTest = checkIfStorePresent(storeView, key);
-                boolean textIsSku = response.getData() != null
-                    && ("sku2".equals(((Data) response.getData()).text) || "sku1".equals(((Data) response.getData()).text));
-
-                assertFalse("Cache with store view 'defaultTest', and text 'sku2' or 'sku1' found",
-                    storeViewIsDefaultTest && textIsSku);
+    private void assertInvalidateStoreView() throws InvocationTargetException, IllegalAccessException {
+        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
+            for (CacheKey key : cache.asMap().keySet()) {
+                boolean storeViewExists = checkIfStorePresent("default", key);
+                assertFalse("Store view default not found in headers", storeViewExists);
             }
         }
     }
 
-    @Test
-    public void testNoCacheWithStoreViewDefaultTestAndComplexStringPattern() throws InvocationTargetException, IllegalAccessException {
-
-        String storeView = "default";
-        cacheInvalidator.invalidateCache(storeView, null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" });
-
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
-            for (Map.Entry<CacheKey, GraphqlResponse<?, ?>> entry : cache.asMap().entrySet()) {
-                CacheKey key = entry.getKey();
-                GraphqlResponse<?, ?> response = entry.getValue();
-
-                boolean storeViewIsDefaultTest = checkIfStorePresent(storeView, key);
-                boolean textIsSku = response.getData() != null
-                    && ("sku2".equals(((Data) response.getData()).text) || "sku1".equals(((Data) response.getData()).text));
-
-                assertFalse("Cache with store view 'defaultTest', and text 'sku2' or 'sku1' found",
-                    storeViewIsDefaultTest && textIsSku);
+    private void assertInvalidateSpecificCaches(String... cacheNames) {
+        // Verify that other caches are not empty
+        Set<String> cacheNamesSet = new HashSet<>(Arrays.asList(cacheNames));
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+            if (cacheNamesSet.contains(entry.getKey())) {
+                assertTrue(entry.getValue().asMap().isEmpty());
+            } else {
+                assertFalse(entry.getValue().asMap().isEmpty());
             }
         }
     }
