@@ -172,6 +172,11 @@ public class CacheInvalidatorTest {
     }
 
     @Test
+    public void testInvalidateCacheWithCacheNameAndStoreView() throws InvocationTargetException, IllegalAccessException {
+        assertCacheInvalidation("default", new String[] { "cache1" }, null, null);
+    }
+
+    @Test
     public void testInvalidateCacheInMultipleCacheListForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
         assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
     }
@@ -199,8 +204,8 @@ public class CacheInvalidatorTest {
 
                 boolean storeViewMatches = storeView == null || checkIfStorePresent(storeView, key);
                 boolean cacheNameMatches = cacheNames == null || Arrays.asList(cacheNames).contains(cache);
-                boolean textMatches = response.getData() != null && Arrays.stream(expectedTexts).anyMatch(text -> text.equals(
-                    ((Data) response.getData()).text));
+                boolean textMatches = expectedTexts == null || (response.getData() != null && Arrays.stream(expectedTexts).anyMatch(
+                    text -> text.equals(((Data) response.getData()).text)));
 
                 assertFalse("Cache with specified criteria found", storeViewMatches && cacheNameMatches && textMatches);
             }

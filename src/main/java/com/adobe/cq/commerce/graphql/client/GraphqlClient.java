@@ -113,7 +113,9 @@ public interface GraphqlClient {
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeOfU, RequestOptions options);
 
     /**
-     * Delete cache entries for in-memory cache based on the cache entries.
+     * Delete cache entries from in-memory cache based on the params entries.
+     * If all params are null or empty, all cache entries are deleted.
+     * If some params are not null or empty, then based on its corresponding cache entries will be deleted.
      * 
      * @param storeView The store view to invalidate cache for.
      * @param cacheNames The cache names to invalidate.

@@ -47,7 +47,10 @@ class CacheInvalidator {
             invalidateStoreView(storeView);
         } else if (StringUtils.isBlank(storeView) && (cacheNames != null && cacheNames.length > 0) &&
             (patterns == null || patterns.length == 0)) {
-            invalidateSpecificCaches(cacheNames);
+            invalidateSpecificCaches(storeView, cacheNames);
+        } else if (!StringUtils.isBlank(storeView) && (cacheNames != null && cacheNames.length > 0) &&
+            (patterns == null || patterns.length == 0)) {
+            invalidateSpecificCaches(storeView, cacheNames);
         } else {
             for (String pattern : patterns) {
                 invalidateCacheBasedOnPattern(pattern, storeView, cacheNames);
@@ -60,25 +63,34 @@ class CacheInvalidator {
             cache.asMap().entrySet().stream()
                 .filter(entry -> checkIfStorePresent(storeView, entry.getKey()))
                 .forEach(entry -> {
-                    LOGGER.info("Invalidating key: {} in cache: {}", entry.getKey(), cacheName);
+                    LOGGER.debug("Invalidating key based StoreView: {} in cache: {}", entry.getKey(), cacheName);
                     cache.invalidate(entry.getKey());
                 });
         });
     }
 
     private void invalidateAll() {
-        LOGGER.info("Invalidating all caches...");
+        LOGGER.debug("Invalidating all caches...");
         caches.values().forEach(Cache::invalidateAll);
     }
 
-    private void invalidateSpecificCaches(String[] cacheEntries) {
-        for (String cacheName : cacheEntries) {
+    private void invalidateSpecificCaches(String storeView, String[] cacheNames) {
+        for (String cacheName : cacheNames) {
             Cache<CacheKey, GraphqlResponse<?, ?>> cache = caches.get(cacheName);
             if (cache != null) {
-                LOGGER.info("Invalidating cache: {}", cacheName);
-                cache.invalidateAll();
+                if (storeView == null) {
+                    LOGGER.debug("Invalidating entire cache: {}", cacheName);
+                    cache.invalidateAll();
+                } else {
+                    cache.asMap().entrySet().stream()
+                        .filter(entry -> checkIfStorePresent(storeView, entry.getKey()))
+                        .forEach(entry -> {
+                            LOGGER.debug("Invalidating key based SpecificCaches & storeView: {} in cache: {}", entry.getKey(), cacheName);
+                            cache.invalidate(entry.getKey());
+                        });
+                }
             } else {
-                LOGGER.warn("Cache not found: {}", cacheName);
+                LOGGER.debug("Cache not found: {}", cacheName);
             }
         }
     }
@@ -103,7 +115,7 @@ class CacheInvalidator {
                     return matcher.find();
                 })
                 .forEach(entry -> {
-                    LOGGER.info("Invalidating key: {} in cache: {}", entry.getKey(), cacheName);
+                    LOGGER.debug("Invalidating key: {} in cache based on pattern: {}", entry.getKey(), cacheName);
                     cache.invalidate(entry.getKey());
                 });
         });
