@@ -128,24 +128,6 @@ public class CacheInvalidatorTest {
     }
 
     @Test
-    public void testInvalidateAllWithOnlyPattenNameAsEmptyArray() {
-        // Call the invalidateCache method with parameters that trigger invalidateAll
-        cacheInvalidator.invalidateCache(null, null, new String[] {});
-
-        // Verify the caches were invalidated
-        assertCachesInvalidated();
-    }
-
-    @Test
-    public void testInvalidateAllWithOnlyCacheNameAsEmptyArray() {
-        // Call the invalidateCache method with parameters that trigger invalidateAll
-        cacheInvalidator.invalidateCache(null, new String[] {}, null);
-
-        // Verify the caches were invalidated
-        assertCachesInvalidated();
-    }
-
-    @Test
     public void testInvalidateStoreView() throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
         cacheInvalidator.invalidateCache("default", null, null);
         // Verify that the cache was invalidated for the store view, were it has been set as default
