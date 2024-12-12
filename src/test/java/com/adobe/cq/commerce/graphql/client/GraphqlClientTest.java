@@ -14,9 +14,10 @@
 
 package com.adobe.cq.commerce.graphql.client;
 
+import java.lang.reflect.Type;
+
 import org.junit.Test;
 
-import java.lang.reflect.Type;
 import static org.junit.Assert.fail;
 
 public class GraphqlClientTest {
@@ -54,7 +55,7 @@ public class GraphqlClientTest {
 
         // Call the default invalidateCache method and assert no exceptions are thrown
         try {
-            graphqlClient.invalidateCache("default", new String[]{"cache1"}, new String[]{"pattern1"});
+            graphqlClient.invalidateCache("default", new String[] { "cache1" }, new String[] { "pattern1" });
         } catch (Exception e) {
             fail("invalidateCache method should not throw any exception");
         }
