@@ -119,6 +119,12 @@ public class CacheInvalidatorTest {
     }
 
     @Test
+    public void testInvalidateAllWithEmptyStoreView() {
+        cacheInvalidator.invalidateCache("", null, null);
+        assertCachesInvalidated();
+    }
+
+    @Test
     public void testInvalidateAllWithEmptyArray() {
         // Call the invalidateCache method with parameters that trigger invalidateAll
         cacheInvalidator.invalidateCache(null, new String[] {}, new String[] {});
