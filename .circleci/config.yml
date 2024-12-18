@@ -63,4 +63,4 @@ workflows:
             branches:
               only: feature/SITES-21278-release
             tags:
-              ignore: /.*/
+              only: /^graphql-client-.*/
