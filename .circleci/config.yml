@@ -52,8 +52,8 @@ workflows:
     jobs:
       - build:
           filters:
-            tags:
-              only: /.*/
+            branches:
+              only: feature/SITES-21278-release
       - release:
           context:
             - CIF Maven Central
@@ -61,6 +61,6 @@ workflows:
             - build
           filters:
             branches:
-              ignore: /.*/
+              only: feature/SITES-21278-release
             tags:
-              only: /^graphql-client-.*/
+              ignore: /.*/
