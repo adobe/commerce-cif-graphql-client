@@ -82,4 +82,22 @@ public class CacheKeyTest {
         Assert.assertNotEquals(key1.hashCode(), key2.hashCode());
         Assert.assertFalse(key1.equals(key2));
     }
+
+    @Test
+    public void testGetGraphqlRequest() {
+        GraphqlRequest req = new GraphqlRequest("{dummy}");
+        RequestOptions opt = new RequestOptions();
+        CacheKey key = new CacheKey(req, opt);
+
+        Assert.assertEquals(req, key.getGraphqlRequest());
+    }
+
+    @Test
+    public void testGetRequestOptions() {
+        GraphqlRequest req = new GraphqlRequest("{dummy}");
+        RequestOptions opt = new RequestOptions();
+        CacheKey key = new CacheKey(req, opt);
+
+        Assert.assertEquals(opt, key.getRequestOptions());
+    }
 }

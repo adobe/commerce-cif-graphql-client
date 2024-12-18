@@ -17,10 +17,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Dictionary;
-import java.util.List;
+import java.util.*;
 
 import org.apache.http.Header;
 import org.apache.http.HeaderIterator;
@@ -98,6 +95,8 @@ public class GraphqlClientImplTest {
     private GraphqlClientImpl graphqlClient;
     private GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
     private MockGraphqlClientConfiguration mockConfig;
+    private CacheInvalidator cacheInvalidator;
+    private Field cacheInvalidatorField;
 
     @Before
     public void setUp() throws Exception {
@@ -112,6 +111,10 @@ public class GraphqlClientImplTest {
 
         graphqlClient.activate(mockConfig, mock(BundleContext.class));
         graphqlClient.client = Mockito.mock(HttpClient.class);
+        // Use reflection to set the private cacheInvalidator field
+        cacheInvalidator = mock(CacheInvalidator.class);
+        cacheInvalidatorField = GraphqlClientImpl.class.getDeclaredField("cacheInvalidator");
+        cacheInvalidatorField.setAccessible(true);
     }
 
     @Test
@@ -412,6 +415,25 @@ public class GraphqlClientImplTest {
         // with keep alive header timeout larger than custom
         prepareResponse(httpResponse, "15");
         assertEquals(customKeepAlive * 1000L, connectionKeepAliveStrategy.getKeepAliveDuration(httpResponse, null));
+    }
+
+    @Test
+    public void testInvalidateCache() throws NoSuchFieldException, IllegalAccessException {
+        String storeView = "default";
+        String[] cacheNames = { "cache1", "cache2" };
+        String[] patterns = { "pattern1", "pattern2" };
+
+        cacheInvalidatorField.set(graphqlClient, cacheInvalidator);
+
+        graphqlClient.invalidateCache(storeView, cacheNames, patterns);
+        verify(cacheInvalidator).invalidateCache(storeView, cacheNames, patterns);
+    }
+
+    @Test
+    public void testInvalidateCacheWhenCacheInvalidatorAsNull() throws NoSuchFieldException, IllegalAccessException {
+        cacheInvalidatorField.set(graphqlClient, null);
+        graphqlClient.invalidateCache(null, null, null);
+        verify(cacheInvalidator, never()).invalidateCache(anyString(), any(), any());
     }
 
     private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {

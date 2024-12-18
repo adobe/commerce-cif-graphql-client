@@ -92,7 +92,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-@Component(service = {})
+@Component(service = { GraphqlClient.class })
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
 
@@ -112,6 +112,8 @@ public class GraphqlClientImpl implements GraphqlClient {
     private GraphqlClientMetrics metrics;
     private GraphqlClientConfigurationImpl configuration;
     private ServiceRegistration<?> registration;
+
+    private CacheInvalidator cacheInvalidator;
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration, BundleContext bundleContext)
@@ -190,6 +192,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             : GraphqlClientMetrics.NOOP;
 
         configureCaches(configuration);
+        if (caches != null) {
+            cacheInvalidator = new CacheInvalidator(caches);
+        }
         client = configureHttpClientBuilder().build();
 
         Hashtable<String, Object> serviceProps = new Hashtable<>();
@@ -288,6 +293,13 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
         }
         return executeImpl(request, typeOfT, typeofU, options);
+    }
+
+    @Override
+    public void invalidateCache(String storeView, String[] cacheNames, String[] patterns) {
+        if (cacheInvalidator != null) {
+            cacheInvalidator.invalidateCache(storeView, cacheNames, patterns);
+        }
     }
 
     private Cache<CacheKey, GraphqlResponse<?, ?>> toActiveCache(GraphqlRequest request, RequestOptions options) {

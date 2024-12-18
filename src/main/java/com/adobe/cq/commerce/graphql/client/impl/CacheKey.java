@@ -49,4 +49,12 @@ public class CacheKey {
         CacheKey that = (CacheKey) o;
         return Objects.equals(request, that.request) && Objects.equals(options, that.options);
     }
+
+    public GraphqlRequest getGraphqlRequest() {
+        return request;
+    }
+
+    public RequestOptions getRequestOptions() {
+        return options;
+    }
 }
