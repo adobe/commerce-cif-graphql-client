@@ -17,7 +17,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.adobe.commerce.cif</groupId>
     <artifactId>graphql-client</artifactId>
-    <version>1.8.1-SNAPSHOT</version>
+    <version>1.8.1</version>
     <packaging>bundle</packaging>
 
     <name>Generic GraphQL client</name>
@@ -28,7 +28,7 @@
         <connection>scm:git:https://github.com/adobe/commerce-cif-graphql-client</connection>
         <developerConnection>scm:git:git@github.com:adobe/commerce-cif-graphql-client.git</developerConnection>
         <url>https://github.com/adobe/commerce-cif-graphql-client</url>
-        <tag>HEAD</tag>
+        <tag>graphql-client-1.8.1</tag>
     </scm>
     <organization>
         <name>Adobe</name>
