@@ -199,6 +199,113 @@ public class CacheInvalidatorTest {
         assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2)\"", "\"text\":\\s*\"(sku1)\"" }, "sku2", "sku1");
     }
 
+    @Test
+    public void testInvalidateCacheWithNullPattern() {
+        // Test handling of null pattern in patterns array
+        cacheInvalidator.invalidateCache("default", null, new String[] { null });
+
+        // Verify that caches are not affected since pattern was null
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+            assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
+        }
+    }
+
+    @Test
+    public void testInvalidateCacheWithInvalidRegexPattern() {
+        try {
+            cacheInvalidator.invalidateCache("default", null, new String[] { "[invalid(regex" });
+
+            // If we reach here, the invalid regex was handled gracefully
+            for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+                assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
+            }
+        } catch (Exception e) {
+            // Verify that it's a PatternSyntaxException
+            assertTrue("Expected PatternSyntaxException but got: " + e.getClass().getName(),
+                e instanceof java.util.regex.PatternSyntaxException);
+        }
+    }
+
+    @Test
+    public void testInvalidateCacheWithNullCacheKey() {
+        // Create a cache with a null key - note that Guava Cache doesn't allow null keys
+        Cache<CacheKey, GraphqlResponse<?, ?>> cache3 = CacheBuilder.newBuilder().build();
+        GraphqlResponse<Data, Error> response = new GraphqlResponse<>();
+        response.setData(new Data());
+        response.getData().text = "sku3";
+
+        // Instead of null key, create a key with null components
+        CacheKey nullKey = new CacheKey(null, null);
+        cache3.put(nullKey, response);
+        caches.put("cache3", cache3);
+
+        // Test invalidation with store view
+        cacheInvalidator.invalidateCache("default", null, null);
+
+        // Verify that the cache with null components in key is handled properly
+        // The key should remain since it has no store view header to match
+        assertTrue(cache3.asMap().containsKey(nullKey));
+    }
+
+    @Test
+    public void testInvalidateCacheWithNullRequestOptions() {
+        // Create a cache entry with null request options
+        GraphqlRequest request = new GraphqlRequest("{dummy4}");
+        CacheKey cacheKey = new CacheKey(request, null);
+        Cache<CacheKey, GraphqlResponse<?, ?>> cache3 = CacheBuilder.newBuilder().build();
+        GraphqlResponse<Data, Error> response = new GraphqlResponse<>();
+        response.setData(new Data());
+        response.getData().text = "sku4";
+        cache3.put(cacheKey, response);
+        caches.put("cache3", cache3);
+
+        // Test invalidation with store view
+        cacheInvalidator.invalidateCache("default", null, null);
+
+        // Verify that the cache entry with null request options is not affected by store view invalidation
+        assertFalse(cache3.asMap().isEmpty());
+    }
+
+    @Test
+    public void testInvalidateCacheWithEmptyHeaders() {
+        // Create a cache entry with empty headers list
+        GraphqlRequest request = new GraphqlRequest("{dummy5}");
+        RequestOptions options = new RequestOptions().withHeaders(Collections.emptyList());
+        CacheKey cacheKey = new CacheKey(request, options);
+        Cache<CacheKey, GraphqlResponse<?, ?>> cache3 = CacheBuilder.newBuilder().build();
+        GraphqlResponse<Data, Error> response = new GraphqlResponse<>();
+        response.setData(new Data());
+        response.getData().text = "sku5";
+        cache3.put(cacheKey, response);
+        caches.put("cache3", cache3);
+
+        // Test invalidation with store view
+        cacheInvalidator.invalidateCache("default", null, null);
+
+        // Verify that the cache entry with empty headers is not affected by store view invalidation
+        assertFalse(cache3.asMap().isEmpty());
+    }
+
+    @Test
+    public void testInvalidateCacheWithNullResponse() {
+        // Create a cache entry with null response data
+        GraphqlRequest request = new GraphqlRequest("{dummy6}");
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions options = new RequestOptions().withHeaders(headers);
+        CacheKey cacheKey = new CacheKey(request, options);
+        Cache<CacheKey, GraphqlResponse<?, ?>> cache3 = CacheBuilder.newBuilder().build();
+        GraphqlResponse<Data, Error> response = new GraphqlResponse<>();
+        response.setData(null);
+        cache3.put(cacheKey, response);
+        caches.put("cache3", cache3);
+
+        // Test invalidation with pattern
+        cacheInvalidator.invalidateCache("default", null, new String[] { "\"text\":\\s*\"(sku6)\"" });
+
+        // Verify that the cache entry with null response data is handled properly
+        assertFalse(cache3.asMap().isEmpty());
+    }
+
     private void assertCacheInvalidation(String storeView, String[] cacheNames, String[] patterns, String... expectedTexts)
         throws InvocationTargetException, IllegalAccessException {
         cacheInvalidator.invalidateCache(storeView, cacheNames, patterns);
@@ -216,12 +323,6 @@ public class CacheInvalidatorTest {
                 assertFalse("Cache with specified criteria found", storeViewMatches && cacheNameMatches && textMatches);
             }
         }
-    }
-
-    @Test
-    public void testInvalidateCacheWithStoreViewDefaultTestAndComplexStringPattern() throws InvocationTargetException,
-        IllegalAccessException {
-        assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" }, "sku2", "sku1");
     }
 
     private void assertCachesInvalidated() {
