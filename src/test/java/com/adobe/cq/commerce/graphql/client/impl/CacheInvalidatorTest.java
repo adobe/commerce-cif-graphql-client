@@ -243,6 +243,33 @@ public class CacheInvalidatorTest {
         }
     }
 
+    @Test
+    public void testInvalidateCacheWithNullStoreViewAndValidCacheNames() {
+        cacheInvalidator.invalidateCache(null, new String[] { CACHE1 }, new String[] { "\"text\":\\s*\"(sku1)\"" });
+        // When store view is null, no entries should be invalidated based on store view matching
+        assertCachesUnchanged();
+    }
+
+    @Test
+    public void testInvalidateCacheWithEmptyStoreViewAndValidCacheNames() throws InvocationTargetException, IllegalAccessException {
+        cacheInvalidator.invalidateCache("", new String[] { CACHE1 }, new String[] { "\"text\":\\s*\"(sku1)\"" });
+        assertCacheInvalidation("", new String[] { CACHE1 }, new String[] { "\"text\":\\s*\"(sku1)\"" }, "sku1");
+    }
+
+    @Test
+    public void testInvalidateCacheWithMixedValidAndInvalidPatterns() throws InvocationTargetException, IllegalAccessException {
+        cacheInvalidator.invalidateCache(DEFAULT_STORE, null,
+            new String[] { "\"text\":\\s*\"(sku1)\"", null, "[[invalid(regex]]" });
+        // Should only invalidate entries matching the valid pattern
+        assertCacheInvalidation(DEFAULT_STORE, null, new String[] { "\"text\":\\s*\"(sku1)\"" }, "sku1");
+    }
+
+    @Test
+    public void testInvalidateCacheWithStoreViewAndPatterns() throws InvocationTargetException, IllegalAccessException {
+        cacheInvalidator.invalidateCache(DEFAULT_STORE, null, new String[] { "\"text\":\\s*\"(sku1)\"" });
+        assertCacheInvalidation(DEFAULT_STORE, null, new String[] { "\"text\":\\s*\"(sku1)\"" }, "sku1");
+    }
+
     // Helper assertion methods
 
     private void assertCacheInvalidation(String storeView, String[] cacheNames, String[] patterns, String... expectedTexts)
@@ -257,7 +284,9 @@ public class CacheInvalidatorTest {
                         boolean textMatches = expectedTexts == null || (response.getData() != null &&
                             Arrays.stream(expectedTexts).anyMatch(text -> text.equals(((Data) response.getData()).text)));
 
-                        assertFalse("Cache with specified criteria found", storeViewMatches && textMatches);
+                        if (storeViewMatches && textMatches) {
+                            fail("Cache entry should have been invalidated but was found: " + key);
+                        }
                     } catch (InvocationTargetException | IllegalAccessException e) {
                         throw new RuntimeException("Error checking store presence", e);
                     }
