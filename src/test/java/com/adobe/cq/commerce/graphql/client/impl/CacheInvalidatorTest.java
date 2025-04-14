@@ -189,18 +189,18 @@ public class CacheInvalidatorTest {
 
     @Test
     public void testInvalidateCacheWithStoreViewDefaultTestAndCacheNameCache2AndTextSku2() throws InvocationTargetException,
-            IllegalAccessException {
+        IllegalAccessException {
         assertCacheInvalidation("defaultTest", new String[] { "cache2" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
     }
 
     @Test
     public void testInvalidateCacheWithStoreViewDefaultTestAndMultipleStringPatterns() throws InvocationTargetException,
-            IllegalAccessException {
+        IllegalAccessException {
         assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2)\"", "\"text\":\\s*\"(sku1)\"" }, "sku2", "sku1");
     }
 
     private void assertCacheInvalidation(String storeView, String[] cacheNames, String[] patterns, String... expectedTexts)
-            throws InvocationTargetException, IllegalAccessException {
+        throws InvocationTargetException, IllegalAccessException {
         cacheInvalidator.invalidateCache(storeView, cacheNames, patterns);
 
         for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
@@ -211,7 +211,7 @@ public class CacheInvalidatorTest {
                 boolean storeViewMatches = storeView == null || checkIfStorePresent(storeView, key);
                 boolean cacheNameMatches = cacheNames == null || Arrays.asList(cacheNames).contains(cache);
                 boolean textMatches = expectedTexts == null || (response.getData() != null && Arrays.stream(expectedTexts).anyMatch(
-                        text -> text.equals(((Data) response.getData()).text)));
+                    text -> text.equals(((Data) response.getData()).text)));
 
                 assertFalse("Cache with specified criteria found", storeViewMatches && cacheNameMatches && textMatches);
             }
@@ -220,7 +220,7 @@ public class CacheInvalidatorTest {
 
     @Test
     public void testInvalidateCacheWithStoreViewDefaultTestAndComplexStringPattern() throws InvocationTargetException,
-            IllegalAccessException {
+        IllegalAccessException {
         assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" }, "sku2", "sku1");
     }
 
