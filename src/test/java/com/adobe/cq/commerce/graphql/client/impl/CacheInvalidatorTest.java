@@ -36,6 +36,7 @@ import com.google.common.cache.CacheBuilder;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 public class CacheInvalidatorTest {
 
@@ -202,8 +203,8 @@ public class CacheInvalidatorTest {
 
     @Test
     public void testInvalidateCacheForEmptySpecificPattern() {
-        cacheInvalidator.invalidateCache("defaultTest", null, new String[] { "" });
-        verify(logger).debug("Skipping null pattern in patterns array");
+        cacheInvalidator.invalidateCache("defaultTest", null, new String[] { null, "" });
+        verify(logger, times(2)).debug("Skipping null pattern in patterns array");
 
     }
 
