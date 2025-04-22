@@ -247,54 +247,96 @@ public class CacheInvalidatorTest {
     }
 
     @Test
-    public void testCheckIfStorePresentWithNullStoreView() throws InvocationTargetException, IllegalAccessException {
+    public void testCheckIfStorePresentWithNullOrEmptyParameters() throws InvocationTargetException, IllegalAccessException {
+        // Create a valid cache key for comparison
         GraphqlRequest request = new GraphqlRequest("{test}");
         List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
         RequestOptions options = new RequestOptions().withHeaders(headers);
-        CacheKey cacheKey = new CacheKey(request, options);
+        CacheKey validCacheKey = new CacheKey(request, options);
 
         // Test with null storeView
-        boolean result = checkIfStorePresent(null, cacheKey);
-        assertFalse("Should return false when storeView is null", result);
-    }
+        assertFalse("Should return false when storeView is null",
+            checkIfStorePresent(null, validCacheKey));
 
-    @Test
-    public void testCheckIfStorePresentWithNullCacheKey() throws InvocationTargetException, IllegalAccessException {
         // Test with null cacheKey
-        boolean result = checkIfStorePresent("default", null);
-        assertFalse("Should return false when cacheKey is null", result);
-    }
-
-    @Test
-    public void testCheckIfStorePresentWithNullRequestOptions() throws InvocationTargetException, IllegalAccessException {
-        GraphqlRequest request = new GraphqlRequest("{test}");
-        CacheKey cacheKey = new CacheKey(request, null);
+        assertFalse("Should return false when cacheKey is null",
+            checkIfStorePresent("default", null));
 
         // Test with null requestOptions
-        boolean result = checkIfStorePresent("default", cacheKey);
-        assertFalse("Should return false when requestOptions is null", result);
-    }
+        CacheKey cacheKeyWithNullOptions = new CacheKey(request, null);
+        assertFalse("Should return false when requestOptions is null",
+            checkIfStorePresent("default", cacheKeyWithNullOptions));
 
-    @Test
-    public void testCheckIfStorePresentWithNullHeaders() throws InvocationTargetException, IllegalAccessException {
-        GraphqlRequest request = new GraphqlRequest("{test}");
-        RequestOptions options = new RequestOptions(); // No headers provided
-        CacheKey cacheKey = new CacheKey(request, options);
-
-        // Test with null headers
-        boolean result = checkIfStorePresent("default", cacheKey);
-        assertFalse("Should return false when headers are null", result);
-    }
-
-    @Test
-    public void testCheckIfStorePresentWithEmptyHeaders() throws InvocationTargetException, IllegalAccessException {
-        GraphqlRequest request = new GraphqlRequest("{test}");
-        RequestOptions options = new RequestOptions().withHeaders(Collections.emptyList());
-        CacheKey cacheKey = new CacheKey(request, options);
+        // Test with null headers (no headers provided)
+        CacheKey cacheKeyWithNoHeaders = new CacheKey(request, new RequestOptions());
+        assertFalse("Should return false when headers are null",
+            checkIfStorePresent("default", cacheKeyWithNoHeaders));
 
         // Test with empty headers list
-        boolean result = checkIfStorePresent("default", cacheKey);
-        assertFalse("Should return false when headers list is empty", result);
+        CacheKey cacheKeyWithEmptyHeaders = new CacheKey(request, new RequestOptions().withHeaders(Collections.emptyList()));
+        assertFalse("Should return false when headers list is empty",
+            checkIfStorePresent("default", cacheKeyWithEmptyHeaders));
+    }
+
+    @Test
+    public void testIsAllParametersEmpty() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        // Get access to the private method using reflection
+        Method isAllParametersEmptyMethod = CacheInvalidator.class.getDeclaredMethod(
+            "isAllParametersEmpty", String.class, String[].class, String[].class);
+        isAllParametersEmptyMethod.setAccessible(true);
+
+        // Test with null values for all parameters
+        boolean result1 = (boolean) isAllParametersEmptyMethod.invoke(cacheInvalidator, null, null, null);
+        assertTrue("Should return true when all parameters are null", result1);
+
+        // Test with empty string and empty arrays
+        boolean result2 = (boolean) isAllParametersEmptyMethod.invoke(cacheInvalidator, "", new String[] {}, new String[] {});
+        assertTrue("Should return true when all parameters are empty", result2);
+
+        // Test with non-empty storeView
+        boolean result3 = (boolean) isAllParametersEmptyMethod.invoke(cacheInvalidator, "default", null, null);
+        assertFalse("Should return false when storeView is not empty", result3);
+
+        // Test with non-empty cacheNames
+        boolean result4 = (boolean) isAllParametersEmptyMethod.invoke(cacheInvalidator, "", new String[] { "cache1" }, null);
+        assertFalse("Should return false when cacheNames is not empty", result4);
+
+        // Test with non-empty patterns
+        boolean result5 = (boolean) isAllParametersEmptyMethod.invoke(cacheInvalidator, "", null, new String[] { "pattern" });
+        assertFalse("Should return false when patterns is not empty", result5);
+
+        // Test with whitespace storeView (should be considered blank)
+        boolean result6 = (boolean) isAllParametersEmptyMethod.invoke(cacheInvalidator, "  ", new String[] {}, new String[] {});
+        assertTrue("Should return true when storeView only contains whitespace", result6);
+    }
+
+    @Test
+    public void testIsCacheNamesProvided() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        // Get access to the private method using reflection
+        Method isCacheNamesProvidedMethod = CacheInvalidator.class.getDeclaredMethod(
+            "isCacheNamesProvided", String[].class, String[].class);
+        isCacheNamesProvidedMethod.setAccessible(true);
+
+        // Test with non-empty cacheNames and null patterns
+        boolean result1 = (boolean) isCacheNamesProvidedMethod.invoke(cacheInvalidator, new String[] { "cache1" }, null);
+        assertTrue("Should return true when cacheNames is not empty and patterns is null", result1);
+
+        // Test with non-empty cacheNames and empty patterns
+        boolean result2 = (boolean) isCacheNamesProvidedMethod.invoke(cacheInvalidator, new String[] { "cache1" }, new String[] {});
+        assertTrue("Should return true when cacheNames is not empty and patterns is empty", result2);
+
+        // Test with null cacheNames
+        boolean result3 = (boolean) isCacheNamesProvidedMethod.invoke(cacheInvalidator, null, null);
+        assertFalse("Should return false when cacheNames is null", result3);
+
+        // Test with empty cacheNames
+        boolean result4 = (boolean) isCacheNamesProvidedMethod.invoke(cacheInvalidator, new String[] {}, null);
+        assertFalse("Should return false when cacheNames is empty", result4);
+
+        // Test with non-empty patterns
+        boolean result5 = (boolean) isCacheNamesProvidedMethod.invoke(cacheInvalidator, new String[] { "cache1" }, new String[] {
+            "pattern" });
+        assertFalse("Should return false when patterns is not empty", result5);
     }
 
     private void assertCachesInvalidated() {

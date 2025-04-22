@@ -54,7 +54,7 @@ class CacheInvalidator {
             (patterns == null || patterns.length == 0);
     }
 
-    private boolean isOnlyCacheNamesProvided(String[] cacheNames, String[] patterns) {
+    private boolean isCacheNamesProvided(String[] cacheNames, String[] patterns) {
         return (cacheNames != null && cacheNames.length > 0) &&
             (patterns == null || patterns.length == 0);
     }
@@ -71,7 +71,7 @@ class CacheInvalidator {
             invalidateAll();
         } else if (isOnlyStoreViewProvided(storeView, cacheNames, patterns)) {
             invalidateStoreView(storeView);
-        } else if (isOnlyCacheNamesProvided(cacheNames, patterns)) {
+        } else if (isCacheNamesProvided(cacheNames, patterns)) {
             invalidateSpecificCaches(storeView, cacheNames);
         } else {
             for (String pattern : patterns) {
