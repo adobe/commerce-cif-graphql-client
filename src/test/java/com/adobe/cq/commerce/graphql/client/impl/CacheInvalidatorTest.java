@@ -209,6 +209,11 @@ public class CacheInvalidatorTest {
     }
 
     @Test
+    public void testInvalidateCacheWithNonExistingCacheListForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
+        assertCacheInvalidation("default", new String[] { "samplecache" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
+    }
+
+    @Test
     public void testInvalidateCacheWithStoreViewDefaultTestAndCacheNameCache2AndTextSku2() throws InvocationTargetException,
         IllegalAccessException {
         assertCacheInvalidation("defaultTest", new String[] { "cache2" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
