@@ -75,7 +75,7 @@ class CacheInvalidator {
             invalidateSpecificCaches(storeView, cacheNames);
         } else {
             for (String pattern : patterns) {
-                if (pattern != null) {
+                if (pattern != null && !pattern.isEmpty()) {
                     invalidateCacheBasedOnPattern(pattern, storeView, cacheNames);
                 } else {
                     LOGGER.debug("Skipping null pattern in patterns array");
@@ -150,7 +150,7 @@ class CacheInvalidator {
             return false;
         }
         List<Header> headers = cacheKey.getRequestOptions().getHeaders();
-        if (headers != null) {
+        if (headers != null && !headers.isEmpty()) {
             return headers.stream()
                 .anyMatch(
                     header -> STORE_HEADER_NAME.equalsIgnoreCase(header.getName())

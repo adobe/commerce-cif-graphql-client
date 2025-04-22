@@ -14,14 +14,19 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
@@ -30,6 +35,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.verify;
 
 public class CacheInvalidatorTest {
 
@@ -41,6 +47,9 @@ public class CacheInvalidatorTest {
 
     private Method checkIfStorePresentMethod;
 
+    @Mock
+    private Logger logger;
+
     private static class Data {
         String text;
     }
@@ -51,6 +60,7 @@ public class CacheInvalidatorTest {
 
     @Before
     public void setUp() throws NoSuchMethodException {
+        MockitoAnnotations.initMocks(this);
 
         caches = new HashMap<>();
 
@@ -100,6 +110,9 @@ public class CacheInvalidatorTest {
         // Get the private method using reflection
         checkIfStorePresentMethod = CacheInvalidator.class.getDeclaredMethod("checkIfStorePresent", String.class, CacheKey.class);
         checkIfStorePresentMethod.setAccessible(true);
+
+        // Set the logger field to the mock logger
+        setLoggerField();
 
         // Store the initial count of entries in each cache
         initialCounts = new HashMap<>();
@@ -188,6 +201,13 @@ public class CacheInvalidatorTest {
     }
 
     @Test
+    public void testInvalidateCacheForEmptySpecificPattern() {
+        cacheInvalidator.invalidateCache("defaultTest", null, new String[] { "" });
+        verify(logger).debug("Skipping null pattern in patterns array");
+
+    }
+
+    @Test
     public void testInvalidateCacheWithStoreViewDefaultTestAndCacheNameCache2AndTextSku2() throws InvocationTargetException,
         IllegalAccessException {
         assertCacheInvalidation("defaultTest", new String[] { "cache2" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
@@ -203,13 +223,15 @@ public class CacheInvalidatorTest {
         throws InvocationTargetException, IllegalAccessException {
         cacheInvalidator.invalidateCache(storeView, cacheNames, patterns);
 
-        for (Cache<CacheKey, GraphqlResponse<?, ?>> cache : caches.values()) {
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> cacheEntry : caches.entrySet()) {
+            Cache<CacheKey, GraphqlResponse<?, ?>> cache = cacheEntry.getValue();
+            String cacheName = cacheEntry.getKey();
             for (Map.Entry<CacheKey, GraphqlResponse<?, ?>> entry : cache.asMap().entrySet()) {
                 CacheKey key = entry.getKey();
                 GraphqlResponse<?, ?> response = entry.getValue();
 
                 boolean storeViewMatches = storeView == null || checkIfStorePresent(storeView, key);
-                boolean cacheNameMatches = cacheNames == null || Arrays.asList(cacheNames).contains(cache);
+                boolean cacheNameMatches = cacheNames == null || Arrays.asList(cacheNames).contains(cacheName);
                 boolean textMatches = expectedTexts == null || (response.getData() != null && Arrays.stream(expectedTexts).anyMatch(
                     text -> text.equals(((Data) response.getData()).text)));
 
@@ -222,6 +244,57 @@ public class CacheInvalidatorTest {
     public void testInvalidateCacheWithStoreViewDefaultTestAndComplexStringPattern() throws InvocationTargetException,
         IllegalAccessException {
         assertCacheInvalidation("default", null, new String[] { "\"text\":\\s*\"(sku2|sku1)\"" }, "sku2", "sku1");
+    }
+
+    @Test
+    public void testCheckIfStorePresentWithNullStoreView() throws InvocationTargetException, IllegalAccessException {
+        GraphqlRequest request = new GraphqlRequest("{test}");
+        List<Header> headers = Collections.singletonList(new BasicHeader("Store", "default"));
+        RequestOptions options = new RequestOptions().withHeaders(headers);
+        CacheKey cacheKey = new CacheKey(request, options);
+
+        // Test with null storeView
+        boolean result = checkIfStorePresent(null, cacheKey);
+        assertFalse("Should return false when storeView is null", result);
+    }
+
+    @Test
+    public void testCheckIfStorePresentWithNullCacheKey() throws InvocationTargetException, IllegalAccessException {
+        // Test with null cacheKey
+        boolean result = checkIfStorePresent("default", null);
+        assertFalse("Should return false when cacheKey is null", result);
+    }
+
+    @Test
+    public void testCheckIfStorePresentWithNullRequestOptions() throws InvocationTargetException, IllegalAccessException {
+        GraphqlRequest request = new GraphqlRequest("{test}");
+        CacheKey cacheKey = new CacheKey(request, null);
+
+        // Test with null requestOptions
+        boolean result = checkIfStorePresent("default", cacheKey);
+        assertFalse("Should return false when requestOptions is null", result);
+    }
+
+    @Test
+    public void testCheckIfStorePresentWithNullHeaders() throws InvocationTargetException, IllegalAccessException {
+        GraphqlRequest request = new GraphqlRequest("{test}");
+        RequestOptions options = new RequestOptions(); // No headers provided
+        CacheKey cacheKey = new CacheKey(request, options);
+
+        // Test with null headers
+        boolean result = checkIfStorePresent("default", cacheKey);
+        assertFalse("Should return false when headers are null", result);
+    }
+
+    @Test
+    public void testCheckIfStorePresentWithEmptyHeaders() throws InvocationTargetException, IllegalAccessException {
+        GraphqlRequest request = new GraphqlRequest("{test}");
+        RequestOptions options = new RequestOptions().withHeaders(Collections.emptyList());
+        CacheKey cacheKey = new CacheKey(request, options);
+
+        // Test with empty headers list
+        boolean result = checkIfStorePresent("default", cacheKey);
+        assertFalse("Should return false when headers list is empty", result);
     }
 
     private void assertCachesInvalidated() {
@@ -253,5 +326,19 @@ public class CacheInvalidatorTest {
 
     private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) throws InvocationTargetException, IllegalAccessException {
         return (boolean) checkIfStorePresentMethod.invoke(cacheInvalidator, storeView, cacheKey);
+    }
+
+    private void setLoggerField() {
+        try {
+            Field loggerField = CacheInvalidator.class.getDeclaredField("LOGGER");
+            loggerField.setAccessible(true);
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(loggerField, loggerField.getModifiers() & ~Modifier.FINAL);
+            loggerField.set(null, logger);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to set logger field", e);
+        }
     }
 }
