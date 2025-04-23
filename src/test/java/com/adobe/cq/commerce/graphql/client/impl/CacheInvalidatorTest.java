@@ -112,14 +112,14 @@ public class CacheInvalidatorTest {
         checkIfStorePresentMethod = CacheInvalidator.class.getDeclaredMethod("checkIfStorePresent", String.class, CacheKey.class);
         checkIfStorePresentMethod.setAccessible(true);
 
-        // Set the logger field to the mock logger
-        setLoggerField();
-
         // Store the initial count of entries in each cache
         initialCounts = new HashMap<>();
         for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
             initialCounts.put(entry.getKey(), entry.getValue().asMap().size());
         }
+
+        // Set the logger field to the mock logger
+        setLoggerField();
 
     }
 
@@ -186,9 +186,7 @@ public class CacheInvalidatorTest {
         cacheInvalidator.invalidateCache(null, new String[] { "cachetest1" }, null);
 
         // Verify that the count of entries in each cache is the same as before
-        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
-            assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
-        }
+        verifyCacheSizes();
     }
 
     @Test
@@ -209,8 +207,10 @@ public class CacheInvalidatorTest {
     }
 
     @Test
-    public void testInvalidateCacheWithNonExistingCacheListForSpecificPattern() throws InvocationTargetException, IllegalAccessException {
-        assertCacheInvalidation("default", new String[] { "samplecache" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
+    public void testInvalidateCacheWithNonExistingCacheListForSpecificPattern() {
+        cacheInvalidator.invalidateCache("default", new String[] { "samplecache", "samplecache2" }, new String[] {
+            "\"text\":\\s*\"(sku2)\"" });
+        verifyCacheSizes();
     }
 
     @Test
@@ -374,6 +374,13 @@ public class CacheInvalidatorTest {
 
     private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) throws InvocationTargetException, IllegalAccessException {
         return (boolean) checkIfStorePresentMethod.invoke(cacheInvalidator, storeView, cacheKey);
+    }
+
+    private void verifyCacheSizes() {
+        // Verify that the count of entries in each cache is the same as before
+        for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
+            assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
+        }
     }
 
     private void setLoggerField() {
