@@ -207,10 +207,15 @@ public class CacheInvalidatorTest {
     }
 
     @Test
-    public void testInvalidateCacheWithNonExistingCacheListForSpecificPattern() {
+    public void testInvalidateCache_WithNonExistingCacheListForSpecificPattern() {
         cacheInvalidator.invalidateCache("default", new String[] { "samplecache", "samplecache2" }, new String[] {
             "\"text\":\\s*\"(sku2)\"" });
         verifyCacheSizes();
+    }
+
+    @Test
+    public void testInvalidateCachePattern_ExistingCacheNames() throws InvocationTargetException, IllegalAccessException {
+        assertCacheInvalidation("default", new String[] { "cache1", "cache2" }, new String[] { "\"text\":\\s*\"(sku2)\"" }, "sku2");
     }
 
     @Test
