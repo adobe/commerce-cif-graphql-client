@@ -27,33 +27,59 @@ import org.slf4j.LoggerFactory;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.google.common.cache.Cache;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 class CacheInvalidator {
     private static final Logger LOGGER = LoggerFactory.getLogger(CacheInvalidator.class);
+    private static final String STORE_HEADER_NAME = "Store";
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private Gson gson;
 
     CacheInvalidator(Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches) {
         this.caches = caches;
-        this.gson = new Gson();
+        this.gson = new GsonBuilder()
+            .disableHtmlEscaping()
+            .create();
     }
 
+    private boolean isAllParametersEmpty(String storeView, String[] cacheNames, String[] patterns) {
+        return StringUtils.isBlank(storeView) &&
+            (cacheNames == null || cacheNames.length == 0) &&
+            (patterns == null || patterns.length == 0);
+    }
+
+    private boolean isOnlyStoreViewProvided(String storeView, String[] cacheNames, String[] patterns) {
+        return !StringUtils.isBlank(storeView) &&
+            (cacheNames == null || cacheNames.length == 0) &&
+            (patterns == null || patterns.length == 0);
+    }
+
+    private boolean isCacheNamesProvided(String[] cacheNames, String[] patterns) {
+        return (cacheNames != null && cacheNames.length > 0) &&
+            (patterns == null || patterns.length == 0);
+    }
+
+    /**
+     * Invalidates cache entries based on the provided criteria.
+     *
+     * @param storeView The store view to match against cache entries
+     * @param cacheNames Array of cache names to invalidate
+     * @param patterns Array of regex patterns to match against cache entries
+     */
     void invalidateCache(String storeView, String[] cacheNames, String[] patterns) {
-        if (StringUtils.isBlank(storeView) && (cacheNames == null || cacheNames.length == 0) &&
-            (patterns == null || patterns.length == 0)) {
+        if (isAllParametersEmpty(storeView, cacheNames, patterns)) {
             invalidateAll();
-        } else if (!StringUtils.isBlank(storeView) && (cacheNames == null || cacheNames.length == 0) &&
-            (patterns == null || patterns.length == 0)) {
+        } else if (isOnlyStoreViewProvided(storeView, cacheNames, patterns)) {
             invalidateStoreView(storeView);
-        } else if (StringUtils.isBlank(storeView) && (cacheNames != null && cacheNames.length > 0) &&
-            (patterns == null || patterns.length == 0)) {
-            invalidateSpecificCaches(storeView, cacheNames);
-        } else if (!StringUtils.isBlank(storeView) && (cacheNames != null && cacheNames.length > 0) &&
-            (patterns == null || patterns.length == 0)) {
+        } else if (isCacheNamesProvided(cacheNames, patterns)) {
             invalidateSpecificCaches(storeView, cacheNames);
         } else {
             for (String pattern : patterns) {
-                invalidateCacheBasedOnPattern(pattern, storeView, cacheNames);
+                if (pattern != null && !pattern.isEmpty()) {
+                    invalidateCacheBasedOnPattern(pattern, storeView, cacheNames);
+                } else {
+                    LOGGER.debug("Skipping null pattern in patterns array");
+                }
             }
         }
     }
@@ -98,7 +124,7 @@ class CacheInvalidator {
     private void invalidateCacheBasedOnPattern(String pattern, String storeView, String[] listOfCacheToSearch) {
         Pattern regex = Pattern.compile(pattern);
         caches.forEach((cacheName, cache) -> {
-            if (listOfCacheToSearch != null
+            if (listOfCacheToSearch != null && listOfCacheToSearch.length > 0
                 && !Arrays.asList(listOfCacheToSearch).contains(cacheName)) {
                 return;
             }
@@ -109,8 +135,6 @@ class CacheInvalidator {
                     }
                     GraphqlResponse<?, ?> value = entry.getValue();
                     String jsonResponse = gson.toJson(value);
-                    // Replace \\u003d with = in the JSON string
-                    jsonResponse = jsonResponse.replace("\\u003d", "=");
                     Matcher matcher = regex.matcher(jsonResponse);
                     return matcher.find();
                 })
@@ -122,11 +146,14 @@ class CacheInvalidator {
     }
 
     private boolean checkIfStorePresent(String storeView, CacheKey cacheKey) {
+        if (storeView == null || cacheKey == null || cacheKey.getRequestOptions() == null) {
+            return false;
+        }
         List<Header> headers = cacheKey.getRequestOptions().getHeaders();
-        if (headers != null) {
+        if (headers != null && !headers.isEmpty()) {
             return headers.stream()
                 .anyMatch(
-                    header -> "Store".equalsIgnoreCase(header.getName())
+                    header -> STORE_HEADER_NAME.equalsIgnoreCase(header.getName())
                         && storeView.equalsIgnoreCase(header.getValue()));
         }
         return false;
