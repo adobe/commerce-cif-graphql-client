@@ -86,13 +86,21 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import dev.failsafe.CircuitBreaker;
+import dev.failsafe.CircuitBreakerOpenException;
+import dev.failsafe.Failsafe;
+import dev.failsafe.FailsafeException;
 
-@Component(service = { GraphqlClient.class })
+@Component(
+    service = GraphqlClient.class,
+    immediate = true)
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
 
@@ -106,6 +114,8 @@ public class GraphqlClientImpl implements GraphqlClient {
     private MetricRegistry metricsRegistry;
     @Reference
     private HttpClientBuilderFactory clientBuilderFactory = HttpClientBuilder::create;
+    @Reference
+    private CircuitBreakerService circuitBreakerService;
 
     private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
@@ -325,42 +335,82 @@ public class GraphqlClientImpl implements GraphqlClient {
         Supplier<Long> stopTimer = metrics.startRequestDurationTimer();
 
         try {
-            return client.execute(buildRequest(request, options), httpResponse -> {
-                StatusLine statusLine = httpResponse.getStatusLine();
-                if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
-                    HttpEntity entity = httpResponse.getEntity();
-                    String json;
-                    try {
-                        json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
-                        Long executionTime = stopTimer.get();
-                        if (executionTime != null) {
-                            LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
+            // We retrieve the circuit breaker for this endpoint
+            CircuitBreaker<Object> circuitBreaker = circuitBreakerService.getCircuitBreaker(configuration.url());
+
+            // We execute the request with the circuit breaker
+            return Failsafe.with(circuitBreaker).get(() -> {
+                try {
+                    return client.execute(buildRequest(request, options), httpResponse -> {
+                        StatusLine statusLine = httpResponse.getStatusLine();
+                        int statusCode = statusLine.getStatusCode();
+
+                        // Check for any 50X server error - only these should create ServerErrorException
+                        if (statusCode >= 500 && statusCode < 600) {
+                            metrics.incrementRequestErrors(statusCode);
+                            String responseBody = EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8);
+                            String errorMessage = String.format("Server error %d: %s", statusCode, statusLine.getReasonPhrase());
+                            LOGGER.warn("Received {} from endpoint {}", errorMessage, configuration.url());
+                            // This is an actual server error, create ServerErrorException to trigger circuit breaker
+                            throw new ServerErrorException(errorMessage, statusCode, responseBody);
                         }
-                    } catch (Exception e) {
-                        metrics.incrementRequestErrors();
-                        throw new RuntimeException("Failed to read HTTP response content", e);
+
+                        if (HttpStatus.SC_OK == statusCode) {
+                            HttpEntity entity = httpResponse.getEntity();
+                            String json;
+                            try {
+                                json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                                Long executionTime = stopTimer.get();
+                                if (executionTime != null) {
+                                    LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
+                                }
+                            } catch (Exception e) {
+                                metrics.incrementRequestErrors();
+                                // Client-side error parsing response, don't create ServerErrorException
+                                throw new RuntimeException("Failed to read HTTP response content", e);
+                            }
+
+                            Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
+                            Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
+                            GraphqlResponse<T, U> response = gson.fromJson(json, type);
+
+                            // We log GraphQL errors because they might otherwise get "silently" unnoticed
+                            if (response.getErrors() != null) {
+                                Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
+                                String errors = gson.toJson(response.getErrors(), listErrorsType);
+                                LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
+                            }
+
+                            return response;
+                        } else {
+                            metrics.incrementRequestErrors(statusCode);
+                            // Client-side error status code, don't create ServerErrorException
+                            throw new RuntimeException("GraphQL query failed with response code " + statusCode);
+                        }
+                    });
+                } catch (IOException e) {
+                    metrics.incrementRequestErrors();
+                    // Network errors, which may indicate service unavailability
+                    String message = e.getMessage();
+                    if (message != null && CircuitBreakerService.isNetworkError(message)) {
+                        // Network connectivity issues should trigger the circuit breaker
+                        LOGGER.warn("Network error connecting to endpoint {}: {}", configuration.url(), message);
+                        throw new ServerErrorException("Network error: " + message, 0, null, e);
                     }
-
-                    Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
-                    Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
-                    GraphqlResponse<T, U> response = gson.fromJson(json, type);
-
-                    // We log GraphQL errors because they might otherwise get "silently" unnoticed
-                    if (response.getErrors() != null) {
-                        Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
-                        String errors = gson.toJson(response.getErrors(), listErrorsType);
-                        LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
-                    }
-
-                    return response;
-                } else {
-                    metrics.incrementRequestErrors(statusLine.getStatusCode());
-                    throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
+                    // Other types of IO exceptions - just pass through
+                    throw e;
                 }
             });
-        } catch (IOException e) {
+        } catch (CircuitBreakerOpenException e) {
+            // Circuit breaker open state
             metrics.incrementRequestErrors();
-            throw new RuntimeException("Failed to send GraphQL request", e);
+            throw new RuntimeException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e);
+        } catch (FailsafeException e) {
+            // All other Failsafe exceptions
+            metrics.incrementRequestErrors();
+
+            // Always use the FailsafeException directly for consistent error handling
+            throw new RuntimeException("Failed to execute GraphQL request: " + e.getMessage(), e);
         }
     }
 
