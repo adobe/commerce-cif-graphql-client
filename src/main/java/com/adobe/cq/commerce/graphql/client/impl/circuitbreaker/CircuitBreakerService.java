@@ -42,16 +42,16 @@ public class CircuitBreakerService {
     private static final String LOG_503_OPEN = "503 circuit breaker OPENED";
     private static final String LOG_503_HALF_OPEN = "503 circuit breaker HALF-OPEN - Current attempt: {}";
     private static final String LOG_503_CLOSED = "503 circuit breaker CLOSED";
+    private static final int SERVICE_UNAVAILABLE_SUCCESS_THRESHOLD = 1;
+    private final CircuitBreaker<Object> serviceUnavailableBreaker;
 
     // Configuration for general 5xx errors
-    private static final int GENERAL_5XX_THRESHOLD = 3;
-    private static final Duration GENERAL_5XX_DELAY = Duration.ofSeconds(10);
+    // Uncomment and configure if you want to handle other 5xx errors with a separate circuit breaker
+    // private static final int GENERAL_5XX_THRESHOLD = 3;
+    // private static final Duration GENERAL_5XX_DELAY = Duration.ofSeconds(10);
+    // private static final int GENERAL_5XX_SUCCESS_THRESHOLD = 1;
+    // private final CircuitBreaker<Object> general5xxBreaker;
 
-    private static final int SERVICE_UNAVAILABLE_SUCCESS_THRESHOLD = 1;
-    private static final int GENERAL_5XX_SUCCESS_THRESHOLD = 1;
-
-    private final CircuitBreaker<Object> serviceUnavailableBreaker;
-    private final CircuitBreaker<Object> general5xxBreaker;
     private int currentAttempt = 1;
 
     public CircuitBreakerService() {
@@ -84,35 +84,36 @@ public class CircuitBreakerService {
             .build();
 
         // Circuit Breaker for other 5xx errors with constant delay
-        this.general5xxBreaker = CircuitBreaker.builder()
-            .handleIf(throwable -> {
-                if (throwable instanceof ServerErrorException) {
-                    ServerErrorException serverError = (ServerErrorException) throwable;
-                    return serverError.getStatusCode() >= 500 && serverError.getStatusCode() != 503;
-                }
-                return false;
-            })
-            .withFailureThreshold(GENERAL_5XX_THRESHOLD)
-            .withDelay(GENERAL_5XX_DELAY)
-            .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
-            .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED"))
-            .withSuccessThreshold(GENERAL_5XX_SUCCESS_THRESHOLD)
-            .build();
+        // Example: 500 Internal Server Error, 502 Bad Gateway, etc.
+        // this.general5xxBreaker = CircuitBreaker.builder()
+        // .handleIf(throwable -> {
+        // if (throwable instanceof ServerErrorException) {
+        // ServerErrorException serverError = (ServerErrorException) throwable;
+        // return serverError.getStatusCode() >= 500 && serverError.getStatusCode() != 503;
+        // }
+        // return false;
+        // })
+        // .withFailureThreshold(GENERAL_5XX_THRESHOLD)
+        // .withDelay(GENERAL_5XX_DELAY)
+        // .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
+        // .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED"))
+        // .withSuccessThreshold(GENERAL_5XX_SUCCESS_THRESHOLD)
+        // .build();
     }
 
     @Activate
     protected void activate() {
         LOGGER.info(
             "Circuit breaker service activated with configuration: " +
-                "503 threshold={}, general 5xx threshold={}",
-            SERVICE_UNAVAILABLE_THRESHOLD, GENERAL_5XX_THRESHOLD);
+                "503 threshold={}",
+            SERVICE_UNAVAILABLE_THRESHOLD);
     }
 
     public <T> T executeWithPolicies(String endpointUrl, java.util.function.Supplier<T> supplier) throws IOException {
         LOGGER.info("Executing request to {}", endpointUrl);
         return Failsafe
             .with(serviceUnavailableBreaker)
-            .compose(general5xxBreaker)
+            // .compose(general5xxBreaker) // Uncomment if you want to use the general 5xx circuit breaker
             .get(supplier::get);
     }
 }
