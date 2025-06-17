@@ -88,14 +88,13 @@ import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import dev.failsafe.CircuitBreaker;
 import dev.failsafe.CircuitBreakerOpenException;
-import dev.failsafe.Failsafe;
 import dev.failsafe.FailsafeException;
 
 @Component(
@@ -335,34 +334,31 @@ public class GraphqlClientImpl implements GraphqlClient {
         Supplier<Long> stopTimer = metrics.startRequestDurationTimer();
 
         try {
-            // Check if fault tolerant fallback is enabled
             if (configuration.enableFaultTolerantFallback()) {
-                // Use fault tolerant mechanism with circuit breaker
-                CircuitBreaker<Object> circuitBreaker = circuitBreakerService.getCircuitBreaker(configuration.url());
-
-                // We execute the request with the circuit breaker (fault tolerant mode)
-                return Failsafe.with(circuitBreaker).get(() -> executeHttpRequest(request, typeOfT, typeofU, options, stopTimer, true));
+                // Execute with fault-tolerant mechanism using circuit breaker policies
+                return circuitBreakerService.executeWithPolicies(
+                    configuration.url(),
+                    () -> {
+                        try {
+                            return executeHttpRequest(request, typeOfT, typeofU, options, stopTimer, true);
+                        } catch (IOException e) {
+                            metrics.incrementRequestErrors();
+                            throw new GraphqlRequestException("Failed to send GraphQL request", e);
+                        }
+                    });
             } else {
-                // Execute without fault tolerant mechanisms (existing flow)
+                // Execute without fault-tolerant mechanisms
                 return executeHttpRequest(request, typeOfT, typeofU, options, stopTimer, false);
             }
         } catch (CircuitBreakerOpenException e) {
-            // Circuit breaker open state (only happens when fault tolerant is enabled)
             metrics.incrementRequestErrors();
-            throw new RuntimeException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e);
+            throw new GraphqlRequestException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e);
         } catch (FailsafeException e) {
-            // All other Failsafe exceptions (only happens when fault tolerant is enabled)
             metrics.incrementRequestErrors();
-            throw new RuntimeException("Failed to execute GraphQL request: " + e.getMessage(), e);
+            throw new GraphqlRequestException("Failed to execute GraphQL request: " + e.getMessage(), e);
         } catch (IOException e) {
-            // Common IOException handling for both fault tolerant and non-fault tolerant modes
             metrics.incrementRequestErrors();
-            String message = e.getMessage();
-            if (configuration.enableFaultTolerantFallback() && message != null && CircuitBreakerService.isNetworkError(message)) {
-                LOGGER.warn("Network error connecting to endpoint {}: {}", configuration.url(), message);
-                throw new RuntimeException("Network error: " + message, e);
-            }
-            throw new RuntimeException("Failed to send GraphQL request", e);
+            throw new GraphqlRequestException("Failed to send GraphQL request", e);
         }
     }
 
@@ -378,6 +374,12 @@ public class GraphqlClientImpl implements GraphqlClient {
                 String responseBody = EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8);
                 String errorMessage = String.format("Server error %d: %s", statusCode, statusLine.getReasonPhrase());
                 LOGGER.warn("Received {} from endpoint {}", errorMessage, configuration.url());
+
+                // Special handling for 503 Service Unavailable
+                if (statusCode == HttpStatus.SC_SERVICE_UNAVAILABLE) {
+                    throw new ServiceUnavailableException(errorMessage, responseBody);
+                }
+
                 throw new ServerErrorException(errorMessage, statusCode, responseBody);
             }
 

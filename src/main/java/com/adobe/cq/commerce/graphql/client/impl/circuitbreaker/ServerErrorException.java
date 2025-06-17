@@ -15,7 +15,10 @@ package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 /**
  * Custom exception for server errors with status code and response body.
- * This is used to capture and analyze server errors in circuit breaker policies.
+ * This exception is used by the circuit breaker policies to differentiate between different types of server errors:
+ * - 503 Service Unavailable errors are handled with a progressive delay policy
+ * - Other 5xx errors are handled with a constant delay policy
+ * Each type of error has its own circuit breaker with specific thresholds and delay strategies.
  */
 public class ServerErrorException extends RuntimeException {
     private final int statusCode;
@@ -25,7 +28,7 @@ public class ServerErrorException extends RuntimeException {
      * Creates a new ServerErrorException with the given message, status code and response body.
      * 
      * @param message The error message
-     * @param statusCode The HTTP status code
+     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      */
     public ServerErrorException(String message, int statusCode, String responseBody) {
@@ -38,7 +41,7 @@ public class ServerErrorException extends RuntimeException {
      * Creates a new ServerErrorException with the given message, status code, response body and cause.
      * 
      * @param message The error message
-     * @param statusCode The HTTP status code
+     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      * @param cause The throwable that caused this exception
      */
@@ -49,7 +52,8 @@ public class ServerErrorException extends RuntimeException {
     }
 
     /**
-     * Gets the HTTP status code.
+     * Gets the HTTP status code. This is used by circuit breaker policies to determine
+     * which handling strategy to apply (progressive delay for 503, constant delay for other 5xx).
      * 
      * @return The HTTP status code
      */
