@@ -71,7 +71,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private static final String USER_AGENT_NAME = "Adobe-CifGraphqlClient";
     static final String PROP_IDENTIFIER = "identifier";
 
-    protected HttpClient client;
+
     protected RequestExecutor executor;
 
     @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
@@ -165,7 +165,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (caches != null) {
             cacheInvalidator = new CacheInvalidator(caches);
         }
-        client = configureHttpClientBuilder().build();
+        HttpClient client = configureHttpClientBuilder().build();
 
         // if fault tolerance is enabled
         executor = new FaultTolerantExecutor(client, metrics, configuration);
@@ -186,13 +186,8 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (registration != null) {
             registration.unregister();
         }
-        if (client instanceof CloseableHttpClient) {
-            try {
-                ((CloseableHttpClient) client).close();
-            } catch (IOException ex) {
-                LOGGER.warn("Failed to close http client: {}", ex.getMessage(), ex);
-            }
-        }
+
+        executor.close();
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {

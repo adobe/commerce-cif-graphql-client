@@ -22,6 +22,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,17 @@ public class DefaultExecutor implements RequestExecutor {
     private void handleErrorResponse(StatusLine statusLine) {
         metrics.incrementRequestErrors(statusLine.getStatusCode());
         throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
+    }
+
+    @Override
+    public void close() {
+        if (client instanceof CloseableHttpClient) {
+            try {
+                ((CloseableHttpClient) client).close();
+            } catch (IOException ex) {
+                LOGGER.warn("Failed to close http client: {}", ex.getMessage(), ex);
+            }
+        }
     }
 
     protected  <T, U> GraphqlResponse<T, U> handleValidResponse(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options, HttpResponse httpResponse) {

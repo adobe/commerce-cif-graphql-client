@@ -22,4 +22,6 @@ import java.lang.reflect.Type;
 public interface RequestExecutor {
 
     <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options);
+
+    void close();
 }
