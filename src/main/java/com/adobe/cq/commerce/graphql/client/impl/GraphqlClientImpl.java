@@ -13,37 +13,18 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Type;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
-
-import javax.net.ssl.SSLContext;
-
+import com.adobe.cq.commerce.graphql.client.*;
+import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
+import com.codahale.metrics.MetricRegistry;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
@@ -52,7 +33,6 @@ import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -63,51 +43,42 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
-import org.apache.http.util.EntityUtils;
 import org.apache.http.util.VersionInfo;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
+import org.osgi.service.component.annotations.*;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.client.CachingStrategy;
-import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
-import com.adobe.cq.commerce.graphql.client.GraphqlClient;
-import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
-import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
-import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
-import com.adobe.cq.commerce.graphql.client.HttpMethod;
-import com.adobe.cq.commerce.graphql.client.RequestOptions;
-import com.codahale.metrics.MetricRegistry;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import javax.net.ssl.SSLContext;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 @Component(service = { GraphqlClient.class })
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
     private static final String USER_AGENT_NAME = "Adobe-CifGraphqlClient";
     static final String PROP_IDENTIFIER = "identifier";
 
     protected HttpClient client;
+    protected RequestExecutor executor;
 
     @Reference(target = "(name=cif)", cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
     private MetricRegistry metricsRegistry;
     @Reference
     private HttpClientBuilderFactory clientBuilderFactory = HttpClientBuilder::create;
 
-    private Gson gson;
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private GraphqlClientMetrics metrics;
     private GraphqlClientConfigurationImpl configuration;
@@ -119,7 +90,6 @@ public class GraphqlClientImpl implements GraphqlClient {
     public void activate(GraphqlClientConfiguration configuration, BundleContext bundleContext)
         throws Exception {
         this.configuration = new GraphqlClientConfigurationImpl(configuration);
-        this.gson = new Gson();
 
         if (this.configuration.socketTimeout() <= 0) {
             LOGGER.warn("Socket timeout set to infinity. This may cause Thread starvation and should be urgently reviewed. Falling back to "
@@ -196,6 +166,11 @@ public class GraphqlClientImpl implements GraphqlClient {
             cacheInvalidator = new CacheInvalidator(caches);
         }
         client = configureHttpClientBuilder().build();
+
+        // if fault tolerance is enabled
+        executor = new FaultTolerantExecutor(client, metrics, configuration);
+        // else
+        executor = new DefaultExecutor(client, metrics, configuration);
 
         Hashtable<String, Object> serviceProps = new Hashtable<>();
         serviceProps.put(PROP_IDENTIFIER, configuration.identifier());
@@ -322,46 +297,7 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query on endpoint '{}': {}", configuration.url(), request.getQuery());
-        Supplier<Long> stopTimer = metrics.startRequestDurationTimer();
-
-        try {
-            return client.execute(buildRequest(request, options), httpResponse -> {
-                StatusLine statusLine = httpResponse.getStatusLine();
-                if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
-                    HttpEntity entity = httpResponse.getEntity();
-                    String json;
-                    try {
-                        json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
-                        Long executionTime = stopTimer.get();
-                        if (executionTime != null) {
-                            LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
-                        }
-                    } catch (Exception e) {
-                        metrics.incrementRequestErrors();
-                        throw new RuntimeException("Failed to read HTTP response content", e);
-                    }
-
-                    Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
-                    Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
-                    GraphqlResponse<T, U> response = gson.fromJson(json, type);
-
-                    // We log GraphQL errors because they might otherwise get "silently" unnoticed
-                    if (response.getErrors() != null) {
-                        Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
-                        String errors = gson.toJson(response.getErrors(), listErrorsType);
-                        LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
-                    }
-
-                    return response;
-                } else {
-                    metrics.incrementRequestErrors(statusLine.getStatusCode());
-                    throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
-                }
-            });
-        } catch (IOException e) {
-            metrics.incrementRequestErrors();
-            throw new RuntimeException("Failed to send GraphQL request", e);
-        }
+        return executor.execute(request, typeOfT, typeofU, options);
     }
 
     HttpClientBuilder configureHttpClientBuilder() throws Exception {
@@ -410,44 +346,6 @@ public class GraphqlClientImpl implements GraphqlClient {
         } // else reuse connections
 
         return httpClientBuilder;
-    }
-
-    private HttpUriRequest buildRequest(GraphqlRequest request, RequestOptions options) throws UnsupportedEncodingException {
-        HttpMethod httpMethod = this.configuration.httpMethod();
-        if (options != null && options.getHttpMethod() != null) {
-            httpMethod = options.getHttpMethod();
-        }
-
-        RequestBuilder rb = RequestBuilder.create(httpMethod.toString()).setUri(configuration.url());
-        rb.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-
-        if (HttpMethod.GET.equals(httpMethod)) {
-            rb.addParameter("query", request.getQuery());
-            if (request.getOperationName() != null) {
-                rb.addParameter("operationName", request.getOperationName());
-            }
-            if (request.getVariables() != null) {
-                String json = gson.toJson(request.getVariables());
-                rb.addParameter("variables", json);
-            }
-        } else {
-            rb.setEntity(new StringEntity(gson.toJson(request), StandardCharsets.UTF_8.name()));
-        }
-
-        for (String httpHeader : configuration.httpHeaders()) {
-            String[] parts = StringUtils.split(httpHeader, ":", 2);
-            if (parts.length == 2 && StringUtils.isNoneBlank(parts[0], parts[1])) {
-                rb.addHeader(parts[0].trim(), parts[1].trim());
-            }
-        }
-
-        if (options != null && options.getHeaders() != null) {
-            for (Header header : options.getHeaders()) {
-                rb.addHeader(header);
-            }
-        }
-
-        return rb.build();
     }
 
     static class ConfigurableConnectionKeepAliveStrategy implements ConnectionKeepAliveStrategy {
