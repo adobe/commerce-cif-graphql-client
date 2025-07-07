@@ -13,11 +13,11 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.lang.reflect.Type;
+
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
-
-import java.lang.reflect.Type;
 
 public interface RequestExecutor {
 

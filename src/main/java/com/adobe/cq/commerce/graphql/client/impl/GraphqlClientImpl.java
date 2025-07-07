@@ -13,11 +13,18 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import com.adobe.cq.commerce.graphql.client.*;
-import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
-import com.codahale.metrics.MetricRegistry;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import java.lang.reflect.Type;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.SSLContext;
+
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HeaderElement;
@@ -33,7 +40,6 @@ import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeaderElementIterator;
@@ -52,17 +58,11 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.SSLContext;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import com.adobe.cq.commerce.graphql.client.*;
+import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
+import com.codahale.metrics.MetricRegistry;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 @Component(service = { GraphqlClient.class })
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
@@ -70,7 +70,6 @@ public class GraphqlClientImpl implements GraphqlClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
     private static final String USER_AGENT_NAME = "Adobe-CifGraphqlClient";
     static final String PROP_IDENTIFIER = "identifier";
-
 
     protected RequestExecutor executor;
 
@@ -167,9 +166,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         }
         HttpClient client = configureHttpClientBuilder().build();
 
-        // if fault tolerance is enabled
-        executor = new FaultTolerantExecutor(client, metrics, configuration);
-        // else
+        // create the executor
         executor = new DefaultExecutor(client, metrics, configuration);
 
         Hashtable<String, Object> serviceProps = new Hashtable<>();

@@ -13,9 +13,13 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import com.adobe.cq.commerce.graphql.client.*;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.function.Supplier;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.*;
 import org.apache.http.client.HttpClient;
@@ -27,12 +31,9 @@ import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.function.Supplier;
+import com.adobe.cq.commerce.graphql.client.*;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class DefaultExecutor implements RequestExecutor {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultExecutor.class);
@@ -59,7 +60,7 @@ public class DefaultExecutor implements RequestExecutor {
                     return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
                 } else {
                     handleErrorResponse(statusLine);
-                    return  null;
+                    return null;
                 }
             });
         } catch (IOException e) {
@@ -84,7 +85,8 @@ public class DefaultExecutor implements RequestExecutor {
         }
     }
 
-    protected  <T, U> GraphqlResponse<T, U> handleValidResponse(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options, HttpResponse httpResponse) {
+    protected <T, U> GraphqlResponse<T, U> handleValidResponse(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options,
+        HttpResponse httpResponse) {
         HttpEntity entity = httpResponse.getEntity();
         String json;
         try {
