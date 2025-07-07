@@ -60,7 +60,6 @@ public class DefaultExecutor implements RequestExecutor {
                     return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
                 } else {
                     handleErrorResponse(statusLine);
-                    return null;
                 }
             });
         } catch (IOException e) {
