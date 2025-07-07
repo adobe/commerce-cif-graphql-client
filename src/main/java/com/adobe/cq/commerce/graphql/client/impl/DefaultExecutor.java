@@ -59,19 +59,14 @@ public class DefaultExecutor implements RequestExecutor {
                 if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
                     return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
                 } else {
-                    handleErrorResponse(statusLine);
+                    metrics.incrementRequestErrors(statusLine.getStatusCode());
+                    throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
                 }
-                return null;
             });
         } catch (IOException e) {
             metrics.incrementRequestErrors();
             throw new RuntimeException("Failed to send GraphQL request", e);
         }
-    }
-
-    private void handleErrorResponse(StatusLine statusLine) {
-        metrics.incrementRequestErrors(statusLine.getStatusCode());
-        throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
     }
 
     @Override
