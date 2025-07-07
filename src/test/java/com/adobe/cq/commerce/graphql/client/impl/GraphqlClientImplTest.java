@@ -56,6 +56,7 @@ import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.GetQueryMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.HeadersMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.RequestBodyMatcher;
+import com.codahale.metrics.MetricRegistry;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -97,6 +98,7 @@ public class GraphqlClientImplTest {
     private MockGraphqlClientConfiguration mockConfig;
     private CacheInvalidator cacheInvalidator;
     private Field cacheInvalidatorField;
+    private HttpClient httpClient;
 
     @Before
     public void setUp() throws Exception {
@@ -110,7 +112,13 @@ public class GraphqlClientImplTest {
             HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE);
 
         graphqlClient.activate(mockConfig, mock(BundleContext.class));
-        graphqlClient.client = Mockito.mock(HttpClient.class);
+        httpClient = Mockito.mock(HttpClient.class);
+
+        // Create a new executor with the mocked client for testing
+        GraphqlClientMetrics metrics = graphqlClient.getConfiguration() != null ? new GraphqlClientMetricsImpl(new MetricRegistry(),
+            graphqlClient.getConfiguration()) : GraphqlClientMetrics.NOOP;
+        graphqlClient.executor = new DefaultExecutor(httpClient, metrics, graphqlClient.getConfiguration());
+
         // Use reflection to set the private cacheInvalidator field
         cacheInvalidator = mock(CacheInvalidator.class);
         cacheInvalidatorField = GraphqlClientImpl.class.getDeclaredField("cacheInvalidator");
@@ -211,7 +219,7 @@ public class GraphqlClientImplTest {
     public void testInvalidHttpHeadersSkipped() throws Exception {
         // should not be possible in real world, but may happen if a regression is introduced that exposes the setHttpHeaders() of the
         // configuration
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         GraphqlClientConfigurationImpl activeConfig = (GraphqlClientConfigurationImpl) graphqlClient.getConfiguration();
         activeConfig.setHttpHeaders("anything", "", ":Value", "Name: ", "Header: Value");
         graphqlClient.execute(dummy, Data.class, Error.class);
@@ -221,12 +229,12 @@ public class GraphqlClientImplTest {
 
         // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
         HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
     public void testRequestResponse() throws Exception {
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
 
         dummy.setOperationName("customOperation");
         dummy.setVariables(Collections.singletonMap("variableName", "variableValue"));
@@ -235,7 +243,7 @@ public class GraphqlClientImplTest {
         // Check that the query is what we expect
         String body = TestUtils.getResource("sample-graphql-request.json");
         RequestBodyMatcher matcher = new RequestBodyMatcher(body);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
 
         // Check the response data
         assertEquals("Some text", response.getData().text);
@@ -249,7 +257,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testHttpError() throws Exception {
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_SERVICE_UNAVAILABLE);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
@@ -262,7 +270,7 @@ public class GraphqlClientImplTest {
     @Test
     @SuppressWarnings("unchecked")
     public void testHttpClientException() throws Exception {
-        when(graphqlClient.client.execute(any(HttpUriRequest.class), any(ResponseHandler.class))).thenThrow(IOException.class);
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class))).thenThrow(IOException.class);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
@@ -274,7 +282,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testInvalidResponse() throws Exception {
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, String.class, String.class);
@@ -286,7 +294,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testHttpResponseError() throws Exception {
-        TestUtils.setupNullResponse(graphqlClient.client);
+        TestUtils.setupNullResponse(httpClient);
         Exception exception = null;
         try {
             graphqlClient.execute(dummy, String.class, String.class);
@@ -311,7 +319,7 @@ public class GraphqlClientImplTest {
         Gson gson = new GsonBuilder().registerTypeAdapter(Data.class, new CustomDeserializer()).create();
 
         // The response from the JSON data is overwritten by the custom deserializer
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
 
         GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withGson(gson));
         assertEquals("customText", response.getData().text);
@@ -320,7 +328,7 @@ public class GraphqlClientImplTest {
 
     @Test
     public void testHeaders() throws Exception {
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         List<Header> requestHeaders = Collections.singletonList(new BasicHeader("customName", "customValue"));
         graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHeaders(requestHeaders));
 
@@ -331,17 +339,17 @@ public class GraphqlClientImplTest {
 
         // Check that the HTTP client is sending the custom request headers and the headers set in the OSGi config
         HeadersMatcher matcher = new HeadersMatcher(expectedHeaders);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
     public void testGetHttpMethod() throws Exception {
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         graphqlClient.execute(dummy, Data.class, Error.class, new RequestOptions().withHttpMethod(HttpMethod.GET));
 
         // Check that the GraphQL request is properly encoded in the URL
         GetQueryMatcher matcher = new GetQueryMatcher(dummy);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
@@ -351,12 +359,12 @@ public class GraphqlClientImplTest {
         request.setOperationName("MyQuery");
         request.setVariables(Collections.singletonMap("arg", "something"));
 
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         graphqlClient.execute(request, Data.class, Error.class, new RequestOptions().withHttpMethod(HttpMethod.GET));
 
         // Check that the GraphQL request is properly encoded in the URL
         GetQueryMatcher matcher = new GetQueryMatcher(request);
-        Mockito.verify(graphqlClient.client, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.argThat(matcher), Mockito.any(ResponseHandler.class));
     }
 
     @Test
