@@ -61,6 +61,7 @@ public class DefaultExecutor implements RequestExecutor {
                 } else {
                     handleErrorResponse(statusLine);
                 }
+                return null;
             });
         } catch (IOException e) {
             metrics.incrementRequestErrors();

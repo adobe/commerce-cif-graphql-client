@@ -16,6 +16,7 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 
@@ -28,6 +29,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicListHeaderIterator;
@@ -36,7 +38,9 @@ import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
@@ -73,6 +77,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -99,9 +104,12 @@ public class GraphqlClientImplTest {
     private CacheInvalidator cacheInvalidator;
     private Field cacheInvalidatorField;
     private HttpClient httpClient;
+    @Mock
+    private org.slf4j.Logger logger;
 
     @Before
     public void setUp() throws Exception {
+        MockitoAnnotations.initMocks(this);
         graphqlClient = new GraphqlClientImpl();
 
         mockConfig = new MockGraphqlClientConfiguration();
@@ -442,6 +450,54 @@ public class GraphqlClientImplTest {
         cacheInvalidatorField.set(graphqlClient, null);
         graphqlClient.invalidateCache(null, null, null);
         verify(cacheInvalidator, never()).invalidateCache(anyString(), any(), any());
+    }
+
+    @Test
+    public void testCloseableHttpClientIsClosed() throws IOException {
+        // given
+        CloseableHttpClient closeableHttpClient = mock(CloseableHttpClient.class);
+        addExecutor(closeableHttpClient, graphqlClient);
+        // Setup logger capture
+        setLoggerField();
+
+        // First call - should work normally
+        graphqlClient.executor.close();
+        verify(closeableHttpClient).close();
+        verify(logger, never()).warn(anyString(), anyString(), any(IOException.class));
+
+        // Reset mock
+        Mockito.reset(closeableHttpClient);
+
+        // Configure mock to throw exception
+        doThrow(new IOException("Connection reset")).when(closeableHttpClient).close();
+
+        // when - should call close() and trigger exception
+        graphqlClient.executor.close();
+
+        // then - verify close() was called and warning was logged
+        verify(closeableHttpClient).close();
+        verify(logger).warn(eq("Failed to close http client: {}"), eq("Connection reset"), any(IOException.class));
+    }
+
+    private void setLoggerField() {
+        try {
+            Field loggerField = DefaultExecutor.class.getDeclaredField("LOGGER");
+            loggerField.setAccessible(true);
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(loggerField, loggerField.getModifiers() & ~Modifier.FINAL);
+            loggerField.set(null, logger);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to set logger field", e);
+        }
+    }
+
+    // This method is used to add an executor to the GraphqlClientImpl instance.
+    private void addExecutor(HttpClient httpClient, GraphqlClientImpl graphqlClient) {
+        GraphqlClientMetrics metrics = graphqlClient.getConfiguration() != null ? new GraphqlClientMetricsImpl(new MetricRegistry(),
+            graphqlClient.getConfiguration()) : GraphqlClientMetrics.NOOP;
+        graphqlClient.executor = new DefaultExecutor(httpClient, metrics, graphqlClient.getConfiguration());
     }
 
     private void prepareResponse(HttpResponse httpResponse, String responseKeepAlive) {
