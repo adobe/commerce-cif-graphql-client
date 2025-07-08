@@ -49,6 +49,8 @@ public class GraphqlClientImplMetricsTest {
     private final GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
     private final GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
 
+    private HttpClient httpClient;
+
     private static class Data {}
 
     private static class Error {}
@@ -60,13 +62,17 @@ public class GraphqlClientImplMetricsTest {
         aemContext.registerInjectActivateService(graphqlClient,
             "identifier", "default",
             "url", "https://foo.bar/api");
-        graphqlClient.client = mock(HttpClient.class);
+        httpClient = mock(HttpClient.class);
+
+        // Create a new executor with the mocked client for testing
+        GraphqlClientMetrics metrics = new GraphqlClientMetricsImpl(metricRegistry, graphqlClient.getConfiguration());
+        graphqlClient.executor = new DefaultExecutor(httpClient, metrics, graphqlClient.getConfiguration());
     }
 
     @Test
     public void testRequestDurationTracked() throws IOException {
         // given
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
 
         // when
         graphqlClient.execute(dummy, Data.class, Error.class);
@@ -80,7 +86,7 @@ public class GraphqlClientImplMetricsTest {
     @Test
     public void testCacheMetricsAddedAndRemovedForMultipleCaches() throws IOException {
         // given
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
             "identifier", "default",
             "url", "https://foo.bar/api",
@@ -117,7 +123,7 @@ public class GraphqlClientImplMetricsTest {
     @Test
     public void testConnectionPoolMetricsAddedAndRemoved() throws IOException {
         // given
-        TestUtils.setupHttpResponse("sample-graphql-response.json", graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
         MockOsgi.activate(graphqlClient, aemContext.bundleContext(),
             "identifier", "default", "url", "https://example.com");
 
@@ -139,7 +145,7 @@ public class GraphqlClientImplMetricsTest {
     @Test
     public void testRequestDurationNotTrackedOnClientError() throws IOException {
         // given
-        doThrow(new IOException()).when(graphqlClient.client).execute(any(), any(ResponseHandler.class));
+        doThrow(new IOException()).when(httpClient).execute(any(), any(ResponseHandler.class));
 
         // when
         try {
@@ -167,7 +173,7 @@ public class GraphqlClientImplMetricsTest {
                 throw new IOException();
             }
         };
-        TestUtils.setupHttpResponse(is, graphqlClient.client, HttpStatus.SC_OK);
+        TestUtils.setupHttpResponse(is, httpClient, HttpStatus.SC_OK);
 
         // when
         try {
@@ -189,7 +195,7 @@ public class GraphqlClientImplMetricsTest {
     @Test
     public void testErrorCodeTrackedWithStatus() throws IOException {
         // given
-        TestUtils.setupHttpResponse(mock(InputStream.class), graphqlClient.client, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+        TestUtils.setupHttpResponse(mock(InputStream.class), httpClient, HttpStatus.SC_INTERNAL_SERVER_ERROR);
 
         // when
         try {
