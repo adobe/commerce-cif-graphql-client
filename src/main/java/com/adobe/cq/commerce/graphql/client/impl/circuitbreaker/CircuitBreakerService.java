@@ -44,7 +44,7 @@ public class CircuitBreakerService {
 
     // Configuration for general 5xx errors
     private static final int GENERAL_5XX_THRESHOLD = 3;
-    private static final Duration GENERAL_5XX_DELAY = Duration.ofSeconds(100);
+    private static final Duration GENERAL_5XX_DELAY = Duration.ofSeconds(10);
     private static final int GENERAL_5XX_SUCCESS_THRESHOLD = 1;
     private final CircuitBreaker<Object> general5xxBreaker;
 
