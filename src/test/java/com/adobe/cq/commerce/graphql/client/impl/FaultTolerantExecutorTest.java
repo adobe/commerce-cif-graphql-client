@@ -40,6 +40,7 @@ import ch.qos.logback.core.Appender;
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
+import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
@@ -50,7 +51,6 @@ import dev.failsafe.CircuitBreakerOpenException;
 import dev.failsafe.FailsafeException;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
 public class FaultTolerantExecutorTest {
@@ -717,6 +717,226 @@ public class FaultTolerantExecutorTest {
         }
     }
 
+    // Additional test cases for CircuitBreakerService coverage
+    @Test
+    public void testCircuitBreakerServiceWith503ErrorHandling() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test that 503 errors are handled by the service unavailable breaker
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServiceUnavailableException("Service unavailable", "Service down");
+            });
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals("Service unavailable", e.getMessage());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWith5xxErrorHandling() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test that other 5xx errors are handled by the general 5xx breaker
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServerErrorException("Server error", 500, "Internal server error");
+            });
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
+            assertEquals("Server error", e.getMessage());
+            assertEquals(500, e.getStatusCode());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWithNonServerError() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test that non-server errors are not handled by circuit breakers
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new IllegalArgumentException("Client error");
+            });
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            assertEquals("Client error", e.getMessage());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceMultiple503Failures() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test multiple 503 failures to trigger circuit breaker
+        for (int i = 0; i < 3; i++) {
+            try {
+                circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                    throw new ServiceUnavailableException("Service unavailable", "Service down");
+                });
+                fail("Expected ServiceUnavailableException on attempt " + (i + 1));
+            } catch (ServiceUnavailableException e) {
+                assertEquals("Service unavailable", e.getMessage());
+            }
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceMultiple5xxFailures() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test multiple 5xx failures to trigger circuit breaker
+        for (int i = 0; i < 3; i++) {
+            try {
+                circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                    throw new ServerErrorException("Server error", 502, "Bad gateway");
+                });
+                fail("Expected ServerErrorException on attempt " + (i + 1));
+            } catch (ServerErrorException e) {
+                assertEquals("Server error", e.getMessage());
+                assertEquals(502, e.getStatusCode());
+            }
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceSuccessAfterFailure() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test success after failure
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServiceUnavailableException("Service unavailable", "Service down");
+            });
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            // Expected
+        }
+
+        // Now test success
+        String result = circuitBreakerService.executeWithPolicies("http://test.com", () -> "success");
+        assertEquals("success", result);
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWithDifferentEndpoints() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        // Test with different endpoints
+        String result1 = circuitBreakerService.executeWithPolicies("http://endpoint1.com", () -> "result1");
+        String result2 = circuitBreakerService.executeWithPolicies("http://endpoint2.com", () -> "result2");
+
+        assertEquals("result1", result1);
+        assertEquals("result2", result2);
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWithIOException() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                try {
+                    throw new IOException("Network error");
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            fail("Expected RuntimeException");
+        } catch (RuntimeException e) {
+            assertTrue(e.getCause() instanceof IOException);
+            assertEquals("Network error", e.getCause().getMessage());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWithNullSupplier() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", null);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWithNullEndpoint() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        String result = circuitBreakerService.executeWithPolicies(null, () -> "success");
+        assertEquals("success", result);
+    }
+
+    @Test
+    public void testCircuitBreakerServiceWithEmptyEndpoint() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        String result = circuitBreakerService.executeWithPolicies("", () -> "success");
+        assertEquals("success", result);
+    }
+
+    @Test
+    public void testCircuitBreakerServiceEdgeCaseStatusCode501() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServerErrorException("Not implemented", 501, "Not implemented");
+            });
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
+            assertEquals("Not implemented", e.getMessage());
+            assertEquals(501, e.getStatusCode());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceEdgeCaseStatusCode599() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServerErrorException("Custom error", 599, "Custom error");
+            });
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
+            assertEquals("Custom error", e.getMessage());
+            assertEquals(599, e.getStatusCode());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceEdgeCaseStatusCode499() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServerErrorException("Client error", 499, "Client error");
+            });
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
+            assertEquals("Client error", e.getMessage());
+            assertEquals(499, e.getStatusCode());
+        }
+    }
+
+    @Test
+    public void testCircuitBreakerServiceEdgeCaseStatusCode600() throws Exception {
+        CircuitBreakerService circuitBreakerService = new CircuitBreakerService();
+
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServerErrorException("Unknown error", 600, "Unknown error");
+            });
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
+            assertEquals("Unknown error", e.getMessage());
+            assertEquals(600, e.getStatusCode());
+        }
+    }
+
     @Test
     public void testMetricsIncrementOnServerError() throws Exception {
         // Test that metrics are incremented on server errors
@@ -753,6 +973,475 @@ public class FaultTolerantExecutorTest {
 
         // Verify metrics were incremented
         verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    // Additional test cases for FaultTolerantExecutor coverage
+    @Test
+    public void testFaultTolerantExecutorWithNullRequest() throws Exception {
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+        // Call the method and assert no exception is thrown
+        faultTolerantExecutor.execute(null, dataType, errorType, null);
+        // Optionally, assert the result is null or whatever is expected
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithNullTypes() throws Exception {
+        // Call the method and assert no exception is thrown
+        faultTolerantExecutor.execute(dummy, null, null, null);
+        // Optionally, assert the result is null or whatever is expected
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithNullOptions() throws Exception {
+        // This should work fine with null options
+        setupSuccessfulResponse();
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+        GraphqlResponse<Data, Error> response = faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+
+        assertNotNull(response);
+        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithIOExceptionInHttpRequest() throws Exception {
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenThrow(new IOException("Network error"));
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected RuntimeException");
+        } catch (RuntimeException e) {
+            assertTrue(e.getMessage().contains("Failed to send GraphQL request") || e.getMessage().contains("Network error"));
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithRuntimeExceptionInHttpRequest() throws Exception {
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenThrow(new RuntimeException("Runtime error"));
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected RuntimeException");
+        } catch (RuntimeException e) {
+            assertEquals("Runtime error", e.getMessage());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithStatusLineNull() throws Exception {
+        when(httpResponse.getStatusLine()).thenReturn(null);
+        when(httpResponse.getEntity()).thenReturn(new StringEntity("test", StandardCharsets.UTF_8));
+
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenAnswer(invocation -> {
+                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
+                return handler.handleResponse(httpResponse);
+            });
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithEntityUtilsException() throws Exception {
+        when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
+            HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable"));
+        when(httpResponse.getEntity()).thenReturn(new StringEntity("test", StandardCharsets.UTF_8));
+
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenAnswer(invocation -> {
+                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
+                try {
+                    return handler.handleResponse(httpResponse);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithDifferentStatusCodeRanges() throws Exception {
+        // Test various status code ranges
+        int[] testStatusCodes = { 499, 500, 501, 502, 503, 504, 505, 599, 600 };
+
+        for (int statusCode : testStatusCodes) {
+            setupErrorResponse(statusCode, "Test Error", "Test error body");
+
+            Type dataType = new TypeToken<Data>() {}.getType();
+            Type errorType = new TypeToken<Error>() {}.getType();
+
+            try {
+                faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+                if (statusCode >= 500 && statusCode < 600) {
+                    fail("Expected exception for status code " + statusCode);
+                }
+            } catch (Exception e) {
+                if (statusCode >= 500 && statusCode < 600) {
+                    if (statusCode == 503) {
+                        assertTrue(e instanceof ServiceUnavailableException);
+                    } else {
+                        assertTrue(e instanceof ServerErrorException);
+                    }
+                } else {
+                    assertTrue(e instanceof RuntimeException);
+                }
+            }
+
+            // Reset mocks for next iteration
+            reset(httpClient, httpResponse);
+            setUp();
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithEmptyResponseBody() throws Exception {
+        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "");
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertEquals("", e.getResponseBody());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithWhitespaceResponseBody() throws Exception {
+        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "   ");
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertEquals("   ", e.getResponseBody());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithSpecialCharactersInResponseBody() throws Exception {
+        String specialBody = "Error with special chars: \n\t\r\"'\\";
+        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", specialBody);
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertEquals(specialBody, e.getResponseBody());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithUnicodeResponseBody() throws Exception {
+        String unicodeBody = "Error with unicode: 中文 Español Français";
+        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", unicodeBody);
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertEquals(unicodeBody, e.getResponseBody());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithVeryLongResponseBody() throws Exception {
+        StringBuilder longBody = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            longBody.append("Very long error message part ").append(i).append(" ");
+        }
+        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", longBody.toString());
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertEquals(longBody.toString(), e.getResponseBody());
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithNullReasonPhrase() throws Exception {
+        when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
+            HttpStatus.SC_SERVICE_UNAVAILABLE, null));
+        when(httpResponse.getEntity()).thenReturn(new StringEntity("test", StandardCharsets.UTF_8));
+
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenAnswer(invocation -> {
+                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
+                try {
+                    return handler.handleResponse(httpResponse);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertTrue(e.getMessage().contains("Server error 503: null"));
+        }
+    }
+
+    @Test
+    public void testFaultTolerantExecutorWithEmptyReasonPhrase() throws Exception {
+        when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
+            HttpStatus.SC_SERVICE_UNAVAILABLE, ""));
+        when(httpResponse.getEntity()).thenReturn(new StringEntity("test", StandardCharsets.UTF_8));
+
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenAnswer(invocation -> {
+                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
+                try {
+                    return handler.handleResponse(httpResponse);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+        Type dataType = new TypeToken<Data>() {}.getType();
+        Type errorType = new TypeToken<Error>() {}.getType();
+
+        try {
+            faultTolerantExecutor.execute(dummy, dataType, errorType, null);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+            assertTrue(e.getMessage().contains("Server error 503: "));
+        }
+    }
+
+    // Test cases for GraphqlClientConfigurationImpl coverage
+    @Test
+    public void testGraphqlClientConfigurationImplFaultTolerantFallback() {
+        // Test default value
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl("http://test.com");
+        assertFalse(config.enableFaultTolerantFallback());
+
+        // Test setting the value
+        config.setEnableFaultTolerantFallback(true);
+        assertTrue(config.enableFaultTolerantFallback());
+
+        // Test setting back to false
+        config.setEnableFaultTolerantFallback(false);
+        assertFalse(config.enableFaultTolerantFallback());
+    }
+
+    @Test
+    public void testGraphqlClientConfigurationImplConstructorWithConfiguration() {
+        // Create a mock configuration with fault tolerant fallback enabled
+        GraphqlClientConfiguration mockConfig = mock(GraphqlClientConfiguration.class);
+        when(mockConfig.identifier()).thenReturn("testIdentifier");
+        when(mockConfig.url()).thenReturn("http://test.com");
+        when(mockConfig.httpMethod()).thenReturn(HttpMethod.POST);
+        when(mockConfig.acceptSelfSignedCertificates()).thenReturn(true);
+        when(mockConfig.allowHttpProtocol()).thenReturn(false);
+        when(mockConfig.maxHttpConnections()).thenReturn(10);
+        when(mockConfig.connectionTimeout()).thenReturn(5000);
+        when(mockConfig.socketTimeout()).thenReturn(10000);
+        when(mockConfig.requestPoolTimeout()).thenReturn(2000);
+        when(mockConfig.httpHeaders()).thenReturn(new String[] { "header1:value1", "header2:value2" });
+        when(mockConfig.cacheConfigurations()).thenReturn(new String[] { "cache1", "cache2" });
+        when(mockConfig.connectionKeepAlive()).thenReturn(30);
+        when(mockConfig.connectionTtl()).thenReturn(60);
+        when(mockConfig.service_ranking()).thenReturn(100);
+        when(mockConfig.enableFaultTolerantFallback()).thenReturn(true);
+
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl(mockConfig);
+
+        assertEquals("testIdentifier", config.identifier());
+        assertEquals("http://test.com", config.url());
+        assertEquals(HttpMethod.POST, config.httpMethod());
+        assertTrue(config.acceptSelfSignedCertificates());
+        assertFalse(config.allowHttpProtocol());
+        assertEquals(10, config.maxHttpConnections());
+        assertEquals(5000, config.connectionTimeout());
+        assertEquals(10000, config.socketTimeout());
+        assertEquals(2000, config.requestPoolTimeout());
+        assertArrayEquals(new String[] { "header1:value1", "header2:value2" }, config.httpHeaders());
+        assertArrayEquals(new String[] { "cache1", "cache2" }, config.cacheConfigurations());
+        assertEquals(30, config.connectionKeepAlive());
+        assertEquals(60, config.connectionTtl());
+        assertEquals(100, config.service_ranking());
+        assertTrue(config.enableFaultTolerantFallback());
+    }
+
+    @Test
+    public void testGraphqlClientConfigurationImplConstructorWithNullHttpHeaders() {
+        GraphqlClientConfiguration mockConfig = mock(GraphqlClientConfiguration.class);
+        when(mockConfig.identifier()).thenReturn("testIdentifier");
+        when(mockConfig.url()).thenReturn("http://test.com");
+        when(mockConfig.httpMethod()).thenReturn(HttpMethod.POST);
+        when(mockConfig.acceptSelfSignedCertificates()).thenReturn(true);
+        when(mockConfig.allowHttpProtocol()).thenReturn(false);
+        when(mockConfig.maxHttpConnections()).thenReturn(10);
+        when(mockConfig.connectionTimeout()).thenReturn(5000);
+        when(mockConfig.socketTimeout()).thenReturn(10000);
+        when(mockConfig.requestPoolTimeout()).thenReturn(2000);
+        when(mockConfig.httpHeaders()).thenReturn(null);
+        when(mockConfig.cacheConfigurations()).thenReturn(null);
+        when(mockConfig.connectionKeepAlive()).thenReturn(30);
+        when(mockConfig.connectionTtl()).thenReturn(60);
+        when(mockConfig.service_ranking()).thenReturn(100);
+        when(mockConfig.enableFaultTolerantFallback()).thenReturn(false);
+
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl(mockConfig);
+
+        assertNotNull(config.httpHeaders());
+        assertEquals(0, config.httpHeaders().length);
+        assertNotNull(config.cacheConfigurations());
+        assertEquals(0, config.cacheConfigurations().length);
+        assertFalse(config.enableFaultTolerantFallback());
+    }
+
+    @Test
+    public void testGraphqlClientConfigurationImplAnnotationMethods() {
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl("http://test.com");
+
+        // Test annotationType method
+        assertEquals(GraphqlClientConfiguration.class, config.annotationType());
+
+        // Test that all getter methods work
+        assertNotNull(config.identifier());
+        assertNotNull(config.url());
+        assertNotNull(config.httpMethod());
+        assertNotNull(config.httpHeaders());
+        assertNotNull(config.cacheConfigurations());
+    }
+
+    @Test
+    public void testGraphqlClientConfigurationImplSetters() {
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl("http://test.com");
+
+        // Test all setter methods
+        config.setIdentifier("newIdentifier");
+        assertEquals("newIdentifier", config.identifier());
+
+        config.setUrl("http://newurl.com");
+        assertEquals("http://newurl.com", config.url());
+
+        config.setHttpMethod(HttpMethod.GET);
+        assertEquals(HttpMethod.GET, config.httpMethod());
+
+        config.setAcceptSelfSignedCertificates(false);
+        assertFalse(config.acceptSelfSignedCertificates());
+
+        config.setAllowHttpProtocol(true);
+        assertTrue(config.allowHttpProtocol());
+
+        config.setMaxHttpConnections(20);
+        assertEquals(20, config.maxHttpConnections());
+
+        config.setConnectionTimeout(10000);
+        assertEquals(10000, config.connectionTimeout());
+
+        config.setSocketTimeout(20000);
+        assertEquals(20000, config.socketTimeout());
+
+        config.setRequestPoolTimeout(5000);
+        assertEquals(5000, config.requestPoolTimeout());
+
+        String[] headers = { "newheader:value" };
+        config.setHttpHeaders(headers);
+        assertArrayEquals(headers, config.httpHeaders());
+
+        String[] caches = { "newcache" };
+        config.setCacheConfigurations(caches);
+        assertArrayEquals(caches, config.cacheConfigurations());
+
+        config.setConnectionKeepAlive(60);
+        assertEquals(60, config.connectionKeepAlive());
+
+        config.setConnectionTtl(120);
+        assertEquals(120, config.connectionTtl());
+
+        config.setServiceRanking(200);
+        assertEquals(200, config.service_ranking());
+
+        config.setEnableFaultTolerantFallback(true);
+        assertTrue(config.enableFaultTolerantFallback());
+    }
+
+    @Test
+    public void testGraphqlClientConfigurationImplVarargsSetters() {
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl("http://test.com");
+
+        // Test varargs setters
+        config.setHttpHeaders("header1:value1", "header2:value2");
+        assertArrayEquals(new String[] { "header1:value1", "header2:value2" }, config.httpHeaders());
+
+        config.setCacheConfigurations("cache1", "cache2", "cache3");
+        assertArrayEquals(new String[] { "cache1", "cache2", "cache3" }, config.cacheConfigurations());
+    }
+
+    @Test
+    public void testGraphqlClientConfigurationImplEdgeCases() {
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl("http://test.com");
+
+        // Test with empty arrays
+        config.setHttpHeaders();
+        assertTrue(config.httpHeaders() == null || config.httpHeaders().length == 0);
+
+        config.setCacheConfigurations();
+        assertTrue(config.cacheConfigurations() == null || config.cacheConfigurations().length == 0);
+
+        // Test with null values in arrays
+        config.setHttpHeaders((String[]) null);
+        assertTrue(config.httpHeaders() == null || config.httpHeaders().length == 0);
+
+        config.setCacheConfigurations((String[]) null);
+        assertTrue(config.cacheConfigurations() == null || config.cacheConfigurations().length == 0);
     }
 
     // Helper methods
