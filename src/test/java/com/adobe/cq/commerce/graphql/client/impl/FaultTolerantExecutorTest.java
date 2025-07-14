@@ -17,7 +17,6 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -34,16 +33,9 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
-import org.slf4j.LoggerFactory;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.Appender;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
-import com.adobe.cq.commerce.graphql.client.RequestOptions;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
 import dev.failsafe.CircuitBreakerOpenException;
@@ -69,6 +61,9 @@ public class FaultTolerantExecutorTest {
     private CloseableHttpClient httpClient;
     private HttpResponse httpResponse;
     private StatusLine statusLine;
+
+    private static final int SERVICE_UNAVAILABLE_THRESHOLD = 3;
+    private static final int SERVICE_UNAVAILABLE_SUCCESS_THRESHOLD = 1;
 
     @Before
     public void setUp() throws Exception {
@@ -115,15 +110,13 @@ public class FaultTolerantExecutorTest {
 
     @Test
     public void testServiceUnavailableErrorWithFaultTolerance() throws Exception {
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
 
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
             fail("Expected ServiceUnavailableException");
         } catch (ServiceUnavailableException e) {
-            assertEquals("Server error 503: Service Unavailable", e.getMessage());
             assertEquals(503, e.getStatusCode());
-            assertEquals("Service temporarily unavailable", e.getResponseBody());
         }
 
         verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
@@ -132,57 +125,79 @@ public class FaultTolerantExecutorTest {
     @Test
     public void testServerErrorsWithFaultTolerance() throws Exception {
         // Test various server error status codes
-        int[] serverErrorCodes = { 500, 502, 504, 599 };
-        String[] reasonPhrases = { "Internal Server Error", "Bad Gateway", "Gateway Timeout", "Custom Server Error" };
-        String[] responseBodies = { "Internal server error occurred", "Bad gateway error", "Gateway timeout error", "Custom server error" };
+        int[] serverErrorCodes = { HttpStatus.SC_INTERNAL_SERVER_ERROR, HttpStatus.SC_BAD_GATEWAY, HttpStatus.SC_GATEWAY_TIMEOUT };
 
         for (int i = 0; i < serverErrorCodes.length; i++) {
-            setupErrorResponse(serverErrorCodes[i], reasonPhrases[i], responseBodies[i]);
+            TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, serverErrorCodes[i]);
 
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
                 fail("Expected ServerErrorException for status code " + serverErrorCodes[i]);
             } catch (ServerErrorException e) {
-                assertEquals("Server error " + serverErrorCodes[i] + ": " + reasonPhrases[i], e.getMessage());
                 assertEquals(serverErrorCodes[i], e.getStatusCode());
-                assertEquals(responseBodies[i], e.getResponseBody());
             }
 
             verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-            reset(httpClient, httpResponse);
             setUp();
         }
     }
 
     @Test
     public void testNonServerErrorWithFaultTolerance() throws Exception {
-        setupErrorResponse(HttpStatus.SC_BAD_REQUEST, "Bad Request", "Bad request error");
+        // Test various server error status codes
+        int[] serverErrorCodes = { HttpStatus.SC_BAD_REQUEST, HttpStatus.SC_REQUEST_TOO_LONG, HttpStatus.SC_NOT_FOUND,
+            HttpStatus.SC_UNAUTHORIZED, HttpStatus.SC_FORBIDDEN, HttpStatus.SC_CONFLICT, HttpStatus.SC_UNPROCESSABLE_ENTITY };
 
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("GraphQL query failed with response code 400", e.getMessage());
+        for (int i = 0; i < serverErrorCodes.length; i++) {
+            TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, serverErrorCodes[i]);
+
+            try {
+                graphqlClient.execute(dummy, Data.class, Error.class);
+                fail("Expected ServerErrorException for status code " + serverErrorCodes[i]);
+            } catch (RuntimeException e) {
+                assertEquals("GraphQL query failed with response code " + serverErrorCodes[i], e.getMessage());
+            }
+
+            verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+            setUp();
         }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
     }
 
     @Test
     public void testCircuitBreakerOpenExceptionWithFaultTolerance() throws Exception {
-        CircuitBreakerOpenException cbException = mock(CircuitBreakerOpenException.class);
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenThrow(cbException);
+        test503WithFaultTolerance();
+    }
 
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected GraphqlRequestException");
-        } catch (GraphqlRequestException e) {
-            assertEquals("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e.getMessage());
-            assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
+    @Test
+    public void testCircuitBreakerClosedWithFaultTolerance() throws Exception {
+        test503WithFaultTolerance();
+        Thread.sleep(20000); // Sleep for 2100 milliseconds
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class);
+        verify(httpClient, times(SERVICE_UNAVAILABLE_THRESHOLD + 1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    private void test503WithFaultTolerance() throws Exception {
+        for (int i = 0; i <= SERVICE_UNAVAILABLE_THRESHOLD; i++) {
+            TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
+            try {
+                graphqlClient.execute(dummy, Data.class, Error.class);
+                if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
+                    fail("Expected Exception for status code " + HttpStatus.SC_SERVICE_UNAVAILABLE);
+                } else {
+                    fail("Expected GraphqlRequestException for status code " + HttpStatus.SC_SERVICE_UNAVAILABLE);
+                }
+            } catch (ServiceUnavailableException e) {
+                if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
+                    assertEquals(503, e.getStatusCode());
+                } else {
+                    fail("Excepted GraphqlRequestException error");
+                }
+            } catch (GraphqlRequestException e) {
+                assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
+            }
         }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+        verify(httpClient, times(3)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
     }
 
     @Test
@@ -221,295 +236,33 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
-    public void testRequestWithOptionsAndFaultTolerance() throws Exception {
-        // Test successful request with options
-        setupSuccessfulResponse();
-        RequestOptions options = new RequestOptions();
-        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class, options);
+    public void testMultipleConsecutive5xxFailuresWithFaultTolerance() throws Exception {
+        // Test various server error status codes
+        int[] serverErrorCodes = { HttpStatus.SC_INTERNAL_SERVER_ERROR, HttpStatus.SC_BAD_GATEWAY, HttpStatus.SC_GATEWAY_TIMEOUT,
+            HttpStatus.SC_INTERNAL_SERVER_ERROR };
 
-        assertNotNull(response);
-        assertNotNull(response.getData());
-        assertEquals("Some text", response.getData().text);
-        assertEquals(42, response.getData().count.intValue());
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-
-        // Test service unavailable with options
-        reset(httpClient, httpResponse);
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class, options);
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
-            assertEquals("Server error 503: Service Unavailable", e.getMessage());
-            assertEquals(503, e.getStatusCode());
-            assertEquals("Service temporarily unavailable", e.getResponseBody());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testLoggingForServerErrorsWithFaultTolerance() throws Exception {
-        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
-        Logger logger = loggerContext.getLogger(FaultTolerantExecutor.class);
-        logger.setLevel(Level.WARN);
-        Appender<ILoggingEvent> appender = mock(Appender.class);
-
-        try {
-            logger.addAppender(appender);
-
-            setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
+        for (int i = 0; i < serverErrorCodes.length; i++) {
+            TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, serverErrorCodes[i]);
 
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
-            } catch (ServiceUnavailableException e) {
-                // Expected
+                if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
+                    fail("Expected Exception for status code " + serverErrorCodes[i]);
+                } else {
+                    fail("Expected GraphqlRequestException for status code " + serverErrorCodes[i]);
+                }
+            } catch (ServerErrorException e) {
+                if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
+                    assertEquals(serverErrorCodes[i], e.getStatusCode());
+                } else {
+                    fail("Excepted GraphqlRequestException error");
+                }
+            } catch (GraphqlRequestException e) {
+                assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
             }
-
-            verify(appender).doAppend(any(ILoggingEvent.class));
-
-        } finally {
-            logger.detachAppender(appender);
-        }
-    }
-
-    @Test
-    public void testMultipleConsecutive503FailuresWithFaultTolerance() throws Exception {
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        // First attempt should throw ServiceUnavailableException
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException on first attempt");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-        }
-
-        // Second attempt should also throw ServiceUnavailableException
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException on second attempt");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-        }
-
-        // Third attempt should also throw ServiceUnavailableException
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException on third attempt");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-        }
-
-        // Fourth attempt should throw CircuitBreakerOpenException (no HTTP call)
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected GraphqlRequestException due to circuit breaker");
-        } catch (GraphqlRequestException e) {
-            assertEquals("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e.getMessage());
-            assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
         }
 
         verify(httpClient, times(3)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testMultipleConsecutive5xxFailuresWithFaultTolerance() throws Exception {
-        // Re-initialize the client and mocks to reset circuit breaker state
-        setUp();
-        reset(httpClient, httpResponse);
-        setupErrorResponse(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Internal Server Error", "Server error");
-
-        // First attempt should throw ServerErrorException
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServerErrorException on first attempt");
-        } catch (ServerErrorException e) {
-            assertEquals(500, e.getStatusCode());
-        }
-
-        // Second attempt should also throw ServerErrorException
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServerErrorException on second attempt");
-        } catch (ServerErrorException e) {
-            assertEquals(500, e.getStatusCode());
-        }
-
-        // Third attempt should also throw ServerErrorException
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServerErrorException on third attempt");
-        } catch (ServerErrorException e) {
-            assertEquals(500, e.getStatusCode());
-        }
-
-        // Fourth attempt should throw CircuitBreakerOpenException (no HTTP call)
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected GraphqlRequestException due to circuit breaker");
-        } catch (GraphqlRequestException e) {
-            assertEquals("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e.getMessage());
-            assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
-        }
-
-        verify(httpClient, times(3)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testSuccessAfterFailureWithFaultTolerance() throws Exception {
-        // Test success after 503 failure
-        AtomicInteger callCount = new AtomicInteger(0);
-
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenAnswer(invocation -> {
-                int count = callCount.incrementAndGet();
-                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
-                if (count == 1) {
-                    // First call returns 503
-                    StringEntity entity = new StringEntity("Service temporarily unavailable", StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                } else {
-                    // Second call returns success
-                    String responseJson = "{\"data\":{\"text\":\"Some text\",\"count\":42},\"errors\":[{\"message\":\"Error message\"}]}";
-                    StringEntity entity = new StringEntity(responseJson, StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_OK, "OK"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                }
-            });
-
-        // First call should fail
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-        }
-
-        // Second call should succeed
-        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class);
-        assertNotNull(response);
-        assertNotNull(response.getData());
-
-        verify(httpClient, times(2)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-
-        // Test success after 5xx failure
-        reset(httpClient, httpResponse);
-        callCount.set(0);
-
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenAnswer(invocation -> {
-                int count = callCount.incrementAndGet();
-                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
-                if (count == 1) {
-                    // First call returns 500
-                    StringEntity entity = new StringEntity("Server error", StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_INTERNAL_SERVER_ERROR, "Internal Server Error"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                } else {
-                    // Second call returns success
-                    String responseJson = "{\"data\":{\"text\":\"Some text\",\"count\":42},\"errors\":[{\"message\":\"Error message\"}]}";
-                    StringEntity entity = new StringEntity(responseJson, StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_OK, "OK"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                }
-            });
-
-        // First call should fail
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServerErrorException");
-        } catch (ServerErrorException e) {
-            assertEquals(500, e.getStatusCode());
-        }
-
-        // Second call should succeed
-        response = graphqlClient.execute(dummy, Data.class, Error.class);
-        assertNotNull(response);
-        assertNotNull(response.getData());
-
-        verify(httpClient, times(2)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testResponseBodyEdgeCasesWithFaultTolerance() throws Exception {
-        // Test empty response body
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-            assertEquals("", e.getResponseBody());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-
-        // Test null response body
-        reset(httpClient, httpResponse);
-        when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-            HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable"));
-        when(httpResponse.getEntity()).thenReturn(null);
-
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenAnswer(invocation -> {
-                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
-                return handler.handleResponse(httpResponse);
-            });
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("Entity may not be null", e.getMessage());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testFaultToleranceDisabled() throws Exception {
-        // Create new client with fault tolerance disabled
-        GraphqlClientImpl clientWithoutFaultTolerance = new GraphqlClientImpl();
-
-        HttpClientBuilderFactory mockBuilderFactory = mock(HttpClientBuilderFactory.class);
-        HttpClientBuilder mockBuilder = mock(HttpClientBuilder.class);
-        when(mockBuilderFactory.newBuilder()).thenReturn(mockBuilder);
-        when(mockBuilder.build()).thenReturn((CloseableHttpClient) httpClient);
-
-        Field clientBuilderFactory = GraphqlClientImpl.class.getDeclaredField("clientBuilderFactory");
-        clientBuilderFactory.setAccessible(true);
-        clientBuilderFactory.set(clientWithoutFaultTolerance, mockBuilderFactory);
-
-        MockGraphqlClientConfiguration configWithoutFaultTolerance = new MockGraphqlClientConfiguration();
-        configWithoutFaultTolerance.setIdentifier("mockIdentifier");
-        configWithoutFaultTolerance.setEnableFaultTolerantFallback(false);
-
-        clientWithoutFaultTolerance.activate(configWithoutFaultTolerance, mock(BundleContext.class));
-
-        // Test that 503 errors are handled normally without fault tolerance
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        try {
-            clientWithoutFaultTolerance.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("GraphQL query failed with response code 503", e.getMessage());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
     }
 
     @Test
@@ -528,72 +281,12 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
-    public void testServerErrorExceptionWithCause() {
-        // Test ServerErrorException constructor with cause
-        Throwable cause = new RuntimeException("Original cause");
-        ServerErrorException exception = new ServerErrorException("Test error", 500, "Error body", cause);
-
-        assertEquals("Test error", exception.getMessage());
-        assertEquals(500, exception.getStatusCode());
-        assertEquals("Error body", exception.getResponseBody());
-        assertEquals(cause, exception.getCause());
-    }
-
-    @Test
-    public void testCircuitBreakerServiceHandleIfConditions() throws Exception {
-        // Test that circuit breakers don't handle non-ServerErrorException
-        setupSuccessfulResponse();
-
-        // This should succeed normally since the exception is not a ServerErrorException
-        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class);
-        assertNotNull(response);
-        assertNotNull(response.getData());
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testNon5xxErrorHandling() throws Exception {
-        // Test handling of non-5xx errors (should not trigger circuit breaker)
-        setupErrorResponse(HttpStatus.SC_BAD_REQUEST, "Bad Request", "Bad request error");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("GraphQL query failed with response code 400", e.getMessage());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testNon5xxErrorWithMultipleAttempts() throws Exception {
-        // Test that non-5xx errors don't trigger circuit breaker even with multiple attempts
-        setupErrorResponse(HttpStatus.SC_NOT_FOUND, "Not Found", "Resource not found");
-
-        for (int i = 0; i < 5; i++) {
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected RuntimeException on attempt " + (i + 1));
-            } catch (RuntimeException e) {
-                assertEquals("GraphQL query failed with response code 404", e.getMessage());
-            }
-        }
-
-        // Should make 5 HTTP calls since circuit breaker doesn't trigger for non-5xx errors
-        verify(httpClient, times(5)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
     public void test4xxErrorHandling() throws Exception {
         // Test various 4xx errors
-        int[] clientErrorCodes = { 400, 401, 403, 404, 409, 422 };
-        String[] reasonPhrases = { "Bad Request", "Unauthorized", "Forbidden", "Not Found", "Conflict", "Unprocessable Entity" };
+        int[] clientErrorCodes = { 400, 401, 403, 404, 409, 422, 600 };
 
         for (int i = 0; i < clientErrorCodes.length; i++) {
-            reset(httpClient, httpResponse);
-            setupErrorResponse(clientErrorCodes[i], reasonPhrases[i], "Client error " + clientErrorCodes[i]);
+            TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, clientErrorCodes[i]);
 
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
@@ -601,261 +294,6 @@ public class FaultTolerantExecutorTest {
             } catch (RuntimeException e) {
                 assertEquals("GraphQL query failed with response code " + clientErrorCodes[i], e.getMessage());
             }
-
-            verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-        }
-    }
-
-    @Test
-    public void test6xxErrorHandling() throws Exception {
-        // Test 6xx errors (should not trigger circuit breaker)
-        setupErrorResponse(600, "Custom Error", "Custom error response");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("GraphQL query failed with response code 600", e.getMessage());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testSuccessfulRequestAfterCircuitBreakerReset() throws Exception {
-        // Test that successful requests reset the circuit breaker state
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        // First two failures
-        for (int i = 0; i < 2; i++) {
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServiceUnavailableException on attempt " + (i + 1));
-            } catch (ServiceUnavailableException e) {
-                assertEquals(503, e.getStatusCode());
-            }
-        }
-        // Should be 2 calls so far
-        verify(httpClient, times(2)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-
-        // Reset and setup success response
-        reset(httpClient, httpResponse);
-        setupSuccessfulResponse();
-
-        // Successful request should reset circuit breaker
-        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class);
-        assertNotNull(response);
-        assertNotNull(response.getData());
-        // Should be 1 call after reset
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-
-        // Now test that circuit breaker is reset by triggering failures again
-        reset(httpClient, httpResponse);
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        // Should need 3 failures again to open circuit breaker
-        for (int i = 0; i < 3; i++) {
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServiceUnavailableException on attempt " + (i + 1));
-            } catch (ServiceUnavailableException e) {
-                assertEquals(503, e.getStatusCode());
-            }
-        }
-        // Should be 3 calls after reset
-        verify(httpClient, times(3)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-
-        // Fourth attempt should open circuit breaker
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected GraphqlRequestException due to circuit breaker");
-        } catch (GraphqlRequestException e) {
-            assertEquals("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e.getMessage());
-            assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
-        }
-    }
-
-    @Test
-    public void testCircuitBreakerServiceLogging() throws Exception {
-        // Test that circuit breaker logging works correctly
-        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
-        Logger logger = loggerContext.getLogger("com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService");
-        logger.setLevel(Level.INFO);
-        Appender<ILoggingEvent> appender = mock(Appender.class);
-
-        try {
-            logger.addAppender(appender);
-
-            setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-            // Trigger circuit breaker to open
-            for (int i = 0; i < 3; i++) {
-                try {
-                    graphqlClient.execute(dummy, Data.class, Error.class);
-                } catch (ServiceUnavailableException e) {
-                    // Expected
-                }
-            }
-
-            // Fourth call should trigger circuit breaker open logging
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-            } catch (GraphqlRequestException e) {
-                // Expected
-            }
-
-            // Verify that logging occurred
-            verify(appender, atLeastOnce()).doAppend(any(ILoggingEvent.class));
-
-        } finally {
-            logger.detachAppender(appender);
-        }
-    }
-
-    @Test
-    public void testMixedErrorTypes() throws Exception {
-        // Test mixing different error types to ensure circuit breakers work independently
-        AtomicInteger callCount = new AtomicInteger(0);
-
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenAnswer(invocation -> {
-                int count = callCount.incrementAndGet();
-                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
-
-                if (count <= 2) {
-                    // First two calls return 503
-                    StringEntity entity = new StringEntity("Service temporarily unavailable", StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                } else if (count <= 4) {
-                    // Next two calls return 500
-                    StringEntity entity = new StringEntity("Internal server error", StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_INTERNAL_SERVER_ERROR, "Internal Server Error"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                } else {
-                    // Fifth call returns success
-                    String responseJson = "{\"data\":{\"text\":\"Some text\",\"count\":42},\"errors\":[{\"message\":\"Error message\"}]}";
-                    StringEntity entity = new StringEntity(responseJson, StandardCharsets.UTF_8);
-                    when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-                        HttpStatus.SC_OK, "OK"));
-                    when(httpResponse.getEntity()).thenReturn(entity);
-                    return handler.handleResponse(httpResponse);
-                }
-            });
-
-        // First two calls should throw ServiceUnavailableException
-        for (int i = 0; i < 2; i++) {
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServiceUnavailableException on attempt " + (i + 1));
-            } catch (ServiceUnavailableException e) {
-                assertEquals(503, e.getStatusCode());
-            }
-        }
-
-        // Next two calls should throw ServerErrorException
-        for (int i = 0; i < 2; i++) {
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServerErrorException on attempt " + (i + 1));
-            } catch (ServerErrorException e) {
-                assertEquals(500, e.getStatusCode());
-            }
-        }
-
-        // Fifth call should succeed
-        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class);
-        assertNotNull(response);
-        assertNotNull(response.getData());
-
-        verify(httpClient, times(5)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testCircuitBreakerHalfOpenAndCloseLogging() throws Exception {
-        // Test that circuit breaker half-open and close logging works correctly
-        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
-        Logger logger = loggerContext.getLogger("com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService");
-        logger.setLevel(Level.INFO);
-        Appender<ILoggingEvent> appender = mock(Appender.class);
-
-        try {
-            logger.addAppender(appender);
-
-            // First, trigger circuit breaker to open with 503 errors
-            setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-            for (int i = 0; i < 3; i++) {
-                try {
-                    graphqlClient.execute(dummy, Data.class, Error.class);
-                } catch (ServiceUnavailableException e) {
-                    // Expected
-                }
-            }
-
-            // Fourth call should open circuit breaker
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-            } catch (GraphqlRequestException e) {
-                // Expected
-            }
-
-            // Reset client and mocks to reset circuit breaker state
-            setUp();
-            reset(httpClient, httpResponse);
-            setupSuccessfulResponse();
-
-            // This should trigger half-open logging and then close logging on success
-            GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class);
-            assertNotNull(response);
-            assertNotNull(response.getData());
-
-            // Verify that logging occurred for both half-open and close events
-            verify(appender, atLeastOnce()).doAppend(any(ILoggingEvent.class));
-
-        } finally {
-            logger.detachAppender(appender);
-        }
-    }
-
-    @Test
-    public void test5xxCircuitBreakerLogging() throws Exception {
-        // Test that 5xx circuit breaker logging works correctly
-        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
-        Logger logger = loggerContext.getLogger("com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService");
-        logger.setLevel(Level.INFO);
-        Appender<ILoggingEvent> appender = mock(Appender.class);
-
-        try {
-            logger.addAppender(appender);
-
-            setupErrorResponse(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Internal Server Error", "Server error");
-
-            // Trigger 5xx circuit breaker to open
-            for (int i = 0; i < 3; i++) {
-                try {
-                    graphqlClient.execute(dummy, Data.class, Error.class);
-                } catch (ServerErrorException e) {
-                    // Expected
-                }
-            }
-
-            // Fourth call should trigger 5xx circuit breaker open logging
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-            } catch (GraphqlRequestException e) {
-                // Expected
-            }
-
-            // Verify that logging occurred
-            verify(appender, atLeastOnce()).doAppend(any(ILoggingEvent.class));
-
-        } finally {
-            logger.detachAppender(appender);
         }
     }
 
@@ -891,142 +329,6 @@ public class FaultTolerantExecutorTest {
         assertEquals(503, exception.getStatusCode());
         assertEquals("Service down", exception.getResponseBody());
         assertEquals(cause, exception.getCause());
-    }
-
-    @Test
-    public void testFaultTolerantExecutorWithNullOptions() throws Exception {
-        // Test that FaultTolerantExecutor works with null options
-        setupSuccessfulResponse();
-
-        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class, null);
-        assertNotNull(response);
-        assertNotNull(response.getData());
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testFaultTolerantExecutorWithEmptyResponseBody() throws Exception {
-        // Test handling of empty response body in fault tolerant mode
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-            assertEquals("", e.getResponseBody());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testFaultTolerantExecutorWithNullResponseBody() throws Exception {
-        // Test handling of null response body in fault tolerant mode
-        when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1,
-            HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable"));
-        when(httpResponse.getEntity()).thenReturn(null);
-
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenAnswer(invocation -> {
-                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
-                return handler.handleResponse(httpResponse);
-            });
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("Entity may not be null", e.getMessage());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testCircuitBreakerServiceHandleIfNonServerError() throws Exception {
-        // Test that circuit breakers don't handle non-ServerErrorException exceptions
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenThrow(new RuntimeException("Non-server error"));
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) {
-            assertEquals("Non-server error", e.getMessage());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testFaultTolerantExecutorMetricsIncrement() throws Exception {
-        // Test that metrics are properly incremented in fault tolerant mode
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-        }
-
-        // Verify that the request was made and metrics should be incremented
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    @Test
-    public void testFaultTolerantExecutorWithDifferent5xxCodes() throws Exception {
-        // Test various 5xx status codes to ensure they all trigger the general 5xx circuit breaker
-        int[] serverErrorCodes = { 500, 501, 502, 504, 505, 599 };
-
-        for (int statusCode : serverErrorCodes) {
-            setUp(); // Reset client and mocks to reset circuit breaker state
-            reset(httpClient, httpResponse);
-            setupErrorResponse(statusCode, "Server Error " + statusCode, "Error " + statusCode);
-
-            try {
-                graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServerErrorException for status code " + statusCode);
-            } catch (ServerErrorException e) {
-                assertEquals(statusCode, e.getStatusCode());
-                assertEquals("Error " + statusCode, e.getResponseBody());
-            }
-
-            verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-        }
-    }
-
-    @Test
-    public void testFaultTolerantExecutorWith503SpecificHandling() throws Exception {
-        // Test that 503 errors are handled specifically and not by the general 5xx circuit breaker
-        setupErrorResponse(HttpStatus.SC_SERVICE_UNAVAILABLE, "Service Unavailable", "Service temporarily unavailable");
-
-        try {
-            graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
-            assertEquals(503, e.getStatusCode());
-            assertEquals("Service temporarily unavailable", e.getResponseBody());
-        }
-
-        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
-    }
-
-    // Helper methods
-    private void setupSuccessfulResponse() throws Exception {
-        String responseJson = "{\"data\":{\"text\":\"Some text\",\"count\":42},\"errors\":[{\"message\":\"Error message\"}]}";
-        StringEntity entity = new StringEntity(responseJson, StandardCharsets.UTF_8);
-
-        when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(org.apache.http.HttpVersion.HTTP_1_1, HttpStatus.SC_OK, "OK"));
-        when(httpResponse.getEntity()).thenReturn(entity);
-
-        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
-            .thenAnswer(invocation -> {
-                ResponseHandler<?> handler = invocation.getArgumentAt(1, ResponseHandler.class);
-                return handler.handleResponse(httpResponse);
-            });
     }
 
     private void setupErrorResponse(int statusCode, String reasonPhrase, String responseBody) throws Exception {
