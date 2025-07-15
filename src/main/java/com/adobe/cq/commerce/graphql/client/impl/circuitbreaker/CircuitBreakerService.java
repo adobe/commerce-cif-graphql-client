@@ -48,7 +48,7 @@ public class CircuitBreakerService {
     private final CircuitBreaker<Object> serviceUnavailableBreaker;
     private final CircuitBreaker<Object> general5xxBreaker;
     private int currentAttempt = 1;
-    protected Properties props = new Properties();
+    private final Properties props = new Properties();
 
     public CircuitBreakerService() {
         loadProperties();
