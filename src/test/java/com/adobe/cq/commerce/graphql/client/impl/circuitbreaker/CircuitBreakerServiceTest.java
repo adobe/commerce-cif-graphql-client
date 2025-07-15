@@ -24,8 +24,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 /**
- * Tests for CircuitBreakerService with comprehensive coverage of property loading methods
- * and their exception handling scenarios.
+ * Tests for CircuitBreakerService with optimized coverage focusing on core functionality.
  */
 public class CircuitBreakerServiceTest {
 
@@ -43,14 +42,12 @@ public class CircuitBreakerServiceTest {
 
     @Test
     public void testExecuteWithPoliciesSuccess() throws Exception {
-        // Test successful execution
         String result = circuitBreakerService.executeWithPolicies("http://test.com", () -> "success");
         assertEquals("success", result);
     }
 
     @Test
     public void testExecuteWithPoliciesWithServiceUnavailableException() throws IOException {
-        // Test execution with ServiceUnavailableException
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
                 throw new ServiceUnavailableException("Service unavailable", "Service down");
@@ -64,7 +61,6 @@ public class CircuitBreakerServiceTest {
 
     @Test
     public void testExecuteWithPoliciesWithServerErrorException() throws IOException {
-        // Test execution with ServerErrorException
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
                 throw new ServerErrorException("Server error", 500, "Internal server error");
@@ -79,7 +75,6 @@ public class CircuitBreakerServiceTest {
 
     @Test
     public void testExecuteWithPoliciesWithIOException() throws IOException {
-        // Test execution with IOException
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
                 try {
@@ -97,7 +92,6 @@ public class CircuitBreakerServiceTest {
 
     @Test
     public void testLoadPropertiesWithValidFile() throws Exception {
-        // Test loadProperties method with valid properties file
         Method loadPropertiesMethod = CircuitBreakerService.class.getDeclaredMethod("loadProperties");
         loadPropertiesMethod.setAccessible(true);
 
@@ -110,230 +104,66 @@ public class CircuitBreakerServiceTest {
     }
 
     @Test
-    public void testGetIntPropertyWithValidValue() throws Exception {
-        // Test getIntProperty with valid integer value
+    public void testPropertyParsingMethods() throws Exception {
+        // Test all property parsing methods with various scenarios in a single test
         Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
             int.class);
-        getIntPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "42");
-
-        int result = (Integer) getIntPropertyMethod.invoke(circuitBreakerService, props, "test.key", 10);
-        assertEquals(42, result);
-    }
-
-    @Test
-    public void testGetIntPropertyWithInvalidValue() throws Exception {
-        // Test getIntProperty with invalid integer value (should use default)
-        Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
-            int.class);
-        getIntPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "not.a.number");
-
-        int result = (Integer) getIntPropertyMethod.invoke(circuitBreakerService, props, "test.key", 10);
-        assertEquals(10, result); // Should return default value
-    }
-
-    @Test
-    public void testGetIntPropertyWithNullValue() throws Exception {
-        // Test getIntProperty with null value (should use default)
-        Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
-            int.class);
-        getIntPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-
-        int result = (Integer) getIntPropertyMethod.invoke(circuitBreakerService, props, "test.key", 10);
-        assertEquals(10, result); // Should return default value
-    }
-
-    @Test
-    public void testGetIntPropertyWithEmptyValue() throws Exception {
-        // Test getIntProperty with empty value (should use default)
-        Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
-            int.class);
-        getIntPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "");
-
-        int result = (Integer) getIntPropertyMethod.invoke(circuitBreakerService, props, "test.key", 10);
-        assertEquals(10, result); // Should return default value
-    }
-
-    @Test
-    public void testGetLongPropertyWithValidValue() throws Exception {
-        // Test getLongProperty with valid long value
         Method getLongPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getLongProperty", Properties.class, String.class,
             long.class);
-        getLongPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "123456789");
-
-        long result = (Long) getLongPropertyMethod.invoke(circuitBreakerService, props, "test.key", 1000L);
-        assertEquals(123456789L, result);
-    }
-
-    @Test
-    public void testGetLongPropertyWithInvalidValue() throws Exception {
-        // Test getLongProperty with invalid long value (should use default)
-        Method getLongPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getLongProperty", Properties.class, String.class,
-            long.class);
-        getLongPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "not.a.long");
-
-        long result = (Long) getLongPropertyMethod.invoke(circuitBreakerService, props, "test.key", 1000L);
-        assertEquals(1000L, result); // Should return default value
-    }
-
-    @Test
-    public void testGetLongPropertyWithNullValue() throws Exception {
-        // Test getLongProperty with null value (should use default)
-        Method getLongPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getLongProperty", Properties.class, String.class,
-            long.class);
-        getLongPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-
-        long result = (Long) getLongPropertyMethod.invoke(circuitBreakerService, props, "test.key", 1000L);
-        assertEquals(1000L, result); // Should return default value
-    }
-
-    @Test
-    public void testGetDoublePropertyWithValidValue() throws Exception {
-        // Test getDoubleProperty with valid double value
         Method getDoublePropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getDoubleProperty", Properties.class, String.class,
             double.class);
-        getDoublePropertyMethod.setAccessible(true);
 
-        Properties props = new Properties();
-        props.setProperty("test.key", "3.14159");
-
-        double result = (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "test.key", 1.0);
-        assertEquals(3.14159, result, 0.00001);
-    }
-
-    @Test
-    public void testGetDoublePropertyWithInvalidValue() throws Exception {
-        // Test getDoubleProperty with invalid double value (should use default)
-        Method getDoublePropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getDoubleProperty", Properties.class, String.class,
-            double.class);
-        getDoublePropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "not.a.double");
-
-        double result = (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "test.key", 1.0);
-        assertEquals(1.0, result, 0.00001); // Should return default value
-    }
-
-    @Test
-    public void testGetDoublePropertyWithNullValue() throws Exception {
-        // Test getDoubleProperty with null value (should use default)
-        Method getDoublePropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getDoubleProperty", Properties.class, String.class,
-            double.class);
+        getIntPropertyMethod.setAccessible(true);
+        getLongPropertyMethod.setAccessible(true);
         getDoublePropertyMethod.setAccessible(true);
 
         Properties props = new Properties();
 
-        double result = (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "test.key", 1.0);
-        assertEquals(1.0, result, 0.00001); // Should return default value
-    }
+        // Test valid values
+        props.setProperty("int.key", "42");
+        props.setProperty("long.key", "123456789");
+        props.setProperty("double.key", "3.14159");
 
-    @Test
-    public void testGetDoublePropertyWithWhitespaceValue() throws Exception {
-        // Test getDoubleProperty with whitespace value (should use default)
-        Method getDoublePropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getDoubleProperty", Properties.class, String.class,
-            double.class);
-        getDoublePropertyMethod.setAccessible(true);
+        assertEquals(42, getIntPropertyMethod.invoke(circuitBreakerService, props, "int.key", 10));
+        assertEquals(123456789L, getLongPropertyMethod.invoke(circuitBreakerService, props, "long.key", 1000L));
+        assertEquals(3.14159, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "double.key", 1.0), 0.00001);
 
-        Properties props = new Properties();
-        props.setProperty("test.key", "   ");
+        // Test invalid values (should use defaults)
+        props.setProperty("invalid.int", "not.a.number");
+        props.setProperty("invalid.long", "not.a.long");
+        props.setProperty("invalid.double", "not.a.double");
 
-        double result = (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "test.key", 1.0);
-        assertEquals(1.0, result, 0.00001); // Should return default value
-    }
+        assertEquals(10, getIntPropertyMethod.invoke(circuitBreakerService, props, "invalid.int", 10));
+        assertEquals(1000L, getLongPropertyMethod.invoke(circuitBreakerService, props, "invalid.long", 1000L));
+        assertEquals(1.0, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "invalid.double", 1.0), 0.00001);
 
-    @Test
-    public void testGetIntPropertyWithWhitespaceValue() throws Exception {
-        // Test getIntProperty with whitespace value (should use default)
-        Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
-            int.class);
-        getIntPropertyMethod.setAccessible(true);
+        // Test null/missing values (should use defaults)
+        assertEquals(10, getIntPropertyMethod.invoke(circuitBreakerService, props, "missing.int", 10));
+        assertEquals(1000L, getLongPropertyMethod.invoke(circuitBreakerService, props, "missing.long", 1000L));
+        assertEquals(1.0, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "missing.double", 1.0), 0.00001);
 
-        Properties props = new Properties();
-        props.setProperty("test.key", "   ");
+        // Test whitespace values (should use defaults)
+        props.setProperty("whitespace.int", "   ");
+        props.setProperty("whitespace.long", "   ");
+        props.setProperty("whitespace.double", "   ");
 
-        int result = (Integer) getIntPropertyMethod.invoke(circuitBreakerService, props, "test.key", 10);
-        assertEquals(10, result); // Should return default value
-    }
+        assertEquals(10, getIntPropertyMethod.invoke(circuitBreakerService, props, "whitespace.int", 10));
+        assertEquals(1000L, getLongPropertyMethod.invoke(circuitBreakerService, props, "whitespace.long", 1000L));
+        assertEquals(1.0, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "whitespace.double", 1.0), 0.00001);
 
-    @Test
-    public void testGetLongPropertyWithWhitespaceValue() throws Exception {
-        // Test getLongProperty with whitespace value (should use default)
-        Method getLongPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getLongProperty", Properties.class, String.class,
-            long.class);
-        getLongPropertyMethod.setAccessible(true);
+        // Test trimmed values
+        props.setProperty("trimmed.int", "  42  ");
+        props.setProperty("trimmed.long", "  123456789  ");
+        props.setProperty("trimmed.double", "  3.14159  ");
 
-        Properties props = new Properties();
-        props.setProperty("test.key", "   ");
-
-        long result = (Long) getLongPropertyMethod.invoke(circuitBreakerService, props, "test.key", 1000L);
-        assertEquals(1000L, result); // Should return default value
-    }
-
-    @Test
-    public void testGetIntPropertyWithTrimmedValue() throws Exception {
-        // Test getIntProperty with value that needs trimming
-        Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
-            int.class);
-        getIntPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "  42  ");
-
-        int result = (Integer) getIntPropertyMethod.invoke(circuitBreakerService, props, "test.key", 10);
-        assertEquals(42, result); // Should return trimmed value
-    }
-
-    @Test
-    public void testGetLongPropertyWithTrimmedValue() throws Exception {
-        // Test getLongProperty with value that needs trimming
-        Method getLongPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getLongProperty", Properties.class, String.class,
-            long.class);
-        getLongPropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "  123456789  ");
-
-        long result = (Long) getLongPropertyMethod.invoke(circuitBreakerService, props, "test.key", 1000L);
-        assertEquals(123456789L, result); // Should return trimmed value
-    }
-
-    @Test
-    public void testGetDoublePropertyWithTrimmedValue() throws Exception {
-        // Test getDoubleProperty with value that needs trimming
-        Method getDoublePropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getDoubleProperty", Properties.class, String.class,
-            double.class);
-        getDoublePropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-        props.setProperty("test.key", "  3.14159  ");
-
-        double result = (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "test.key", 1.0);
-        assertEquals(3.14159, result, 0.00001); // Should return trimmed value
+        assertEquals(42, getIntPropertyMethod.invoke(circuitBreakerService, props, "trimmed.int", 10));
+        assertEquals(123456789L, getLongPropertyMethod.invoke(circuitBreakerService, props, "trimmed.long", 1000L));
+        assertEquals(3.14159, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "trimmed.double", 1.0), 0.00001);
     }
 
     @Test
     public void testCircuitBreakerServiceWithDefaultValues() {
         // Test that CircuitBreakerService can be created with default values
-        // This tests the scenario where properties file is not found or empty
         CircuitBreakerService service = new CircuitBreakerService();
         assertNotNull("Service should be created with default values", service);
 
@@ -344,13 +174,5 @@ public class CircuitBreakerServiceTest {
         } catch (Exception e) {
             fail("Should not throw exception for successful execution");
         }
-    }
-
-    @Test
-    public void testCircuitBreakerServiceWithIOExceptionDuringPropertiesLoad() {
-        // This test verifies that the service can handle IOExceptions during properties loading
-        // The service should use default values when properties cannot be loaded
-        CircuitBreakerService service = new CircuitBreakerService();
-        assertNotNull("Service should be created even when properties loading fails", service);
     }
 }

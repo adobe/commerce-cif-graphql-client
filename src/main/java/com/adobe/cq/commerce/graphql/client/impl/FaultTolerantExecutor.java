@@ -59,9 +59,6 @@ public class FaultTolerantExecutor extends DefaultExecutor {
         } catch (FailsafeException e) {
             metrics.incrementRequestErrors();
             throw new GraphqlRequestException("Failed to execute GraphQL request: " + e.getMessage(), e);
-        } catch (IOException e) {
-            metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to send GraphQL request", e);
         }
     }
 

@@ -301,6 +301,22 @@ public class FaultTolerantExecutorTest {
         assertEquals(cause, exception.getCause());
     }
 
+    @Test
+    public void testHandleErrorResponseMethod() throws Exception {
+        // Test the handleErrorResponse method that is called for non-5xx errors
+        // This tests the line: throw handleErrorResponse(statusLine);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_BAD_REQUEST);
+
+        try {
+            graphqlClient.execute(dummy, Data.class, Error.class);
+            fail("Expected RuntimeException from handleErrorResponse");
+        } catch (RuntimeException e) {
+            assertEquals("GraphQL query failed with response code 400", e.getMessage());
+        }
+
+        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
     // helpers
     private void test503WithFaultTolerance() throws Exception {
         for (int i = 0; i <= SERVICE_UNAVAILABLE_THRESHOLD; i++) {

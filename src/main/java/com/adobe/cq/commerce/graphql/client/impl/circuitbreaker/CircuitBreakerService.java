@@ -97,7 +97,7 @@ public class CircuitBreakerService {
             .build();
     }
 
-    public <T> T executeWithPolicies(String endpointUrl, java.util.function.Supplier<T> supplier) throws IOException {
+    public <T> T executeWithPolicies(String endpointUrl, java.util.function.Supplier<T> supplier) {
         LOGGER.info("Executing request to {}", endpointUrl);
         return Failsafe
             .with(serviceUnavailableBreaker)
