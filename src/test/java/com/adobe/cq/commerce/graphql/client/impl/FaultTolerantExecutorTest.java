@@ -267,6 +267,18 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
+    public void testServerErrorExceptionWithCause() {
+        // Test ServerErrorException constructor with cause
+        Throwable cause = new RuntimeException("Original cause");
+        ServerErrorException exception = new ServerErrorException("Server error", 500, "Error body", cause);
+
+        assertEquals("Server error", exception.getMessage());
+        assertEquals(500, exception.getStatusCode());
+        assertEquals("Error body", exception.getResponseBody());
+        assertEquals(cause, exception.getCause());
+    }
+
+    @Test
     public void testServiceUnavailableExceptionWithoutCause() {
         // Test ServiceUnavailableException constructor without cause
         ServiceUnavailableException exception = new ServiceUnavailableException("Service unavailable", "Service down");
