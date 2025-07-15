@@ -14,7 +14,9 @@
 package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
+import java.util.Properties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,57 +34,66 @@ import dev.failsafe.Failsafe;
 public class CircuitBreakerService {
     private static final Logger LOGGER = LoggerFactory.getLogger(CircuitBreakerService.class);
 
-    // Configuration for 503 Service Unavailable
-    private static final int SERVICE_UNAVAILABLE_THRESHOLD = 3;
-    private static final long INITIAL_DELAY_MS = 20000L; // 20 seconds
-    private static final long MAX_DELAY_MS = 180000L;    // 3 minutes
-    private static final double DELAY_MULTIPLIER = 1.5;
-    private static final String LOG_503_ATTEMPT = "503 error - Attempt {} - Progressive delay: {}ms";
-    private static final String LOG_503_OPEN = "503 circuit breaker OPENED";
-    private static final String LOG_503_HALF_OPEN = "503 circuit breaker HALF-OPEN - Current attempt: {}";
-    private static final String LOG_503_CLOSED = "503 circuit breaker CLOSED";
-    private static final int SERVICE_UNAVAILABLE_SUCCESS_THRESHOLD = 1;
+    // Default values
+    private static final int DEFAULT_503_THRESHOLD = 3;
+    private static final long DEFAULT_503_INITIAL_DELAY_MS = 20000L;
+    private static final long DEFAULT_503_MAX_DELAY_MS = 180000L;
+    private static final double DEFAULT_503_DELAY_MULTIPLIER = 1.5;
+    private static final int DEFAULT_503_SUCCESS_THRESHOLD = 1;
+
+    private static final int DEFAULT_5XX_THRESHOLD = 3;
+    private static final long DEFAULT_5XX_DELAY_MS = 10000L;
+    private static final int DEFAULT_5XX_SUCCESS_THRESHOLD = 1;
+
     private final CircuitBreaker<Object> serviceUnavailableBreaker;
-
-    // Configuration for general 5xx errors
-    private static final int GENERAL_5XX_THRESHOLD = 3;
-    private static final Duration GENERAL_5XX_DELAY = Duration.ofSeconds(10);
-    private static final int GENERAL_5XX_SUCCESS_THRESHOLD = 1;
     private final CircuitBreaker<Object> general5xxBreaker;
-
     private int currentAttempt = 1;
 
     public CircuitBreakerService() {
+        Properties props = loadProperties();
+
+        // Load 503 configuration
+        int threshold503 = getIntProperty(props, "circuit.breaker.503.threshold", DEFAULT_503_THRESHOLD);
+        long initialDelay503 = getLongProperty(props, "circuit.breaker.503.initial.delay.ms", DEFAULT_503_INITIAL_DELAY_MS);
+        long maxDelay503 = getLongProperty(props, "circuit.breaker.503.max.delay.ms", DEFAULT_503_MAX_DELAY_MS);
+        double multiplier503 = getDoubleProperty(props, "circuit.breaker.503.delay.multiplier", DEFAULT_503_DELAY_MULTIPLIER);
+        int successThreshold503 = getIntProperty(props, "circuit.breaker.503.success.threshold", DEFAULT_503_SUCCESS_THRESHOLD);
+
+        // Load 5xx configuration
+        int threshold5xx = getIntProperty(props, "circuit.breaker.5xx.threshold", DEFAULT_5XX_THRESHOLD);
+        long delay5xxMs = getLongProperty(props, "circuit.breaker.5xx.delay.ms", DEFAULT_5XX_DELAY_MS);
+        int successThreshold5xx = getIntProperty(props, "circuit.breaker.5xx.success.threshold", DEFAULT_5XX_SUCCESS_THRESHOLD);
+
         // Circuit Breaker for 503 errors with progressive delay
         this.serviceUnavailableBreaker = CircuitBreaker.builder()
-            .handleIf(throwable -> throwable instanceof ServiceUnavailableException)
-            .withFailureThreshold(SERVICE_UNAVAILABLE_THRESHOLD)
+            .handleIf(ServiceUnavailableException.class::isInstance)
+            .withFailureThreshold(threshold503)
             .withDelayFn(context -> {
-                long delay = (long) (INITIAL_DELAY_MS * Math.pow(DELAY_MULTIPLIER, (double) (currentAttempt - 1)));
-                long finalDelay = Math.min(delay, MAX_DELAY_MS);
-                LOGGER.info(LOG_503_ATTEMPT, currentAttempt, finalDelay);
+                long delay = (long) (initialDelay503 * Math.pow(multiplier503, (double) (currentAttempt - 1)));
+                long finalDelay = Math.min(delay, maxDelay503);
+                LOGGER.info("503 error - Attempt {} - Progressive delay: {}ms", currentAttempt, finalDelay);
                 return Duration.ofMillis(finalDelay);
             })
-            .onOpen(event -> LOGGER.warn(LOG_503_OPEN))
+            .onOpen(event -> LOGGER.warn("503 circuit breaker OPENED"))
             .onHalfOpen(event -> {
                 currentAttempt++;
-                LOGGER.info(LOG_503_HALF_OPEN, currentAttempt);
+                LOGGER.info("503 circuit breaker HALF-OPEN - Current attempt: {}", currentAttempt);
             })
             .onClose(event -> {
-                LOGGER.info(LOG_503_CLOSED);
+                LOGGER.info("503 circuit breaker CLOSED");
                 currentAttempt = 1;
             })
-            .withSuccessThreshold(SERVICE_UNAVAILABLE_SUCCESS_THRESHOLD)
+            .withSuccessThreshold(successThreshold503)
             .build();
 
         // Circuit Breaker for other 5xx errors with constant delay
         this.general5xxBreaker = CircuitBreaker.builder()
-            .handleIf(throwable -> throwable instanceof ServerErrorException)
-            .withFailureThreshold(GENERAL_5XX_THRESHOLD)
-            .withDelay(GENERAL_5XX_DELAY)
+            .handleIf(ServerErrorException.class::isInstance)
+            .withFailureThreshold(threshold5xx)
+            .withDelay(Duration.ofMillis(delay5xxMs))
             .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
             .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED"))
-            .withSuccessThreshold(GENERAL_5XX_SUCCESS_THRESHOLD)
+            .withSuccessThreshold(successThreshold5xx)
             .build();
     }
 
@@ -92,5 +103,58 @@ public class CircuitBreakerService {
             .with(serviceUnavailableBreaker)
             .compose(general5xxBreaker)
             .get(supplier::get);
+    }
+
+    /**
+     * Loads properties from the circuit-breaker.properties file.
+     */
+    private Properties loadProperties() {
+        Properties props = new Properties();
+        try (InputStream in = getClass().getClassLoader()
+            .getResourceAsStream("com/adobe/cq/commerce/graphql/client/impl/circuitbreaker/circuit-breaker.properties")) {
+            if (in != null) {
+                props.load(in);
+                LOGGER.debug("Loaded circuit breaker configuration from properties file");
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Failed to load circuit breaker properties, using default values", e);
+        }
+        return props;
+    }
+
+    private int getIntProperty(Properties props, String key, int defaultValue) {
+        String value = props.getProperty(key);
+        if (value != null) {
+            try {
+                return Integer.parseInt(value.trim());
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid integer value for property {}: {}. Using default: {}", key, value, defaultValue);
+            }
+        }
+        return defaultValue;
+    }
+
+    private long getLongProperty(Properties props, String key, long defaultValue) {
+        String value = props.getProperty(key);
+        if (value != null) {
+            try {
+                return Long.parseLong(value.trim());
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid long value for property {}: {}. Using default: {}", key, value, defaultValue);
+            }
+        }
+        return defaultValue;
+    }
+
+    private double getDoubleProperty(Properties props, String key, double defaultValue) {
+        String value = props.getProperty(key);
+        if (value != null) {
+            try {
+                return Double.parseDouble(value.trim());
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid double value for property {}: {}. Using default: {}", key, value, defaultValue);
+            }
+        }
+        return defaultValue;
     }
 }
