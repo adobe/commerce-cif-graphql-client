@@ -26,6 +26,8 @@ import dev.failsafe.Failsafe;
  * Managing circuit breakers with different policies.
  * This service creates and manages circuit breakers for different endpoints and error types,
  * using separate policies for 503 and general 5xx errors.
+ * The circuit breakers rely on exception types rather than status code checking for cleaner,
+ * more maintainable code.
  */
 public class CircuitBreakerService {
     private static final Logger LOGGER = LoggerFactory.getLogger(CircuitBreakerService.class);
@@ -53,13 +55,7 @@ public class CircuitBreakerService {
     public CircuitBreakerService() {
         // Circuit Breaker for 503 errors with progressive delay
         this.serviceUnavailableBreaker = CircuitBreaker.builder()
-            .handleIf(throwable -> {
-                if (throwable instanceof ServerErrorException) {
-                    ServerErrorException serverError = (ServerErrorException) throwable;
-                    return serverError.getStatusCode() == 503;
-                }
-                return false;
-            })
+            .handleIf(throwable -> throwable instanceof ServiceUnavailableException)
             .withFailureThreshold(SERVICE_UNAVAILABLE_THRESHOLD)
             .withDelayFn(context -> {
                 long delay = (long) (INITIAL_DELAY_MS * Math.pow(DELAY_MULTIPLIER, (double) (currentAttempt - 1)));
@@ -81,13 +77,7 @@ public class CircuitBreakerService {
 
         // Circuit Breaker for other 5xx errors with constant delay
         this.general5xxBreaker = CircuitBreaker.builder()
-            .handleIf(throwable -> {
-                if (throwable instanceof ServerErrorException) {
-                    ServerErrorException serverError = (ServerErrorException) throwable;
-                    return serverError.getStatusCode() >= 500 && serverError.getStatusCode() != 503;
-                }
-                return false;
-            })
+            .handleIf(throwable -> throwable instanceof ServerErrorException)
             .withFailureThreshold(GENERAL_5XX_THRESHOLD)
             .withDelay(GENERAL_5XX_DELAY)
             .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
