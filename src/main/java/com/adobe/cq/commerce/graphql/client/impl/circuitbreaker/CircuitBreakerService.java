@@ -48,10 +48,10 @@ public class CircuitBreakerService {
     private final CircuitBreaker<Object> serviceUnavailableBreaker;
     private final CircuitBreaker<Object> general5xxBreaker;
     private int currentAttempt = 1;
+    protected Properties props = new Properties();
 
     public CircuitBreakerService() {
-        Properties props = loadProperties();
-
+        loadProperties();
         // Load 503 configuration
         int threshold503 = getIntProperty(props, "circuit.breaker.503.threshold", DEFAULT_503_THRESHOLD);
         long initialDelay503 = getLongProperty(props, "circuit.breaker.503.initial.delay.ms", DEFAULT_503_INITIAL_DELAY_MS);
@@ -108,10 +108,9 @@ public class CircuitBreakerService {
     /**
      * Loads properties from the circuit-breaker.properties file.
      */
-    private Properties loadProperties() {
-        Properties props = new Properties();
-        try (InputStream in = getClass().getClassLoader()
-            .getResourceAsStream("com/adobe/cq/commerce/graphql/client/impl/circuitbreaker/circuit-breaker.properties")) {
+    private void loadProperties() {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(
+            "com/adobe/cq/commerce/graphql/client/impl/circuitbreaker/circuit-breaker.properties")) {
             if (in != null) {
                 props.load(in);
                 LOGGER.debug("Loaded circuit breaker configuration from properties file");
@@ -119,7 +118,6 @@ public class CircuitBreakerService {
         } catch (IOException e) {
             LOGGER.warn("Failed to load circuit breaker properties, using default values", e);
         }
-        return props;
     }
 
     private int getIntProperty(Properties props, String key, int defaultValue) {
