@@ -175,6 +175,41 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
+    public void testCircuitBreakerContinuousOpenStateWithFaultTolerance() throws Exception {
+        // First, trigger circuit breaker to open state by exceeding threshold
+        test503WithFaultTolerance();
+
+        // Wait for circuit breaker to transition to half-open state
+        Thread.sleep(10);
+
+        // Simulate another 503 response to test circuit breaker behavior in half-open state
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
+
+        // Attempt execution - should throw ServiceUnavailableException and re-open circuit breaker
+        // The circuit breaker will return to open state due to the 503 response
+        try {
+            graphqlClient.execute(dummy, Data.class, Error.class);
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+        }
+
+        // Verify the HTTP client was called (circuit breaker was in half-open state)
+        verify(httpClient, times(SERVICE_UNAVAILABLE_THRESHOLD + 1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+
+        // Wait for circuit breaker timeout to transition back to half-open state
+        Thread.sleep(12);
+
+        // Simulate successful response to test circuit breaker closing
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+
+        // Execute again - should succeed and close the circuit breaker
+        graphqlClient.execute(dummy, Data.class, Error.class);
+
+        // Verify the HTTP client was called again (circuit breaker is now closed)
+        verify(httpClient, times(SERVICE_UNAVAILABLE_THRESHOLD + 2)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    @Test
     public void testFailsafeExceptionWithFaultTolerance() throws Exception {
         FailsafeException failsafeException = mock(FailsafeException.class);
         when(failsafeException.getMessage()).thenReturn("Failsafe error occurred");
