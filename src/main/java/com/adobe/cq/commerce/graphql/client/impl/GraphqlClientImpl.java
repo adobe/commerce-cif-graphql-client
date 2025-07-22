@@ -167,7 +167,11 @@ public class GraphqlClientImpl implements GraphqlClient {
         HttpClient client = configureHttpClientBuilder().build();
 
         // create the executor
-        executor = new DefaultExecutor(client, metrics, configuration);
+        if (configuration.enableFaultTolerantFallback()) {
+            executor = new FaultTolerantExecutor(client, metrics, configuration);
+        } else {
+            executor = new DefaultExecutor(client, metrics, configuration);
+        }
 
         Hashtable<String, Object> serviceProps = new Hashtable<>();
         serviceProps.put(PROP_IDENTIFIER, configuration.identifier());

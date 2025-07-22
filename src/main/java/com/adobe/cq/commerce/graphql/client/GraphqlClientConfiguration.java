@@ -132,6 +132,13 @@ public @interface GraphqlClientConfiguration {
     String[] cacheConfigurations();
 
     @AttributeDefinition(
+        name = "Enable Fault Tolerant Fallback",
+        description = "Enable fault tolerant fallback mechanism when encountering 503 (Service Unavailable) and other service errors. "
+            + "When enabled, the client will use resilient error handling with fallback strategies. When disabled, the existing error handling flow will be used.",
+        type = AttributeType.BOOLEAN)
+    boolean enableFaultTolerantFallback() default false;
+
+    @AttributeDefinition(
         name = "Ranking",
         description = "Integer value defining the ranking of this queue configuration. If more than one GraphQL Client use the same "
             + "identifier the one with the higher ranking will be used. Defaults to 0")

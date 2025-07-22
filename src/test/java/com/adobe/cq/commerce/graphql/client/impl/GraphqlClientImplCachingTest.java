@@ -14,16 +14,20 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
+import java.lang.reflect.Field;
 import java.util.Collections;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpStatus;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.CachingStrategy;
@@ -31,10 +35,10 @@ import com.adobe.cq.commerce.graphql.client.CachingStrategy.DataFetchingPolicy;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
-import com.codahale.metrics.MetricRegistry;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class GraphqlClientImplCachingTest {
 
@@ -52,20 +56,30 @@ public class GraphqlClientImplCachingTest {
 
     private static final String MY_CACHE = "mycache";
     private static final String MY_DISABLED_CACHE = "mydisabledcache";
-    private HttpClient httpClient;
+    private CloseableHttpClient httpClient;
 
     @Before
     public void setUp() throws Exception {
+        MockitoAnnotations.initMocks(this);
+
+        httpClient = Mockito.mock(CloseableHttpClient.class);
+        // Mock HttpClientBuilderFactory to return our mocked HttpClient
+        HttpClientBuilderFactory mockBuilderFactory = mock(HttpClientBuilderFactory.class);
+        HttpClientBuilder mockBuilder = mock(HttpClientBuilder.class);
+        when(mockBuilderFactory.newBuilder()).thenReturn(mockBuilder);
+        when(mockBuilder.build()).thenReturn((CloseableHttpClient) httpClient);
+
         graphqlClient = new GraphqlClientImpl();
+
+        // Use reflection to set the private cacheInvalidator field
+        Field clientBuilderFactory = GraphqlClientImpl.class.getDeclaredField("clientBuilderFactory");
+        clientBuilderFactory.setAccessible(true);
+        clientBuilderFactory.set(graphqlClient, mockBuilderFactory);
 
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(MY_CACHE + ":true:100:5", MY_DISABLED_CACHE + ":false:100:5", "");
 
         graphqlClient.activate(config, mock(BundleContext.class));
-        httpClient = mock(HttpClient.class);
-
-        // Create a new executor with the mocked client for testing
-        addExecutor(httpClient, graphqlClient);
 
     }
 
@@ -221,10 +235,7 @@ public class GraphqlClientImplCachingTest {
 
     @Test
     public void testNoCache() throws Exception {
-        graphqlClient = new GraphqlClientImpl();
         graphqlClient.activate(new MockGraphqlClientConfiguration(), mock(BundleContext.class));
-        httpClient = mock(HttpClient.class);
-        addExecutor(httpClient, graphqlClient);
 
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)
@@ -237,12 +248,9 @@ public class GraphqlClientImplCachingTest {
 
     @Test
     public void testEmptyCache() throws Exception {
-        graphqlClient = new GraphqlClientImpl();
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(ArrayUtils.EMPTY_STRING_ARRAY);
         graphqlClient.activate(config, mock(BundleContext.class));
-        httpClient = mock(HttpClient.class);
-        addExecutor(httpClient, graphqlClient);
 
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_CACHE)
@@ -267,12 +275,5 @@ public class GraphqlClientImplCachingTest {
 
         // HTTP client was called twice
         Mockito.verify(httpClient, Mockito.times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
-    }
-
-    // This method is used to add an executor to the GraphqlClientImpl instance.
-    private void addExecutor(HttpClient httpClient, GraphqlClientImpl graphqlClient) {
-        GraphqlClientMetrics metrics = graphqlClient.getConfiguration() != null ? new GraphqlClientMetricsImpl(new MetricRegistry(),
-            graphqlClient.getConfiguration()) : GraphqlClientMetrics.NOOP;
-        graphqlClient.executor = new DefaultExecutor(httpClient, metrics, graphqlClient.getConfiguration());
     }
 }

@@ -33,6 +33,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicListHeaderIterator;
+import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.http.protocol.HTTP;
 import org.hamcrest.CustomMatcher;
 import org.junit.Before;
@@ -103,7 +104,7 @@ public class GraphqlClientImplTest {
     private MockGraphqlClientConfiguration mockConfig;
     private CacheInvalidator cacheInvalidator;
     private Field cacheInvalidatorField;
-    private HttpClient httpClient;
+    private CloseableHttpClient httpClient;
     @Mock
     private org.slf4j.Logger logger;
 
@@ -111,6 +112,19 @@ public class GraphqlClientImplTest {
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         graphqlClient = new GraphqlClientImpl();
+
+        httpClient = Mockito.mock(CloseableHttpClient.class);
+
+        // Mock HttpClientBuilderFactory to return our mocked HttpClient
+        HttpClientBuilderFactory mockBuilderFactory = mock(HttpClientBuilderFactory.class);
+        HttpClientBuilder mockBuilder = mock(HttpClientBuilder.class);
+        when(mockBuilderFactory.newBuilder()).thenReturn(mockBuilder);
+        when(mockBuilder.build()).thenReturn((CloseableHttpClient) httpClient);
+
+        // Use reflection to set the private cacheInvalidator field
+        Field clientBuilderFactory = GraphqlClientImpl.class.getDeclaredField("clientBuilderFactory");
+        clientBuilderFactory.setAccessible(true);
+        clientBuilderFactory.set(graphqlClient, mockBuilderFactory);
 
         mockConfig = new MockGraphqlClientConfiguration();
         mockConfig.setIdentifier("mockIdentifier");
@@ -120,12 +134,6 @@ public class GraphqlClientImplTest {
             HttpHeaders.CACHE_CONTROL + " : " + CACHE_HEADER_VALUE);
 
         graphqlClient.activate(mockConfig, mock(BundleContext.class));
-        httpClient = Mockito.mock(HttpClient.class);
-
-        // Create a new executor with the mocked client for testing
-        GraphqlClientMetrics metrics = graphqlClient.getConfiguration() != null ? new GraphqlClientMetricsImpl(new MetricRegistry(),
-            graphqlClient.getConfiguration()) : GraphqlClientMetrics.NOOP;
-        graphqlClient.executor = new DefaultExecutor(httpClient, metrics, graphqlClient.getConfiguration());
 
         // Use reflection to set the private cacheInvalidator field
         cacheInvalidator = mock(CacheInvalidator.class);
@@ -228,8 +236,9 @@ public class GraphqlClientImplTest {
         // should not be possible in real world, but may happen if a regression is introduced that exposes the setHttpHeaders() of the
         // configuration
         TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
-        GraphqlClientConfigurationImpl activeConfig = (GraphqlClientConfigurationImpl) graphqlClient.getConfiguration();
-        activeConfig.setHttpHeaders("anything", "", ":Value", "Name: ", "Header: Value");
+        mockConfig.setHttpHeaders("anything", "", ":Value", "Name: ", "Header: Value");
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
+
         graphqlClient.execute(dummy, Data.class, Error.class);
 
         List<Header> expectedHeaders = new ArrayList<>();

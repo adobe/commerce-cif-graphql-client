@@ -18,14 +18,15 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.http.HttpStatus;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.sling.testing.mock.osgi.MockOsgi;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.codahale.metrics.Counter;
@@ -38,8 +39,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 public class GraphqlClientImplMetricsTest {
 
@@ -49,7 +50,7 @@ public class GraphqlClientImplMetricsTest {
     private final GraphqlClientImpl graphqlClient = new GraphqlClientImpl();
     private final GraphqlRequest dummy = new GraphqlRequest("{dummy-é}"); // with accent to check UTF-8 character
 
-    private HttpClient httpClient;
+    private CloseableHttpClient httpClient;
 
     private static class Data {}
 
@@ -57,16 +58,20 @@ public class GraphqlClientImplMetricsTest {
 
     @Before
     public void setUp() {
-        aemContext.registerService(HttpClientBuilderFactory.class, HttpClientBuilder::create);
+
+        httpClient = Mockito.mock(CloseableHttpClient.class);
+        // Mock HttpClientBuilderFactory to return our mocked HttpClient
+        HttpClientBuilderFactory mockBuilderFactory = mock(HttpClientBuilderFactory.class);
+        HttpClientBuilder mockBuilder = mock(HttpClientBuilder.class);
+        when(mockBuilderFactory.newBuilder()).thenReturn(mockBuilder);
+        when(mockBuilder.build()).thenReturn((CloseableHttpClient) httpClient);
+
+        aemContext.registerService(HttpClientBuilderFactory.class, mockBuilderFactory);
         aemContext.registerService(MetricRegistry.class, metricRegistry, "name", "cif");
         aemContext.registerInjectActivateService(graphqlClient,
             "identifier", "default",
             "url", "https://foo.bar/api");
-        httpClient = mock(HttpClient.class);
 
-        // Create a new executor with the mocked client for testing
-        GraphqlClientMetrics metrics = new GraphqlClientMetricsImpl(metricRegistry, graphqlClient.getConfiguration());
-        graphqlClient.executor = new DefaultExecutor(httpClient, metrics, graphqlClient.getConfiguration());
     }
 
     @Test
