@@ -50,6 +50,25 @@ public class DefaultExecutor implements RequestExecutor {
         this.gson = new Gson();
     }
 
+    /**
+     * Calculates the duration in milliseconds from the stop timer.
+     * 
+     * @return duration in milliseconds, or 0 if timer is null
+     */
+    protected long calculateDurationMs() {
+        Long executionTime = stopTimer.get();
+        return executionTime != null ? (long) Math.floor(executionTime / 1e6) : 0;
+    }
+
+    /**
+     * Creates a duration message for logging and exceptions.
+     * 
+     * @return duration message like " after 150ms" or empty string if no duration
+     */
+    protected String getDurationMessage() {
+        return " after " + calculateDurationMs() + "ms";
+    }
+
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         stopTimer = metrics.startRequestDurationTimer();
@@ -64,13 +83,13 @@ public class DefaultExecutor implements RequestExecutor {
             });
         } catch (IOException e) {
             metrics.incrementRequestErrors();
-            throw new RuntimeException("Failed to send GraphQL request", e);
+            throw new RuntimeException("Failed to send GraphQL request" + getDurationMessage(), e);
         }
     }
 
     private RuntimeException handleErrorResponse(StatusLine statusLine) {
         metrics.incrementRequestErrors(statusLine.getStatusCode());
-        throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
+        throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode() + getDurationMessage());
     }
 
     @Override
@@ -92,22 +111,26 @@ public class DefaultExecutor implements RequestExecutor {
             json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
             Long executionTime = stopTimer.get();
             if (executionTime != null) {
-                LOGGER.debug("Executed in {}ms", Math.floor(executionTime / 1e6));
+                LOGGER.debug("Executed in {}ms", calculateDurationMs());
             }
         } catch (Exception e) {
             metrics.incrementRequestErrors();
-            throw new RuntimeException("Failed to read HTTP response content", e);
+            throw new RuntimeException("Failed to read HTTP response content" + getDurationMessage(), e);
         }
 
         Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
         Type type = TypeToken.getParameterized(GraphqlResponse.class, typeOfT, typeofU).getType();
         GraphqlResponse<T, U> response = gson.fromJson(json, type);
 
+        // Set duration on response
+        response.setDuration(calculateDurationMs());
+
         // We log GraphQL errors because they might otherwise get "silently" unnoticed
         if (response.getErrors() != null) {
             Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
             String errors = gson.toJson(response.getErrors(), listErrorsType);
-            LOGGER.warn("GraphQL request {} returned some errors {}", request.getQuery(), errors);
+            LOGGER.warn("GraphQL request {} returned some errors{}: {}",
+                request.getQuery(), getDurationMessage(), errors);
         }
 
         return response;

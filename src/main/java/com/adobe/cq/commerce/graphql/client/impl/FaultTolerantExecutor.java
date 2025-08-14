@@ -55,10 +55,11 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                 () -> executeHttpRequest(request, typeOfT, typeofU, options));
         } catch (CircuitBreakerOpenException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e);
+            throw new GraphqlRequestException("GraphQL service temporarily unavailable (circuit breaker open)" + getDurationMessage()
+                + ". Please try again later.", e);
         } catch (FailsafeException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to execute GraphQL request: " + e.getMessage(), e);
+            throw new GraphqlRequestException("Failed to execute GraphQL request" + getDurationMessage() + ": " + e.getMessage(), e);
         }
     }
 
@@ -77,9 +78,9 @@ public class FaultTolerantExecutor extends DefaultExecutor {
 
                     // Special handling for 503 Service Unavailable
                     if (statusCode == HttpStatus.SC_SERVICE_UNAVAILABLE) {
-                        throw new ServiceUnavailableException(errorMessage, responseBody);
+                        throw new ServiceUnavailableException(errorMessage + getDurationMessage(), responseBody);
                     }
-                    throw new ServerErrorException(errorMessage, statusCode, responseBody);
+                    throw new ServerErrorException(errorMessage + getDurationMessage(), statusCode, responseBody);
                 }
                 if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
                     return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
@@ -88,12 +89,12 @@ public class FaultTolerantExecutor extends DefaultExecutor {
             });
         } catch (IOException e) {
             metrics.incrementRequestErrors();
-            throw new RuntimeException("Failed to send GraphQL request", e);
+            throw new RuntimeException("Failed to send GraphQL request" + getDurationMessage(), e);
         }
     }
 
     private RuntimeException handleErrorResponse(StatusLine statusLine) {
         metrics.incrementRequestErrors(statusLine.getStatusCode());
-        throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode());
+        throw new RuntimeException("GraphQL query failed with response code " + statusLine.getStatusCode() + getDurationMessage());
     }
 }
