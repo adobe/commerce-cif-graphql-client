@@ -188,7 +188,9 @@ public class GraphqlClientImpl implements GraphqlClient {
             registration.unregister();
         }
 
-        executor.close();
+        if (executor != null) {
+            executor.close();
+        }
     }
 
     private void configureCaches(GraphqlClientConfiguration configuration) {
