@@ -488,6 +488,16 @@ public class GraphqlClientImplTest {
         verify(logger).warn(eq("Failed to close http client: {}"), eq("Connection reset"), any(IOException.class));
     }
 
+    @Test
+    public void testDeactivateWhenExecutorIsNull() throws Exception {
+        // given - create a client with no executor (simulating early return from activate)
+        GraphqlClientImpl clientWithNoExecutor = new GraphqlClientImpl();
+
+        // when - call deactivate
+        // then - no exception should be thrown, executor.close() should not be called
+        clientWithNoExecutor.deactivate();
+    }
+
     private void setLoggerField() {
         try {
             Field loggerField = DefaultExecutor.class.getDeclaredField("LOGGER");
