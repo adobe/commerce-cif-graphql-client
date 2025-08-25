@@ -20,6 +20,7 @@ public class GraphqlResponse<T, U> {
 
     protected T data;
     protected List<U> errors;
+    protected Long duration = Long.valueOf(0);
 
     public T getData() {
         return data;
@@ -35,5 +36,23 @@ public class GraphqlResponse<T, U> {
 
     public void setErrors(List<U> errors) {
         this.errors = errors;
+    }
+
+    /**
+     * Returns the execution duration in milliseconds, or null if not available.
+     * 
+     * @return execution duration in milliseconds
+     */
+    public Long getDuration() {
+        return duration;
+    }
+
+    /**
+     * Sets the execution duration in milliseconds.
+     * 
+     * @param duration execution duration in milliseconds
+     */
+    public void setDuration(Long duration) {
+        this.duration = duration;
     }
 }

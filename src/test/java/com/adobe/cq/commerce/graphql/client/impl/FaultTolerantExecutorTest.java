@@ -32,6 +32,7 @@ import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
+import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
@@ -151,8 +152,8 @@ public class FaultTolerantExecutorTest {
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
                 fail("Expected ServerErrorException for status code " + serverErrorCodes[i]);
-            } catch (RuntimeException e) {
-                assertEquals("GraphQL query failed with response code " + serverErrorCodes[i], e.getMessage());
+            } catch (GraphqlRequestException e) {
+                assertEquals("GraphQL query failed with response code " + serverErrorCodes[i], e.getOriginalMessage());
             }
 
             verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
@@ -220,7 +221,7 @@ public class FaultTolerantExecutorTest {
             graphqlClient.execute(dummy, Data.class, Error.class);
             fail("Expected GraphqlRequestException");
         } catch (GraphqlRequestException e) {
-            assertEquals("Failed to execute GraphQL request: Failsafe error occurred", e.getMessage());
+            assertEquals("Failed to execute GraphQL request: Failsafe error occurred", e.getOriginalMessage());
             assertTrue(e.getCause() instanceof FailsafeException);
         }
 
@@ -284,8 +285,8 @@ public class FaultTolerantExecutorTest {
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
                 fail("Expected RuntimeException for status code " + clientErrorCodes[i]);
-            } catch (RuntimeException e) {
-                assertEquals("GraphQL query failed with response code " + clientErrorCodes[i], e.getMessage());
+            } catch (GraphqlRequestException e) {
+                assertEquals("GraphQL query failed with response code " + clientErrorCodes[i], e.getOriginalMessage());
             }
         }
     }
@@ -344,9 +345,9 @@ public class FaultTolerantExecutorTest {
 
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException from handleErrorResponse");
-        } catch (RuntimeException e) {
-            assertEquals("GraphQL query failed with response code 400", e.getMessage());
+            fail("Expected GraphqlRequestException from handleErrorResponse");
+        } catch (GraphqlRequestException e) {
+            assertEquals("GraphQL query failed with response code 400", e.getOriginalMessage());
         }
 
         verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
