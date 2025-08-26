@@ -276,7 +276,9 @@ public class GraphqlClientImplTest {
         } catch (Exception e) {
             exception = e;
         }
-        assertEquals("GraphQL query failed with response code 503", exception.getMessage());
+        assertEquals(
+            "GraphQL query failed with response code 503",
+            ((GraphqlRequestException) exception).getOriginalMessage());
     }
 
     @Test
