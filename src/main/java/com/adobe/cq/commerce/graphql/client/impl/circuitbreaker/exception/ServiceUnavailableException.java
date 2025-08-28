@@ -11,85 +11,73 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 
 /**
- * Custom exception for server errors with status code and response body.
- * This exception is used by the circuit breaker policies to differentiate between different types of server errors:
- * - 503 Service Unavailable errors are handled with a progressive delay policy
- * - Other 5xx errors are handled with a constant delay policy
- * Each type of error has its own circuit breaker with specific thresholds and delay strategies.
+ * Custom exception for 503 Service Unavailable errors.
+ * This exception is used by the circuit breaker policies to handle 503 errors with a progressive delay strategy.
+ * The exception type itself indicates the error category, eliminating the need for status code checking.
  */
-public class ServerErrorException extends GraphqlRequestException {
-    private final int statusCode;
+public class ServiceUnavailableException extends GraphqlRequestException {
     private final String responseBody;
 
     /**
-     * Creates a new ServerErrorException with the given message, status code and response body.
+     * Creates a new ServiceUnavailableException with the given message and response body.
      * 
      * @param message The error message
-     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      */
-    public ServerErrorException(String message, int statusCode, String responseBody) {
+    public ServiceUnavailableException(String message, String responseBody) {
         super(message, 0);
-        this.statusCode = statusCode;
         this.responseBody = responseBody;
     }
 
     /**
-     * Creates a new ServerErrorException with the given message, status code, response body and duration.
+     * Creates a new ServiceUnavailableException with the given message, response body and duration.
      * 
      * @param message The error message
-     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      * @param durationMs The duration in milliseconds
      */
-    public ServerErrorException(String message, int statusCode, String responseBody, long durationMs) {
+    public ServiceUnavailableException(String message, String responseBody, long durationMs) {
         super(message, durationMs);
-        this.statusCode = statusCode;
         this.responseBody = responseBody;
     }
 
     /**
-     * Creates a new ServerErrorException with the given message, status code, response body and cause.
+     * Creates a new ServiceUnavailableException with the given message, response body and cause.
      * 
      * @param message The error message
-     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      * @param cause The throwable that caused this exception
      */
-    public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause) {
+    public ServiceUnavailableException(String message, String responseBody, Throwable cause) {
         super(message, cause, 0);
-        this.statusCode = statusCode;
         this.responseBody = responseBody;
     }
 
     /**
-     * Creates a new ServerErrorException with the given message, status code, response body, cause and duration.
+     * Creates a new ServiceUnavailableException with the given message, response body, cause and duration.
      * 
      * @param message The error message
-     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      * @param cause The throwable that caused this exception
      * @param durationMs The duration in milliseconds
      */
-    public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause, long durationMs) {
+    public ServiceUnavailableException(String message, String responseBody, Throwable cause, long durationMs) {
         super(message, cause, durationMs);
-        this.statusCode = statusCode;
         this.responseBody = responseBody;
     }
 
     /**
-     * Gets the HTTP status code. This is used by circuit breaker policies to determine
-     * which handling strategy to apply (progressive delay for 503, constant delay for other 5xx).
+     * Gets the HTTP status code. This method always returns 503 for ServiceUnavailableException.
      * 
-     * @return The HTTP status code
+     * @return The HTTP status code (always 503)
      */
     public int getStatusCode() {
-        return statusCode;
+        return 503;
     }
 
     /**

@@ -25,9 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.*;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Service;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerErrorException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeoutException;
 import dev.failsafe.CircuitBreakerOpenException;
 import dev.failsafe.FailsafeException;
 
@@ -35,11 +36,11 @@ public class FaultTolerantExecutor extends DefaultExecutor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FaultTolerantExecutor.class);
 
-    private CircuitBreakerService circuitBreakerService;
+    private Service circuitBreakerService;
 
     public FaultTolerantExecutor(HttpClient client, GraphqlClientMetrics metrics, GraphqlClientConfiguration configuration) {
         super(client, metrics, configuration);
-        this.circuitBreakerService = new CircuitBreakerService();
+        this.circuitBreakerService = new Service();
     }
 
     @Override
@@ -83,6 +84,10 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                 }
                 throw handleErrorResponse(statusLine);
             });
+        } catch (java.net.SocketTimeoutException e) {
+            metrics.incrementRequestErrors();
+            throw new SocketTimeoutException("Read timeout occurred while sending GraphQL request",
+                "Timeout details: " + e.getMessage(), e, calculateDuration());
         } catch (IOException e) {
             metrics.incrementRequestErrors();
             throw new GraphqlRequestException("Failed to send GraphQL request", e, calculateDuration());

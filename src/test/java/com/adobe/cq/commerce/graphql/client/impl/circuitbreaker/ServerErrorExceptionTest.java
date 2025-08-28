@@ -18,6 +18,8 @@ import java.io.IOException;
 
 import org.junit.Test;
 
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerErrorException;
+
 import static org.junit.Assert.*;
 
 public class ServerErrorExceptionTest {
