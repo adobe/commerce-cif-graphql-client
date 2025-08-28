@@ -18,11 +18,11 @@ import java.io.IOException;
 
 import org.junit.Test;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerErrorException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
 
 import static org.junit.Assert.*;
 
-public class ServerErrorExceptionTest {
+public class ServerErrorTest {
 
     // Test constants
     private static final String ERROR_MESSAGE = "Server error occurred";
@@ -32,7 +32,7 @@ public class ServerErrorExceptionTest {
     private static final long DURATION_MS = 1200L;
 
     // Helper method for basic assertions
-    private void assertBasicProperties(ServerErrorException exception, String expectedMessage,
+    private void assertBasicProperties(ServerError exception, String expectedMessage,
         int expectedStatusCode, String expectedResponseBody) {
         assertEquals(expectedMessage, exception.getOriginalMessage());
         assertEquals(expectedStatusCode, exception.getStatusCode());
@@ -41,7 +41,7 @@ public class ServerErrorExceptionTest {
 
     @Test
     public void testConstructorWithDuration() {
-        ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY, DURATION_MS);
+        ServerError exception = new ServerError(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY, DURATION_MS);
 
         assertBasicProperties(exception, ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
         assertEquals(DURATION_MS, exception.getDurationMs());
@@ -52,7 +52,7 @@ public class ServerErrorExceptionTest {
     @Test
     public void testConstructorWithCauseAndDuration() {
         IOException cause = new IOException("Connection timeout");
-        ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY, cause, DURATION_MS);
+        ServerError exception = new ServerError(ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY, cause, DURATION_MS);
 
         assertBasicProperties(exception, ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY);
         assertEquals(DURATION_MS, exception.getDurationMs());
@@ -62,8 +62,8 @@ public class ServerErrorExceptionTest {
 
     @Test
     public void testInheritanceFromGraphqlRequestException() {
-        ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
-        assertTrue("ServerErrorException should extend GraphqlRequestException",
+        ServerError exception = new ServerError(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
+        assertTrue("ServerError should extend GraphqlRequestException",
             exception instanceof com.adobe.cq.commerce.graphql.client.GraphqlRequestException);
     }
 }

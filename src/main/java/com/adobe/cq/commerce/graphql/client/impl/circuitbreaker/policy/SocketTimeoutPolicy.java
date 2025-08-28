@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Policy;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeoutException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
 import dev.failsafe.CircuitBreaker;
 
 /**
@@ -41,7 +41,7 @@ public class SocketTimeoutPolicy implements Policy {
     @Override
     public CircuitBreaker<Object> createCircuitBreaker() {
         return CircuitBreaker.builder()
-            .handleIf(SocketTimeoutException.class::isInstance)
+            .handleIf(SocketTimeout.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelayFn(context -> {
                 long delay = (long) (config.getInitialDelayMs() * Math.pow(config.getDelayMultiplier(), (double) (currentAttempt - 1)));
@@ -69,6 +69,6 @@ public class SocketTimeoutPolicy implements Policy {
 
     @Override
     public Class<? extends Exception> getHandledException() {
-        return SocketTimeoutException.class;
+        return SocketTimeout.class;
     }
 }

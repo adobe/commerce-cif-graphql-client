@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Policy;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerErrorException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
 import dev.failsafe.CircuitBreaker;
 
 /**
@@ -40,7 +40,7 @@ public class ServerErrorPolicy implements Policy {
     @Override
     public CircuitBreaker<Object> createCircuitBreaker() {
         return CircuitBreaker.builder()
-            .handleIf(ServerErrorException.class::isInstance)
+            .handleIf(ServerError.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelay(Duration.ofMillis(config.getDelayMs()))
             .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
@@ -56,6 +56,6 @@ public class ServerErrorPolicy implements Policy {
 
     @Override
     public Class<? extends Exception> getHandledException() {
-        return ServerErrorException.class;
+        return ServerError.class;
     }
 }

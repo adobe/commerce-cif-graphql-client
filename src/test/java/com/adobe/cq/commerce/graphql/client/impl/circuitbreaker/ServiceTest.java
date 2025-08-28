@@ -20,9 +20,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockitoAnnotations;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerErrorException;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailableException;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeoutException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
 
 import static org.junit.Assert.*;
 
@@ -51,26 +51,26 @@ public class ServiceTest {
     }
 
     @Test
-    public void testExecuteWithPoliciesWithServiceUnavailableException() throws IOException {
+    public void testExecuteWithPoliciesWithServiceUnavailable() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServiceUnavailableException("Service unavailable", "Service down");
+                throw new ServiceUnavailable("Service unavailable", "Service down");
             });
-            fail("Expected ServiceUnavailableException to be thrown");
-        } catch (ServiceUnavailableException e) {
+            fail("Expected ServiceUnavailable to be thrown");
+        } catch (ServiceUnavailable e) {
             assertEquals("Service unavailable", e.getMessage());
             assertEquals("Service down", e.getResponseBody());
         }
     }
 
     @Test
-    public void testExecuteWithPoliciesWithServerErrorException() throws IOException {
+    public void testExecuteWithPoliciesWithServerError() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServerErrorException("Server error", 500, "Internal server error");
+                throw new ServerError("Server error", 500, "Internal server error");
             });
-            fail("Expected ServerErrorException to be thrown");
-        } catch (ServerErrorException e) {
+            fail("Expected ServerError to be thrown");
+        } catch (ServerError e) {
             assertEquals("Server error", e.getMessage());
             assertEquals(500, e.getStatusCode());
             assertEquals("Internal server error", e.getResponseBody());
@@ -78,13 +78,13 @@ public class ServiceTest {
     }
 
     @Test
-    public void testExecuteWithPoliciesWithSocketTimeoutException() throws IOException {
+    public void testExecuteWithPoliciesWithSocketTimeout() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new SocketTimeoutException("Socket timeout", "Connection timed out", 5000L);
+                throw new SocketTimeout("Socket timeout", "Connection timed out", 5000L);
             });
-            fail("Expected SocketTimeoutException to be thrown");
-        } catch (SocketTimeoutException e) {
+            fail("Expected SocketTimeout to be thrown");
+        } catch (SocketTimeout e) {
             assertEquals("Socket timeout", e.getOriginalMessage());
             assertEquals("Connection timed out", e.getDetails());
             assertEquals(5000L, e.getDurationMs());
@@ -126,33 +126,33 @@ public class ServiceTest {
     public void testAllThreeCircuitBreakerPolicies() {
         // Test that all three circuit breaker policies are integrated and handle their respective exceptions
 
-        // Test ServiceUnavailableException handling
+        // Test ServiceUnavailable handling
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServiceUnavailableException("Service down", "Maintenance mode");
+                throw new ServiceUnavailable("Service down", "Maintenance mode");
             });
-            fail("Expected ServiceUnavailableException");
-        } catch (ServiceUnavailableException e) {
+            fail("Expected ServiceUnavailable");
+        } catch (ServiceUnavailable e) {
             assertEquals("Service down", e.getOriginalMessage());
         }
 
-        // Test ServerErrorException handling
+        // Test ServerError handling
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServerErrorException("Internal error", 500, "Database unavailable");
+                throw new ServerError("Internal error", 500, "Database unavailable");
             });
-            fail("Expected ServerErrorException");
-        } catch (ServerErrorException e) {
+            fail("Expected ServerError");
+        } catch (ServerError e) {
             assertEquals("Internal error", e.getOriginalMessage());
         }
 
-        // Test SocketTimeoutException handling
+        // Test SocketTimeout handling
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new SocketTimeoutException("Timeout", "Connection timeout", 10000L);
+                throw new SocketTimeout("Timeout", "Connection timeout", 10000L);
             });
-            fail("Expected SocketTimeoutException");
-        } catch (SocketTimeoutException e) {
+            fail("Expected SocketTimeout");
+        } catch (SocketTimeout e) {
             assertEquals("Timeout", e.getOriginalMessage());
         }
     }

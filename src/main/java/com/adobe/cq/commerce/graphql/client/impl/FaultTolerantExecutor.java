@@ -26,9 +26,9 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.*;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Service;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerErrorException;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailableException;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeoutException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
 import dev.failsafe.CircuitBreakerOpenException;
 import dev.failsafe.FailsafeException;
 
@@ -75,9 +75,9 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                     LOGGER.warn("Received {} from endpoint {}", errorMessage, configuration.url());
                     // Special handling for 503 Service Unavailable
                     if (statusCode == HttpStatus.SC_SERVICE_UNAVAILABLE) {
-                        throw new ServiceUnavailableException(errorMessage, responseBody, calculateDuration());
+                        throw new ServiceUnavailable(errorMessage, responseBody, calculateDuration());
                     }
-                    throw new ServerErrorException(errorMessage, statusCode, responseBody, calculateDuration());
+                    throw new ServerError(errorMessage, statusCode, responseBody, calculateDuration());
                 }
                 if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
                     return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
@@ -86,7 +86,7 @@ public class FaultTolerantExecutor extends DefaultExecutor {
             });
         } catch (java.net.SocketTimeoutException e) {
             metrics.incrementRequestErrors();
-            throw new SocketTimeoutException("Read timeout occurred while sending GraphQL request",
+            throw new SocketTimeout("Read timeout occurred while sending GraphQL request",
                 "Timeout details: " + e.getMessage(), e, calculateDuration());
         } catch (IOException e) {
             metrics.incrementRequestErrors();

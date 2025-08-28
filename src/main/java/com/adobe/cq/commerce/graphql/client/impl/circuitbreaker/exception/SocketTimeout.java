@@ -20,7 +20,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
  * This exception is used by the circuit breaker policies to handle socket timeout errors with a specific retry strategy.
  * The exception type itself indicates the error category, eliminating the need for specific timeout checking.
  */
-public class SocketTimeoutException extends GraphqlRequestException {
+public class SocketTimeout extends GraphqlRequestException {
     private final String details;
 
     /**
@@ -29,7 +29,7 @@ public class SocketTimeoutException extends GraphqlRequestException {
      * @param message The error message
      * @param details Additional details about the timeout, may contain connection information
      */
-    public SocketTimeoutException(String message, String details) {
+    public SocketTimeout(String message, String details) {
         super(message, 0);
         this.details = details;
     }
@@ -41,7 +41,7 @@ public class SocketTimeoutException extends GraphqlRequestException {
      * @param details Additional details about the timeout, may contain connection information
      * @param durationMs The duration in milliseconds
      */
-    public SocketTimeoutException(String message, String details, long durationMs) {
+    public SocketTimeout(String message, String details, long durationMs) {
         super(message, durationMs);
         this.details = details;
     }
@@ -53,7 +53,7 @@ public class SocketTimeoutException extends GraphqlRequestException {
      * @param details Additional details about the timeout, may contain connection information
      * @param cause The throwable that caused this exception
      */
-    public SocketTimeoutException(String message, String details, Throwable cause) {
+    public SocketTimeout(String message, String details, Throwable cause) {
         super(message, cause, 0);
         this.details = details;
     }
@@ -66,7 +66,7 @@ public class SocketTimeoutException extends GraphqlRequestException {
      * @param cause The throwable that caused this exception
      * @param durationMs The duration in milliseconds
      */
-    public SocketTimeoutException(String message, String details, Throwable cause, long durationMs) {
+    public SocketTimeout(String message, String details, Throwable cause, long durationMs) {
         super(message, cause, durationMs);
         this.details = details;
     }

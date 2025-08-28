@@ -18,11 +18,11 @@ import java.io.IOException;
 
 import org.junit.Test;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
 
 import static org.junit.Assert.*;
 
-public class ServiceUnavailableExceptionTest {
+public class ServiceUnavailableTest {
 
     // Test constants
     private static final String ERROR_MESSAGE = "Service temporarily unavailable";
@@ -31,7 +31,7 @@ public class ServiceUnavailableExceptionTest {
     private static final int EXPECTED_STATUS_CODE = 503;
 
     // Helper method for common assertions
-    private void assertServiceUnavailableException(ServiceUnavailableException exception, String expectedMessage,
+    private void assertServiceUnavailable(ServiceUnavailable exception, String expectedMessage,
         String expectedResponseBody, long expectedDuration, Throwable expectedCause) {
         assertEquals(expectedMessage, exception.getOriginalMessage());
         assertEquals(EXPECTED_STATUS_CODE, exception.getStatusCode());
@@ -42,26 +42,26 @@ public class ServiceUnavailableExceptionTest {
 
     @Test
     public void testConstructorWithDuration() {
-        ServiceUnavailableException exception = new ServiceUnavailableException(ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS);
+        ServiceUnavailable exception = new ServiceUnavailable(ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS);
 
-        assertServiceUnavailableException(exception, ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS, null);
+        assertServiceUnavailable(exception, ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS, null);
         assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
     }
 
     @Test
     public void testConstructorWithCauseAndDuration() {
         IOException cause = new IOException("Network timeout");
-        ServiceUnavailableException exception = new ServiceUnavailableException(ERROR_MESSAGE, RESPONSE_BODY, cause, DURATION_MS);
+        ServiceUnavailable exception = new ServiceUnavailable(ERROR_MESSAGE, RESPONSE_BODY, cause, DURATION_MS);
 
-        assertServiceUnavailableException(exception, ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS, cause);
+        assertServiceUnavailable(exception, ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS, cause);
         assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
     }
 
     @Test
     public void testStatusCodeAlwaysReturns503() {
         // Verify that getStatusCode() always returns 503, regardless of constructor used
-        ServiceUnavailableException exception1 = new ServiceUnavailableException(ERROR_MESSAGE, RESPONSE_BODY);
-        ServiceUnavailableException exception2 = new ServiceUnavailableException(ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS);
+        ServiceUnavailable exception1 = new ServiceUnavailable(ERROR_MESSAGE, RESPONSE_BODY);
+        ServiceUnavailable exception2 = new ServiceUnavailable(ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS);
 
         assertEquals(EXPECTED_STATUS_CODE, exception1.getStatusCode());
         assertEquals(EXPECTED_STATUS_CODE, exception2.getStatusCode());

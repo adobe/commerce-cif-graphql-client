@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Policy;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
 import dev.failsafe.CircuitBreaker;
 
 /**
@@ -41,7 +41,7 @@ public class ServiceUnavailablePolicy implements Policy {
     @Override
     public CircuitBreaker<Object> createCircuitBreaker() {
         return CircuitBreaker.builder()
-            .handleIf(ServiceUnavailableException.class::isInstance)
+            .handleIf(ServiceUnavailable.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelayFn(context -> {
                 long delay = (long) (config.getInitialDelayMs() * Math.pow(config.getDelayMultiplier(), (double) (currentAttempt - 1)));
@@ -69,6 +69,6 @@ public class ServiceUnavailablePolicy implements Policy {
 
     @Override
     public Class<? extends Exception> getHandledException() {
-        return ServiceUnavailableException.class;
+        return ServiceUnavailable.class;
     }
 }

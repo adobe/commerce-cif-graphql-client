@@ -97,4 +97,30 @@ public class ConfigurationTest {
             fail("Configuration should handle edge cases gracefully: " + e.getMessage());
         }
     }
+
+    @Test
+    public void testConfigurationGetters() {
+        Configuration.ServiceUnavailableConfig serviceConfig = configuration.getServiceUnavailableConfig();
+        Configuration.ServerErrorConfig serverConfig = configuration.getServerErrorConfig();
+        Configuration.SocketTimeoutConfig socketConfig = configuration.getSocketTimeoutConfig();
+
+        // Test ServiceUnavailableConfig getters
+        assertTrue("Threshold should be positive", serviceConfig.getThreshold() > 0);
+        assertTrue("Initial delay should be positive", serviceConfig.getInitialDelayMs() > 0);
+        assertTrue("Max delay should be positive", serviceConfig.getMaxDelayMs() > 0);
+        assertTrue("Delay multiplier should be positive", serviceConfig.getDelayMultiplier() > 0);
+        assertTrue("Success threshold should be positive", serviceConfig.getSuccessThreshold() > 0);
+
+        // Test ServerErrorConfig getters
+        assertTrue("Threshold should be positive", serverConfig.getThreshold() > 0);
+        assertTrue("Delay should be positive", serverConfig.getDelayMs() > 0);
+        assertTrue("Success threshold should be positive", serverConfig.getSuccessThreshold() > 0);
+
+        // Test SocketTimeoutConfig getters
+        assertTrue("Threshold should be positive", socketConfig.getThreshold() > 0);
+        assertTrue("Initial delay should be positive", socketConfig.getInitialDelayMs() > 0);
+        assertTrue("Max delay should be positive", socketConfig.getMaxDelayMs() > 0);
+        assertTrue("Delay multiplier should be positive", socketConfig.getDelayMultiplier() > 0);
+        assertTrue("Success threshold should be positive", socketConfig.getSuccessThreshold() > 0);
+    }
 }
