@@ -87,7 +87,7 @@ public class Configuration {
             getIntProperty("circuit.breaker.timeout.success.threshold", DEFAULT_TIMEOUT_SUCCESS_THRESHOLD));
     }
 
-    private Properties loadProperties() {
+    protected Properties loadProperties() {
         Properties props = new Properties();
         try (InputStream in = getClass().getClassLoader().getResourceAsStream(
             "com/adobe/cq/commerce/graphql/client/impl/circuitbreaker/circuit-breaker.properties")) {

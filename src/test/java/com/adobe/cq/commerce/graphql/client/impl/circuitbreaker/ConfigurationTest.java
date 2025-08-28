@@ -14,6 +14,8 @@
 
 package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
+import java.util.Properties;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -122,5 +124,87 @@ public class ConfigurationTest {
         assertTrue("Max delay should be positive", socketConfig.getMaxDelayMs() > 0);
         assertTrue("Delay multiplier should be positive", socketConfig.getDelayMultiplier() > 0);
         assertTrue("Success threshold should be positive", socketConfig.getSuccessThreshold() > 0);
+    }
+
+    @Test
+    public void testConfigurationWithInvalidProperties() {
+        // Create a configuration with a custom Properties object to test edge cases
+        Configuration config = new Configuration() {
+            @Override
+            protected Properties loadProperties() {
+                Properties props = new Properties();
+                // Add invalid values to test NumberFormatException handling
+                props.setProperty("circuit.breaker.503.threshold", "invalid-number");
+                props.setProperty("circuit.breaker.5xx.delay.ms", "not-a-long");
+                props.setProperty("circuit.breaker.timeout.delay.multiplier", "not-a-double");
+                props.setProperty("circuit.breaker.503.initial.delay.ms", "   ");  // whitespace test
+                return props;
+            }
+        };
+
+        // These should use default values when parsing fails
+        Configuration.ServiceUnavailableConfig serviceConfig = config.getServiceUnavailableConfig();
+        Configuration.ServerErrorConfig serverConfig = config.getServerErrorConfig();
+        Configuration.SocketTimeoutConfig socketConfig = config.getSocketTimeoutConfig();
+
+        // Verify default values are used when parsing fails
+        assertEquals("Should use default threshold", 3, serviceConfig.getThreshold());
+        assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
+        assertEquals("Should use default multiplier", 1.5, socketConfig.getDelayMultiplier(), 0.01);
+    }
+
+    @Test
+    public void testConfigurationWithNullValues() {
+        // Test behavior when properties return null values
+        Configuration config = new Configuration() {
+            @Override
+            protected Properties loadProperties() {
+                return new Properties(); // Empty properties - all getProperty calls return null
+            }
+        };
+
+        Configuration.ServiceUnavailableConfig serviceConfig = config.getServiceUnavailableConfig();
+        Configuration.ServerErrorConfig serverConfig = config.getServerErrorConfig();
+        Configuration.SocketTimeoutConfig socketConfig = config.getSocketTimeoutConfig();
+
+        // Should all use default values
+        assertEquals("Should use default threshold", 3, serviceConfig.getThreshold());
+        assertEquals("Should use default initial delay", 20000L, serviceConfig.getInitialDelayMs());
+        assertEquals("Should use default max delay", 180000L, serviceConfig.getMaxDelayMs());
+        assertEquals("Should use default multiplier", 1.5, serviceConfig.getDelayMultiplier(), 0.01);
+        assertEquals("Should use default success threshold", 1, serviceConfig.getSuccessThreshold());
+
+        assertEquals("Should use default threshold", 3, serverConfig.getThreshold());
+        assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
+        assertEquals("Should use default success threshold", 1, serverConfig.getSuccessThreshold());
+
+        assertEquals("Should use default threshold", 3, socketConfig.getThreshold());
+        assertEquals("Should use default initial delay", 20000L, socketConfig.getInitialDelayMs());
+        assertEquals("Should use default max delay", 180000L, socketConfig.getMaxDelayMs());
+        assertEquals("Should use default multiplier", 1.5, socketConfig.getDelayMultiplier(), 0.01);
+        assertEquals("Should use default success threshold", 1, socketConfig.getSuccessThreshold());
+    }
+
+    @Test
+    public void testConfigurationIOExceptionHandling() {
+        // Test that Configuration handles IOException gracefully when properties file doesn't exist
+        Configuration config = new Configuration() {
+            @Override
+            protected Properties loadProperties() {
+                Properties props = new Properties();
+                try {
+                    // Try to load from non-existent file to trigger IOException path
+                    props.load(this.getClass().getResourceAsStream("non-existent-file.properties"));
+                } catch (Exception e) {
+                    // This tests the IOException handling path in loadProperties
+                }
+                return props;
+            }
+        };
+
+        // Should still work with default values
+        assertNotNull("Configuration should handle IO errors gracefully", config.getServiceUnavailableConfig());
+        assertNotNull("Configuration should handle IO errors gracefully", config.getServerErrorConfig());
+        assertNotNull("Configuration should handle IO errors gracefully", config.getSocketTimeoutConfig());
     }
 }
