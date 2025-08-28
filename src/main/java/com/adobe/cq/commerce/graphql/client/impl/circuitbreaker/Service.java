@@ -20,9 +20,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.ServerErrorPolicy;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.ServiceUnavailablePolicy;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.SocketTimeoutPolicy;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.ServerError;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.ServiceUnavailable;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.SocketTimeout;
 import dev.failsafe.CircuitBreaker;
 import dev.failsafe.Failsafe;
 
@@ -47,9 +47,9 @@ public class Service {
     public Service(Configuration configuration) {
         // Create policies with their configurations
         List<Policy> policies = Arrays.asList(
-            new ServiceUnavailablePolicy(configuration.getServiceUnavailableConfig()),
-            new ServerErrorPolicy(configuration.getServerErrorConfig()),
-            new SocketTimeoutPolicy(configuration.getSocketTimeoutConfig()));
+            new ServiceUnavailable(configuration.getServiceUnavailableConfig()),
+            new ServerError(configuration.getServerErrorConfig()),
+            new SocketTimeout(configuration.getSocketTimeoutConfig()));
 
         // Create circuit breakers from policies
         this.circuitBreakers = policies.stream()

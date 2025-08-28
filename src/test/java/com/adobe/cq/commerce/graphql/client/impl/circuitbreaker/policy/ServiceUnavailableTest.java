@@ -18,20 +18,19 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
 import dev.failsafe.CircuitBreaker;
 
 import static org.junit.Assert.*;
 
-public class ServiceUnavailablePolicyTest {
+public class ServiceUnavailableTest {
 
-    private ServiceUnavailablePolicy policy;
+    private ServiceUnavailable policy;
     private Configuration.ServiceUnavailableConfig config;
 
     @Before
     public void setUp() {
         config = new Configuration.ServiceUnavailableConfig(3, 20000L, 180000L, 1.5, 1);
-        policy = new ServiceUnavailablePolicy(config);
+        policy = new ServiceUnavailable(config);
     }
 
     @Test
@@ -41,7 +40,8 @@ public class ServiceUnavailablePolicyTest {
 
     @Test
     public void testGetHandledException() {
-        assertEquals(ServiceUnavailable.class, policy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable.class, policy
+            .getHandledException());
     }
 
     @Test
@@ -54,10 +54,11 @@ public class ServiceUnavailablePolicyTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.ServiceUnavailableConfig testConfig = new Configuration.ServiceUnavailableConfig(5, 30000L, 300000L, 2.0, 2);
-        ServiceUnavailablePolicy testPolicy = new ServiceUnavailablePolicy(testConfig);
+        ServiceUnavailable testPolicy = new ServiceUnavailable(testConfig);
 
         assertEquals("ServiceUnavailable", testPolicy.getPolicyName());
-        assertEquals(ServiceUnavailable.class, testPolicy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable.class, testPolicy
+            .getHandledException());
 
         CircuitBreaker<Object> circuitBreaker = testPolicy.createCircuitBreaker();
         assertNotNull(circuitBreaker);

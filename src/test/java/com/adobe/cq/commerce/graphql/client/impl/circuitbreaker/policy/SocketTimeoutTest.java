@@ -18,20 +18,19 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
 import dev.failsafe.CircuitBreaker;
 
 import static org.junit.Assert.*;
 
-public class SocketTimeoutPolicyTest {
+public class SocketTimeoutTest {
 
-    private SocketTimeoutPolicy policy;
+    private SocketTimeout policy;
     private Configuration.SocketTimeoutConfig config;
 
     @Before
     public void setUp() {
         config = new Configuration.SocketTimeoutConfig(3, 20000L, 180000L, 1.5, 1);
-        policy = new SocketTimeoutPolicy(config);
+        policy = new SocketTimeout(config);
     }
 
     @Test
@@ -41,7 +40,7 @@ public class SocketTimeoutPolicyTest {
 
     @Test
     public void testGetHandledException() {
-        assertEquals(SocketTimeout.class, policy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout.class, policy.getHandledException());
     }
 
     @Test
@@ -54,10 +53,11 @@ public class SocketTimeoutPolicyTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.SocketTimeoutConfig testConfig = new Configuration.SocketTimeoutConfig(5, 30000L, 300000L, 2.0, 2);
-        SocketTimeoutPolicy testPolicy = new SocketTimeoutPolicy(testConfig);
+        SocketTimeout testPolicy = new SocketTimeout(testConfig);
 
         assertEquals("SocketTimeout", testPolicy.getPolicyName());
-        assertEquals(SocketTimeout.class, testPolicy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout.class, testPolicy
+            .getHandledException());
 
         CircuitBreaker<Object> circuitBreaker = testPolicy.createCircuitBreaker();
         assertNotNull(circuitBreaker);

@@ -18,20 +18,19 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
 import dev.failsafe.CircuitBreaker;
 
 import static org.junit.Assert.*;
 
-public class ServerErrorPolicyTest {
+public class ServerErrorTest {
 
-    private ServerErrorPolicy policy;
+    private ServerError policy;
     private Configuration.ServerErrorConfig config;
 
     @Before
     public void setUp() {
         config = new Configuration.ServerErrorConfig(3, 10000L, 1);
-        policy = new ServerErrorPolicy(config);
+        policy = new ServerError(config);
     }
 
     @Test
@@ -41,7 +40,7 @@ public class ServerErrorPolicyTest {
 
     @Test
     public void testGetHandledException() {
-        assertEquals(ServerError.class, policy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError.class, policy.getHandledException());
     }
 
     @Test
@@ -54,10 +53,11 @@ public class ServerErrorPolicyTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.ServerErrorConfig testConfig = new Configuration.ServerErrorConfig(5, 15000L, 2);
-        ServerErrorPolicy testPolicy = new ServerErrorPolicy(testConfig);
+        ServerError testPolicy = new ServerError(testConfig);
 
         assertEquals("ServerError", testPolicy.getPolicyName());
-        assertEquals(ServerError.class, testPolicy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError.class, testPolicy
+            .getHandledException());
 
         CircuitBreaker<Object> circuitBreaker = testPolicy.createCircuitBreaker();
         assertNotNull(circuitBreaker);

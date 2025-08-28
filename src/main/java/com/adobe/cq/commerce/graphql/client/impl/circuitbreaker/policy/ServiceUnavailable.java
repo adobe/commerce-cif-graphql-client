@@ -20,42 +20,41 @@ import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Policy;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
 import dev.failsafe.CircuitBreaker;
 
 /**
- * Circuit breaker policy for Socket Timeout errors.
+ * Circuit breaker policy for 503 Service Unavailable errors.
  * Uses progressive delay strategy where delays increase with each failure attempt.
- * Follows Single Responsibility Principle by focusing only on socket timeout handling.
+ * Follows Single Responsibility Principle by focusing only on 503 error handling.
  */
-public class SocketTimeoutPolicy implements Policy {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SocketTimeoutPolicy.class);
+public class ServiceUnavailable implements Policy {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServiceUnavailable.class);
 
-    private final Configuration.SocketTimeoutConfig config;
+    private final Configuration.ServiceUnavailableConfig config;
     private int currentAttempt = 1;
 
-    public SocketTimeoutPolicy(Configuration.SocketTimeoutConfig config) {
+    public ServiceUnavailable(Configuration.ServiceUnavailableConfig config) {
         this.config = config;
     }
 
     @Override
     public CircuitBreaker<Object> createCircuitBreaker() {
         return CircuitBreaker.builder()
-            .handleIf(SocketTimeout.class::isInstance)
+            .handleIf(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelayFn(context -> {
                 long delay = (long) (config.getInitialDelayMs() * Math.pow(config.getDelayMultiplier(), (double) (currentAttempt - 1)));
                 long finalDelay = Math.min(delay, config.getMaxDelayMs());
-                LOGGER.info("Socket timeout error - Attempt {} - Progressive delay: {}ms", currentAttempt, finalDelay);
+                LOGGER.info("503 error - Attempt {} - Progressive delay: {}ms", currentAttempt, finalDelay);
                 return Duration.ofMillis(finalDelay);
             })
-            .onOpen(event -> LOGGER.warn("Socket timeout circuit breaker OPENED"))
+            .onOpen(event -> LOGGER.warn("503 circuit breaker OPENED"))
             .onHalfOpen(event -> {
                 currentAttempt++;
-                LOGGER.info("Socket timeout circuit breaker HALF-OPEN - Current attempt: {}", currentAttempt);
+                LOGGER.info("503 circuit breaker HALF-OPEN - Current attempt: {}", currentAttempt);
             })
             .onClose(event -> {
-                LOGGER.info("Socket timeout circuit breaker CLOSED");
+                LOGGER.info("503 circuit breaker CLOSED");
                 currentAttempt = 1;
             })
             .withSuccessThreshold(config.getSuccessThreshold())
@@ -64,11 +63,11 @@ public class SocketTimeoutPolicy implements Policy {
 
     @Override
     public String getPolicyName() {
-        return "SocketTimeout";
+        return "ServiceUnavailable";
     }
 
     @Override
     public Class<? extends Exception> getHandledException() {
-        return SocketTimeout.class;
+        return com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable.class;
     }
 }
