@@ -23,7 +23,6 @@ import dev.failsafe.CircuitBreaker;
 /**
  * Circuit breaker policy for Server Error (5xx) errors.
  * Uses constant delay strategy for general server errors (excluding 503).
- * Follows Single Responsibility Principle by focusing only on 5xx error handling.
  */
 public class ServerErrorPolicy implements Policy {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerErrorPolicy.class);

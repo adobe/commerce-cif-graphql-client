@@ -23,7 +23,6 @@ import dev.failsafe.CircuitBreaker;
 /**
  * Circuit breaker policy for Socket Timeout errors.
  * Uses progressive delay strategy where delays increase with each failure attempt.
- * Follows Single Responsibility Principle by focusing only on socket timeout handling.
  */
 public class SocketTimeoutPolicy implements Policy {
     private static final Logger LOGGER = LoggerFactory.getLogger(SocketTimeoutPolicy.class);

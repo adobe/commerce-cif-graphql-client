@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration class for circuit breaker settings.
  * Handles loading and parsing of circuit breaker configuration from properties files.
- * Follows Single Responsibility Principle by focusing only on configuration management.
  */
 class Configuration {
     private static final Logger LOGGER = LoggerFactory.getLogger(Configuration.class);

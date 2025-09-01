@@ -23,7 +23,6 @@ import dev.failsafe.CircuitBreaker;
 /**
  * Circuit breaker policy for 503 Service Unavailable errors.
  * Uses progressive delay strategy where delays increase with each failure attempt.
- * Follows Single Responsibility Principle by focusing only on 503 error handling.
  */
 public class ServiceUnavailablePolicy implements Policy {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServiceUnavailablePolicy.class);
