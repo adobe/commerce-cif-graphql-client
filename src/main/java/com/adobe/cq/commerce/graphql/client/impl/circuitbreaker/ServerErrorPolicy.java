@@ -11,15 +11,13 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import java.time.Duration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Policy;
 import dev.failsafe.CircuitBreaker;
 
 /**
@@ -27,19 +25,19 @@ import dev.failsafe.CircuitBreaker;
  * Uses constant delay strategy for general server errors (excluding 503).
  * Follows Single Responsibility Principle by focusing only on 5xx error handling.
  */
-public class ServerError implements Policy {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ServerError.class);
+public class ServerErrorPolicy implements Policy {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServerErrorPolicy.class);
 
     private final Configuration.ServerErrorConfig config;
 
-    public ServerError(Configuration.ServerErrorConfig config) {
+    public ServerErrorPolicy(Configuration.ServerErrorConfig config) {
         this.config = config;
     }
 
     @Override
     public CircuitBreaker<Object> createCircuitBreaker() {
         return CircuitBreaker.builder()
-            .handleIf(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError.class::isInstance)
+            .handleIf(ServerErrorException.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelay(Duration.ofMillis(config.getDelayMs()))
             .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
@@ -55,6 +53,6 @@ public class ServerError implements Policy {
 
     @Override
     public Class<? extends Exception> getHandledException() {
-        return com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError.class;
+        return ServerErrorException.class;
     }
 }

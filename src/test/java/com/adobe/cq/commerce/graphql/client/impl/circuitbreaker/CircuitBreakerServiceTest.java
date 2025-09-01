@@ -20,23 +20,19 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockitoAnnotations;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
-
 import static org.junit.Assert.*;
 
 /**
- * Tests for Service with optimized coverage focusing on core functionality.
+ * Tests for CircuitBreakerService with optimized coverage focusing on core functionality.
  */
-public class ServiceTest {
+public class CircuitBreakerServiceTest {
 
-    private Service circuitBreakerService;
+    private CircuitBreakerService circuitBreakerService;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        circuitBreakerService = new Service();
+        circuitBreakerService = new CircuitBreakerService();
     }
 
     @Test
@@ -54,10 +50,10 @@ public class ServiceTest {
     public void testExecuteWithPoliciesWithServiceUnavailable() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServiceUnavailable("Service unavailable", "Service down");
+                throw new ServiceUnavailableException("Service unavailable", "Service down");
             });
-            fail("Expected ServiceUnavailable to be thrown");
-        } catch (ServiceUnavailable e) {
+            fail("Expected ServiceUnavailableException to be thrown");
+        } catch (ServiceUnavailableException e) {
             assertEquals("Service unavailable", e.getMessage());
             assertEquals("Service down", e.getResponseBody());
         }
@@ -67,10 +63,10 @@ public class ServiceTest {
     public void testExecuteWithPoliciesWithServerError() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServerError("Server error", 500, "Internal server error");
+                throw new ServerErrorException("Server error", 500, "Internal server error");
             });
-            fail("Expected ServerError to be thrown");
-        } catch (ServerError e) {
+            fail("Expected ServerErrorException to be thrown");
+        } catch (ServerErrorException e) {
             assertEquals("Server error", e.getMessage());
             assertEquals(500, e.getStatusCode());
             assertEquals("Internal server error", e.getResponseBody());
@@ -81,10 +77,10 @@ public class ServiceTest {
     public void testExecuteWithPoliciesWithSocketTimeout() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new SocketTimeout("Socket timeout", "Connection timed out", 5000L);
+                throw new SocketTimeoutException("Socket timeout", "Connection timed out", 5000L);
             });
-            fail("Expected SocketTimeout to be thrown");
-        } catch (SocketTimeout e) {
+            fail("Expected SocketTimeoutException to be thrown");
+        } catch (SocketTimeoutException e) {
             assertEquals("Socket timeout", e.getOriginalMessage());
             assertEquals("Connection timed out", e.getDetails());
             assertEquals(5000L, e.getDurationMs());
@@ -93,10 +89,10 @@ public class ServiceTest {
 
     @Test
     public void testServiceWithCustomConfiguration() {
-        // Test that Service can be created with custom configuration
+        // Test that CircuitBreakerService can be created with custom configuration
         Configuration customConfig = new Configuration();
-        Service service = new Service(customConfig);
-        assertNotNull("Service should be created with custom configuration", service);
+        CircuitBreakerService service = new CircuitBreakerService(customConfig);
+        assertNotNull("CircuitBreakerService should be created with custom configuration", service);
 
         // Test that it can execute successfully
         try {
@@ -109,9 +105,9 @@ public class ServiceTest {
 
     @Test
     public void testServiceWithDefaultValues() {
-        // Test that Service can be created with default values
-        Service service = new Service();
-        assertNotNull("Service should be created with default values", service);
+        // Test that CircuitBreakerService can be created with default values
+        CircuitBreakerService service = new CircuitBreakerService();
+        assertNotNull("CircuitBreakerService should be created with default values", service);
 
         // Test that it can execute successfully
         try {
@@ -129,30 +125,30 @@ public class ServiceTest {
         // Test ServiceUnavailable handling
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServiceUnavailable("Service down", "Maintenance mode");
+                throw new ServiceUnavailableException("Service down", "Maintenance mode");
             });
-            fail("Expected ServiceUnavailable");
-        } catch (ServiceUnavailable e) {
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
             assertEquals("Service down", e.getOriginalMessage());
         }
 
         // Test ServerError handling
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new ServerError("Internal error", 500, "Database unavailable");
+                throw new ServerErrorException("Internal error", 500, "Database unavailable");
             });
-            fail("Expected ServerError");
-        } catch (ServerError e) {
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
             assertEquals("Internal error", e.getOriginalMessage());
         }
 
         // Test SocketTimeout handling
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
-                throw new SocketTimeout("Timeout", "Connection timeout", 10000L);
+                throw new SocketTimeoutException("Timeout", "Connection timeout", 10000L);
             });
-            fail("Expected SocketTimeout");
-        } catch (SocketTimeout e) {
+            fail("Expected SocketTimeoutException");
+        } catch (SocketTimeoutException e) {
             assertEquals("Timeout", e.getOriginalMessage());
         }
     }

@@ -11,7 +11,7 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 
@@ -20,7 +20,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
  * This exception is used by the circuit breaker policies to handle 503 errors with a progressive delay strategy.
  * The exception type itself indicates the error category, eliminating the need for status code checking.
  */
-public class ServiceUnavailable extends GraphqlRequestException {
+public class ServiceUnavailableException extends GraphqlRequestException {
     private final String responseBody;
 
     /**
@@ -29,7 +29,7 @@ public class ServiceUnavailable extends GraphqlRequestException {
      * @param message The error message
      * @param responseBody The response body, may contain details about the error
      */
-    public ServiceUnavailable(String message, String responseBody) {
+    public ServiceUnavailableException(String message, String responseBody) {
         super(message, 0);
         this.responseBody = responseBody;
     }
@@ -41,7 +41,7 @@ public class ServiceUnavailable extends GraphqlRequestException {
      * @param responseBody The response body, may contain details about the error
      * @param durationMs The duration in milliseconds
      */
-    public ServiceUnavailable(String message, String responseBody, long durationMs) {
+    public ServiceUnavailableException(String message, String responseBody, long durationMs) {
         super(message, durationMs);
         this.responseBody = responseBody;
     }
@@ -53,7 +53,7 @@ public class ServiceUnavailable extends GraphqlRequestException {
      * @param responseBody The response body, may contain details about the error
      * @param cause The throwable that caused this exception
      */
-    public ServiceUnavailable(String message, String responseBody, Throwable cause) {
+    public ServiceUnavailableException(String message, String responseBody, Throwable cause) {
         super(message, cause, 0);
         this.responseBody = responseBody;
     }
@@ -66,7 +66,7 @@ public class ServiceUnavailable extends GraphqlRequestException {
      * @param cause The throwable that caused this exception
      * @param durationMs The duration in milliseconds
      */
-    public ServiceUnavailable(String message, String responseBody, Throwable cause, long durationMs) {
+    public ServiceUnavailableException(String message, String responseBody, Throwable cause, long durationMs) {
         super(message, cause, durationMs);
         this.responseBody = responseBody;
     }

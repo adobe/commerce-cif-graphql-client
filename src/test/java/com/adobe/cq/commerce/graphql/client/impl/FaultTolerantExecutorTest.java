@@ -34,9 +34,9 @@ import org.osgi.framework.BundleContext;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException;
 import dev.failsafe.CircuitBreakerOpenException;
 import dev.failsafe.FailsafeException;
 
@@ -113,8 +113,8 @@ public class FaultTolerantExecutorTest {
 
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected ServiceUnavailable");
-        } catch (ServiceUnavailable e) {
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
             assertEquals(503, e.getStatusCode());
         }
 
@@ -131,8 +131,8 @@ public class FaultTolerantExecutorTest {
 
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServerError for status code " + serverErrorCodes[i]);
-            } catch (ServerError e) {
+                fail("Expected ServerErrorException for status code " + serverErrorCodes[i]);
+            } catch (ServerErrorException e) {
                 assertEquals(serverErrorCodes[i], e.getStatusCode());
             }
 
@@ -187,11 +187,11 @@ public class FaultTolerantExecutorTest {
         // Simulate another 503 response to test circuit breaker behavior in half-open state
         TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
 
-        // Attempt execution - should throw ServiceUnavailable and re-open circuit breaker
+        // Attempt execution - should throw ServiceUnavailableException and re-open circuit breaker
         // The circuit breaker will return to open state due to the 503 response
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
-        } catch (ServiceUnavailable e) {
+        } catch (ServiceUnavailableException e) {
             assertEquals(503, e.getStatusCode());
         }
 
@@ -235,11 +235,11 @@ public class FaultTolerantExecutorTest {
         when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
             .thenThrow(socketTimeout);
 
-        // Attempt execution - should throw SocketTimeout and re-open circuit breaker
+        // Attempt execution - should throw SocketTimeoutException and re-open circuit breaker
         // The circuit breaker will return to open state due to the socket timeout
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
-        } catch (SocketTimeout e) {
+        } catch (SocketTimeoutException e) {
             assertEquals("Read timeout occurred while sending GraphQL request", e.getOriginalMessage());
             assertEquals("Timeout details: Read timed out in half-open state", e.getDetails());
         }
@@ -343,8 +343,8 @@ public class FaultTolerantExecutorTest {
 
     @Test
     public void testServerErrorWithoutCause() {
-        // Test ServerError constructor without cause
-        ServerError exception = new ServerError("Test error", 500, "Error body");
+        // Test ServerErrorException constructor without cause
+        ServerErrorException exception = new ServerErrorException("Test error", 500, "Error body");
 
         assertEquals("Test error", exception.getMessage());
         assertEquals(500, exception.getStatusCode());
@@ -354,9 +354,9 @@ public class FaultTolerantExecutorTest {
 
     @Test
     public void testServerErrorWithCause() {
-        // Test ServerError constructor with cause
+        // Test ServerErrorException constructor with cause
         Throwable cause = new RuntimeException("Original cause");
-        ServerError exception = new ServerError("Server error", 500, "Error body", cause);
+        ServerErrorException exception = new ServerErrorException("Server error", 500, "Error body", cause);
 
         assertEquals("Server error", exception.getMessage());
         assertEquals(500, exception.getStatusCode());
@@ -366,8 +366,8 @@ public class FaultTolerantExecutorTest {
 
     @Test
     public void testServiceUnavailableWithoutCause() {
-        // Test ServiceUnavailable constructor without cause
-        ServiceUnavailable exception = new ServiceUnavailable("Service unavailable", "Service down");
+        // Test ServiceUnavailableException constructor without cause
+        ServiceUnavailableException exception = new ServiceUnavailableException("Service unavailable", "Service down");
 
         assertEquals("Service unavailable", exception.getMessage());
         assertEquals(503, exception.getStatusCode());
@@ -377,9 +377,9 @@ public class FaultTolerantExecutorTest {
 
     @Test
     public void testServiceUnavailableWithCause() {
-        // Test ServiceUnavailable constructor with cause
+        // Test ServiceUnavailableException constructor with cause
         Throwable cause = new RuntimeException("Original cause");
-        ServiceUnavailable exception = new ServiceUnavailable("Service unavailable", "Service down", cause);
+        ServiceUnavailableException exception = new ServiceUnavailableException("Service unavailable", "Service down", cause);
 
         assertEquals("Service unavailable", exception.getMessage());
         assertEquals(503, exception.getStatusCode());
@@ -414,7 +414,7 @@ public class FaultTolerantExecutorTest {
                 } else {
                     fail("Expected GraphqlRequestException for status code " + HttpStatus.SC_SERVICE_UNAVAILABLE);
                 }
-            } catch (ServiceUnavailable e) {
+            } catch (ServiceUnavailableException e) {
                 if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
                     assertEquals(503, e.getStatusCode());
                 } else {
@@ -442,7 +442,7 @@ public class FaultTolerantExecutorTest {
                 } else {
                     fail("Expected GraphqlRequestException for status code " + serverErrorCodes[i]);
                 }
-            } catch (ServerError e) {
+            } catch (ServerErrorException e) {
                 if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
                     assertEquals(serverErrorCodes[i], e.getStatusCode());
                 } else {
@@ -470,7 +470,7 @@ public class FaultTolerantExecutorTest {
                 } else {
                     fail("Expected GraphqlRequestException for iteration " + i);
                 }
-            } catch (SocketTimeout e) {
+            } catch (SocketTimeoutException e) {
                 if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
                     assertEquals("Read timeout occurred while sending GraphQL request", e.getOriginalMessage());
                     assertEquals("Timeout details: Read timed out", e.getDetails());

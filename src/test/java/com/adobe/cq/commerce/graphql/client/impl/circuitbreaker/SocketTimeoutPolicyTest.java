@@ -12,35 +12,34 @@
  *
  ******************************************************************************/
 
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
 import dev.failsafe.CircuitBreaker;
 
 import static org.junit.Assert.*;
 
-public class ServerErrorTest {
+public class SocketTimeoutPolicyTest {
 
-    private ServerError policy;
-    private Configuration.ServerErrorConfig config;
+    private SocketTimeoutPolicy policy;
+    private Configuration.SocketTimeoutConfig config;
 
     @Before
     public void setUp() {
-        config = new Configuration.ServerErrorConfig(3, 10000L, 1);
-        policy = new ServerError(config);
+        config = new Configuration.SocketTimeoutConfig(3, 20000L, 180000L, 1.5, 1);
+        policy = new SocketTimeoutPolicy(config);
     }
 
     @Test
     public void testGetPolicyName() {
-        assertEquals("ServerError", policy.getPolicyName());
+        assertEquals("SocketTimeout", policy.getPolicyName());
     }
 
     @Test
     public void testGetHandledException() {
-        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError.class, policy.getHandledException());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException.class, policy.getHandledException());
     }
 
     @Test
@@ -52,11 +51,11 @@ public class ServerErrorTest {
     @Test
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
-        Configuration.ServerErrorConfig testConfig = new Configuration.ServerErrorConfig(5, 15000L, 2);
-        ServerError testPolicy = new ServerError(testConfig);
+        Configuration.SocketTimeoutConfig testConfig = new Configuration.SocketTimeoutConfig(5, 30000L, 300000L, 2.0, 2);
+        SocketTimeoutPolicy testPolicy = new SocketTimeoutPolicy(testConfig);
 
-        assertEquals("ServerError", testPolicy.getPolicyName());
-        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError.class, testPolicy
+        assertEquals("SocketTimeout", testPolicy.getPolicyName());
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException.class, testPolicy
             .getHandledException());
 
         CircuitBreaker<Object> circuitBreaker = testPolicy.createCircuitBreaker();

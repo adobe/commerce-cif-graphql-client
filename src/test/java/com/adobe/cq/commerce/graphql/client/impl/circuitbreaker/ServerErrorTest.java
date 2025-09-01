@@ -18,8 +18,6 @@ import java.io.IOException;
 
 import org.junit.Test;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
-
 import static org.junit.Assert.*;
 
 public class ServerErrorTest {
@@ -32,7 +30,7 @@ public class ServerErrorTest {
     private static final long DURATION_MS = 1200L;
 
     // Helper method for basic assertions
-    private void assertBasicProperties(ServerError exception, String expectedMessage,
+    private void assertBasicProperties(ServerErrorException exception, String expectedMessage,
         int expectedStatusCode, String expectedResponseBody) {
         assertEquals(expectedMessage, exception.getOriginalMessage());
         assertEquals(expectedStatusCode, exception.getStatusCode());
@@ -41,7 +39,7 @@ public class ServerErrorTest {
 
     @Test
     public void testConstructorWithDuration() {
-        ServerError exception = new ServerError(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY, DURATION_MS);
+        ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY, DURATION_MS);
 
         assertBasicProperties(exception, ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
         assertEquals(DURATION_MS, exception.getDurationMs());
@@ -52,7 +50,7 @@ public class ServerErrorTest {
     @Test
     public void testConstructorWithCauseAndDuration() {
         IOException cause = new IOException("Connection timeout");
-        ServerError exception = new ServerError(ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY, cause, DURATION_MS);
+        ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY, cause, DURATION_MS);
 
         assertBasicProperties(exception, ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY);
         assertEquals(DURATION_MS, exception.getDurationMs());
@@ -62,8 +60,8 @@ public class ServerErrorTest {
 
     @Test
     public void testInheritanceFromGraphqlRequestException() {
-        ServerError exception = new ServerError(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
-        assertTrue("ServerError should extend GraphqlRequestException",
+        ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
+        assertTrue("ServerErrorException should extend GraphqlRequestException",
             exception instanceof com.adobe.cq.commerce.graphql.client.GraphqlRequestException);
     }
 }

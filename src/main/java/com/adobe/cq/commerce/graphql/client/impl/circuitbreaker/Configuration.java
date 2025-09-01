@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * Handles loading and parsing of circuit breaker configuration from properties files.
  * Follows Single Responsibility Principle by focusing only on configuration management.
  */
-public class Configuration {
+class Configuration {
     private static final Logger LOGGER = LoggerFactory.getLogger(Configuration.class);
 
     // 503 Service Unavailable defaults

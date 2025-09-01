@@ -12,25 +12,24 @@
  *
  ******************************************************************************/
 
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
 import dev.failsafe.CircuitBreaker;
 
 import static org.junit.Assert.*;
 
-public class ServiceUnavailableTest {
+public class ServiceUnavailablePolicyTest {
 
-    private ServiceUnavailable policy;
+    private ServiceUnavailablePolicy policy;
     private Configuration.ServiceUnavailableConfig config;
 
     @Before
     public void setUp() {
         config = new Configuration.ServiceUnavailableConfig(3, 20000L, 180000L, 1.5, 1);
-        policy = new ServiceUnavailable(config);
+        policy = new ServiceUnavailablePolicy(config);
     }
 
     @Test
@@ -40,7 +39,7 @@ public class ServiceUnavailableTest {
 
     @Test
     public void testGetHandledException() {
-        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable.class, policy
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException.class, policy
             .getHandledException());
     }
 
@@ -54,10 +53,10 @@ public class ServiceUnavailableTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.ServiceUnavailableConfig testConfig = new Configuration.ServiceUnavailableConfig(5, 30000L, 300000L, 2.0, 2);
-        ServiceUnavailable testPolicy = new ServiceUnavailable(testConfig);
+        ServiceUnavailablePolicy testPolicy = new ServiceUnavailablePolicy(testConfig);
 
         assertEquals("ServiceUnavailable", testPolicy.getPolicyName());
-        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable.class, testPolicy
+        assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException.class, testPolicy
             .getHandledException());
 
         CircuitBreaker<Object> circuitBreaker = testPolicy.createCircuitBreaker();

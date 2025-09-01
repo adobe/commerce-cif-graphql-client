@@ -20,7 +20,7 @@ import dev.failsafe.CircuitBreaker;
  * Follows Open/Closed Principle - open for extension (new policies), closed for modification.
  * Follows Interface Segregation Principle - provides only what clients need.
  */
-public interface Policy {
+interface Policy {
 
     /**
      * Creates and configures a circuit breaker for this policy.

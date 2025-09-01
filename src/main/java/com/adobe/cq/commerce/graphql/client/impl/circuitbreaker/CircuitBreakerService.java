@@ -20,36 +20,28 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.ServerError;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.ServiceUnavailable;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy.SocketTimeout;
 import dev.failsafe.CircuitBreaker;
 import dev.failsafe.Failsafe;
 
 /**
  * Orchestrates circuit breaker policies for fault-tolerant GraphQL request execution.
- * Follows SOLID principles:
- * - Single Responsibility: Only responsible for orchestrating policies
- * - Open/Closed: Open for new policies, closed for modification
- * - Dependency Inversion: Depends on Policy abstraction
- * 
  * Uses composition to combine different circuit breaker policies for comprehensive fault tolerance.
  */
-public class Service {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Service.class);
+public class CircuitBreakerService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CircuitBreakerService.class);
 
     private final List<CircuitBreaker<Object>> circuitBreakers;
 
-    public Service() {
+    public CircuitBreakerService() {
         this(new Configuration());
     }
 
-    public Service(Configuration configuration) {
+    public CircuitBreakerService(Configuration configuration) {
         // Create policies with their configurations
         List<Policy> policies = Arrays.asList(
-            new ServiceUnavailable(configuration.getServiceUnavailableConfig()),
-            new ServerError(configuration.getServerErrorConfig()),
-            new SocketTimeout(configuration.getSocketTimeoutConfig()));
+            new ServiceUnavailablePolicy(configuration.getServiceUnavailableConfig()),
+            new ServerErrorPolicy(configuration.getServerErrorConfig()),
+            new SocketTimeoutPolicy(configuration.getSocketTimeoutConfig()));
 
         // Create circuit breakers from policies
         this.circuitBreakers = policies.stream()
@@ -60,7 +52,7 @@ public class Service {
             })
             .collect(Collectors.toList());
 
-        LOGGER.info("Initialized Service with {} policies", policies.size());
+        LOGGER.info("Initialized CircuitBreakerService with {} policies", policies.size());
     }
 
     /**

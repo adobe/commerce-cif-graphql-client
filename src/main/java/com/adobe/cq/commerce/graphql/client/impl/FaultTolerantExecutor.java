@@ -25,10 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.commerce.graphql.client.*;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Service;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServerError;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.ServiceUnavailable;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException;
 import dev.failsafe.CircuitBreakerOpenException;
 import dev.failsafe.FailsafeException;
 
@@ -36,11 +36,11 @@ public class FaultTolerantExecutor extends DefaultExecutor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FaultTolerantExecutor.class);
 
-    private Service circuitBreakerService;
+    private CircuitBreakerService circuitBreakerService;
 
     public FaultTolerantExecutor(HttpClient client, GraphqlClientMetrics metrics, GraphqlClientConfiguration configuration) {
         super(client, metrics, configuration);
-        this.circuitBreakerService = new Service();
+        this.circuitBreakerService = new CircuitBreakerService();
     }
 
     @Override
@@ -75,9 +75,9 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                     LOGGER.warn("Received {} from endpoint {}", errorMessage, configuration.url());
                     // Special handling for 503 Service Unavailable
                     if (statusCode == HttpStatus.SC_SERVICE_UNAVAILABLE) {
-                        throw new ServiceUnavailable(errorMessage, responseBody, calculateDuration());
+                        throw new ServiceUnavailableException(errorMessage, responseBody, calculateDuration());
                     }
-                    throw new ServerError(errorMessage, statusCode, responseBody, calculateDuration());
+                    throw new ServerErrorException(errorMessage, statusCode, responseBody, calculateDuration());
                 }
                 if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
                     return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
@@ -86,7 +86,7 @@ public class FaultTolerantExecutor extends DefaultExecutor {
             });
         } catch (java.net.SocketTimeoutException e) {
             metrics.incrementRequestErrors();
-            throw new SocketTimeout("Read timeout occurred while sending GraphQL request",
+            throw new SocketTimeoutException("Read timeout occurred while sending GraphQL request",
                 "Timeout details: " + e.getMessage(), e, calculateDuration());
         } catch (IOException e) {
             metrics.incrementRequestErrors();

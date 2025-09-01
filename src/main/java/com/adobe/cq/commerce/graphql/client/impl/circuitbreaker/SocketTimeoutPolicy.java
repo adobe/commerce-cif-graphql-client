@@ -11,15 +11,13 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.policy;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import java.time.Duration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Configuration;
-import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.Policy;
 import dev.failsafe.CircuitBreaker;
 
 /**
@@ -27,20 +25,20 @@ import dev.failsafe.CircuitBreaker;
  * Uses progressive delay strategy where delays increase with each failure attempt.
  * Follows Single Responsibility Principle by focusing only on socket timeout handling.
  */
-public class SocketTimeout implements Policy {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SocketTimeout.class);
+public class SocketTimeoutPolicy implements Policy {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SocketTimeoutPolicy.class);
 
     private final Configuration.SocketTimeoutConfig config;
     private int currentAttempt = 1;
 
-    public SocketTimeout(Configuration.SocketTimeoutConfig config) {
+    public SocketTimeoutPolicy(Configuration.SocketTimeoutConfig config) {
         this.config = config;
     }
 
     @Override
     public CircuitBreaker<Object> createCircuitBreaker() {
         return CircuitBreaker.builder()
-            .handleIf(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout.class::isInstance)
+            .handleIf(SocketTimeoutException.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelayFn(context -> {
                 long delay = (long) (config.getInitialDelayMs() * Math.pow(config.getDelayMultiplier(), (double) (currentAttempt - 1)));
@@ -68,6 +66,6 @@ public class SocketTimeout implements Policy {
 
     @Override
     public Class<? extends Exception> getHandledException() {
-        return com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception.SocketTimeout.class;
+        return SocketTimeoutException.class;
     }
 }

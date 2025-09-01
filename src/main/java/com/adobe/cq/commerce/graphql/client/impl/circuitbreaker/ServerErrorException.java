@@ -11,7 +11,7 @@
  *    governing permissions and limitations under the License.
  *
  ******************************************************************************/
-package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.exception;
+package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 
@@ -22,7 +22,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
  * - Other 5xx errors are handled with a constant delay policy
  * Each type of error has its own circuit breaker with specific thresholds and delay strategies.
  */
-public class ServerError extends GraphqlRequestException {
+public class ServerErrorException extends GraphqlRequestException {
     private final int statusCode;
     private final String responseBody;
 
@@ -33,7 +33,7 @@ public class ServerError extends GraphqlRequestException {
      * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
      * @param responseBody The response body, may contain details about the error
      */
-    public ServerError(String message, int statusCode, String responseBody) {
+    public ServerErrorException(String message, int statusCode, String responseBody) {
         super(message, 0);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
@@ -47,7 +47,7 @@ public class ServerError extends GraphqlRequestException {
      * @param responseBody The response body, may contain details about the error
      * @param durationMs The duration in milliseconds
      */
-    public ServerError(String message, int statusCode, String responseBody, long durationMs) {
+    public ServerErrorException(String message, int statusCode, String responseBody, long durationMs) {
         super(message, durationMs);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
@@ -61,7 +61,7 @@ public class ServerError extends GraphqlRequestException {
      * @param responseBody The response body, may contain details about the error
      * @param cause The throwable that caused this exception
      */
-    public ServerError(String message, int statusCode, String responseBody, Throwable cause) {
+    public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause) {
         super(message, cause, 0);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
@@ -76,7 +76,7 @@ public class ServerError extends GraphqlRequestException {
      * @param cause The throwable that caused this exception
      * @param durationMs The duration in milliseconds
      */
-    public ServerError(String message, int statusCode, String responseBody, Throwable cause, long durationMs) {
+    public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause, long durationMs) {
         super(message, cause, durationMs);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
