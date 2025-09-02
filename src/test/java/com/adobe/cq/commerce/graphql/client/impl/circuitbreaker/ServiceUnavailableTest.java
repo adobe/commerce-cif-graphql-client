@@ -31,10 +31,10 @@ public class ServiceUnavailableTest {
     // Helper method for common assertions
     private void assertServiceUnavailable(ServiceUnavailableException exception, String expectedMessage,
         String expectedResponseBody, long expectedDuration, Throwable expectedCause) {
-        assertEquals(expectedMessage, exception.getOriginalMessage());
+        assertEquals(expectedMessage, exception.getMessage());
         assertEquals(EXPECTED_STATUS_CODE, exception.getStatusCode());
         assertEquals(expectedResponseBody, exception.getResponseBody());
-        assertEquals(expectedDuration, exception.getDurationMs());
+        assertEquals(expectedDuration, exception.getDuration());
         assertEquals(expectedCause, exception.getCause());
     }
 
@@ -43,7 +43,7 @@ public class ServiceUnavailableTest {
         ServiceUnavailableException exception = new ServiceUnavailableException(ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS);
 
         assertServiceUnavailable(exception, ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS, null);
-        assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
     }
 
     @Test
@@ -52,7 +52,7 @@ public class ServiceUnavailableTest {
         ServiceUnavailableException exception = new ServiceUnavailableException(ERROR_MESSAGE, RESPONSE_BODY, cause, DURATION_MS);
 
         assertServiceUnavailable(exception, ERROR_MESSAGE, RESPONSE_BODY, DURATION_MS, cause);
-        assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
     }
 
     @Test

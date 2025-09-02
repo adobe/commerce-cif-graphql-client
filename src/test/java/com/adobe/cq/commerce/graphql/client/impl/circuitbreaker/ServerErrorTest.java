@@ -32,7 +32,7 @@ public class ServerErrorTest {
     // Helper method for basic assertions
     private void assertBasicProperties(ServerErrorException exception, String expectedMessage,
         int expectedStatusCode, String expectedResponseBody) {
-        assertEquals(expectedMessage, exception.getOriginalMessage());
+        assertEquals(expectedMessage, exception.getMessage());
         assertEquals(expectedStatusCode, exception.getStatusCode());
         assertEquals(expectedResponseBody, exception.getResponseBody());
     }
@@ -42,8 +42,8 @@ public class ServerErrorTest {
         ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY, DURATION_MS);
 
         assertBasicProperties(exception, ERROR_MESSAGE, STATUS_CODE_500, RESPONSE_BODY);
-        assertEquals(DURATION_MS, exception.getDurationMs());
-        assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
+        assertEquals(DURATION_MS, exception.getDuration());
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
         assertNull(exception.getCause());
     }
 
@@ -53,8 +53,8 @@ public class ServerErrorTest {
         ServerErrorException exception = new ServerErrorException(ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY, cause, DURATION_MS);
 
         assertBasicProperties(exception, ERROR_MESSAGE, STATUS_CODE_503, RESPONSE_BODY);
-        assertEquals(DURATION_MS, exception.getDurationMs());
-        assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
+        assertEquals(DURATION_MS, exception.getDuration());
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
         assertEquals(cause, exception.getCause());
     }
 

@@ -76,7 +76,7 @@ public class DefaultExecutor implements RequestExecutor {
             });
         } catch (IOException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to send GraphQL request", e, calculateDuration());
+            throw new GraphqlRequestException("Failed to send GraphQL request", calculateDuration(), e);
         }
     }
 
@@ -108,7 +108,7 @@ public class DefaultExecutor implements RequestExecutor {
             }
         } catch (Exception e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to read HTTP response content", e, calculateDuration());
+            throw new GraphqlRequestException("Failed to read HTTP response content", calculateDuration(), e);
         }
 
         Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;

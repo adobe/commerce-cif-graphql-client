@@ -54,7 +54,7 @@ public class ServiceUnavailableException extends GraphqlRequestException {
      * @param cause The throwable that caused this exception
      */
     public ServiceUnavailableException(String message, String responseBody, Throwable cause) {
-        super(message, cause, 0);
+        super(message, 0, cause);
         this.responseBody = responseBody;
     }
 
@@ -67,7 +67,7 @@ public class ServiceUnavailableException extends GraphqlRequestException {
      * @param durationMs The duration in milliseconds
      */
     public ServiceUnavailableException(String message, String responseBody, Throwable cause, long durationMs) {
-        super(message, cause, durationMs);
+        super(message, durationMs, cause);
         this.responseBody = responseBody;
     }
 

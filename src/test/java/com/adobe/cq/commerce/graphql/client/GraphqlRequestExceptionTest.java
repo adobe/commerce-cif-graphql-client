@@ -43,19 +43,15 @@ public class GraphqlRequestExceptionTest {
     // Helper method to assert exception properties with zero duration
     private void assertExceptionWithZeroDuration(GraphqlRequestException exception, String expectedMessage, Throwable expectedCause) {
         assertEquals(expectedMessage, exception.getMessage());
-        assertEquals(expectedMessage, exception.getOriginalMessage());
-        assertEquals(ZERO_DURATION, exception.getDurationMs());
+        assertEquals(ZERO_DURATION, exception.getDuration());
         assertEquals(expectedCause, exception.getCause());
     }
 
     // Helper method to assert exception properties with duration
-    private void assertExceptionWithDuration(GraphqlRequestException exception, String expectedOriginalMessage,
+    private void assertExceptionWithDuration(GraphqlRequestException exception, String expectedMessage,
         long expectedDuration, Throwable expectedCause) {
-        String expectedMessage = expectedDuration > 0 ? expectedOriginalMessage + " after " + expectedDuration + "ms"
-            : expectedOriginalMessage;
         assertEquals(expectedMessage, exception.getMessage());
-        assertEquals(expectedOriginalMessage, exception.getOriginalMessage());
-        assertEquals(expectedDuration, exception.getDurationMs());
+        assertEquals(expectedDuration, exception.getDuration());
         assertEquals(expectedCause, exception.getCause());
     }
 
@@ -75,7 +71,7 @@ public class GraphqlRequestExceptionTest {
     @Test
     public void testConstructorWithMessageCauseAndDuration() {
         IOException cause = createTestIOException();
-        GraphqlRequestException exception = new GraphqlRequestException(TEST_MESSAGE, cause, LONG_DURATION);
+        GraphqlRequestException exception = new GraphqlRequestException(TEST_MESSAGE, LONG_DURATION, cause);
         assertExceptionWithDuration(exception, TEST_MESSAGE, LONG_DURATION, cause);
     }
 
@@ -91,7 +87,7 @@ public class GraphqlRequestExceptionTest {
         GraphqlRequestException zeroException = new GraphqlRequestException(TEST_MESSAGE, ZERO_DURATION);
         assertExceptionWithDuration(zeroException, TEST_MESSAGE, ZERO_DURATION, null);
 
-        // Test positive duration - includes formatting
+        // Test positive duration - no automatic formatting in message
         GraphqlRequestException positiveException = new GraphqlRequestException(TEST_MESSAGE, MEDIUM_DURATION);
         assertExceptionWithDuration(positiveException, TEST_MESSAGE, MEDIUM_DURATION, null);
     }
@@ -100,15 +96,13 @@ public class GraphqlRequestExceptionTest {
     public void testNullMessageHandling() {
         // Test null message with zero duration
         GraphqlRequestException nullMessageException = new GraphqlRequestException(null);
-        assertNull(nullMessageException.getOriginalMessage());
         assertNull(nullMessageException.getMessage());
-        assertEquals(ZERO_DURATION, nullMessageException.getDurationMs());
+        assertEquals(ZERO_DURATION, nullMessageException.getDuration());
 
         // Test null message with duration
         GraphqlRequestException nullWithDurationException = new GraphqlRequestException(null, SHORT_DURATION);
-        assertNull(nullWithDurationException.getOriginalMessage());
-        assertEquals("null after " + SHORT_DURATION + "ms", nullWithDurationException.getMessage());
-        assertEquals(SHORT_DURATION, nullWithDurationException.getDurationMs());
+        assertNull(nullWithDurationException.getMessage());
+        assertEquals(SHORT_DURATION, nullWithDurationException.getDuration());
     }
 
     @Test
@@ -118,7 +112,7 @@ public class GraphqlRequestExceptionTest {
         assertExceptionWithZeroDuration(nullCauseException, ALTERNATE_MESSAGE, null);
 
         // Test null cause with duration
-        GraphqlRequestException nullCauseWithDurationException = new GraphqlRequestException(ALTERNATE_MESSAGE, null, MEDIUM_DURATION);
+        GraphqlRequestException nullCauseWithDurationException = new GraphqlRequestException(ALTERNATE_MESSAGE, MEDIUM_DURATION, null);
         assertExceptionWithDuration(nullCauseWithDurationException, ALTERNATE_MESSAGE, MEDIUM_DURATION, null);
     }
 
@@ -132,7 +126,7 @@ public class GraphqlRequestExceptionTest {
     public void testNestedCauseChain() {
         RuntimeException rootCause = new RuntimeException(ROOT_CAUSE_MESSAGE);
         IOException intermediateCause = new IOException(INTERMEDIATE_CAUSE_MESSAGE, rootCause);
-        GraphqlRequestException exception = new GraphqlRequestException(TOP_LEVEL_MESSAGE, intermediateCause, SHORT_DURATION);
+        GraphqlRequestException exception = new GraphqlRequestException(TOP_LEVEL_MESSAGE, SHORT_DURATION, intermediateCause);
 
         assertEquals(intermediateCause, exception.getCause());
         assertEquals(rootCause, exception.getCause().getCause());

@@ -30,9 +30,9 @@ public class SocketTimeoutTest {
     // Helper method for common assertions
     private void assertSocketTimeout(SocketTimeoutException exception, String expectedMessage,
         String expectedDetails, long expectedDuration, Throwable expectedCause) {
-        assertEquals(expectedMessage, exception.getOriginalMessage());
+        assertEquals(expectedMessage, exception.getMessage());
         assertEquals(expectedDetails, exception.getDetails());
-        assertEquals(expectedDuration, exception.getDurationMs());
+        assertEquals(expectedDuration, exception.getDuration());
         assertEquals(expectedCause, exception.getCause());
     }
 
@@ -41,7 +41,7 @@ public class SocketTimeoutTest {
         SocketTimeoutException exception = new SocketTimeoutException(ERROR_MESSAGE, TIMEOUT_DETAILS, DURATION_MS);
 
         assertSocketTimeout(exception, ERROR_MESSAGE, TIMEOUT_DETAILS, DURATION_MS, null);
-        assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
     }
 
     @Test
@@ -59,7 +59,7 @@ public class SocketTimeoutTest {
         SocketTimeoutException exception = new SocketTimeoutException(ERROR_MESSAGE, TIMEOUT_DETAILS, cause, DURATION_MS);
 
         assertSocketTimeout(exception, ERROR_MESSAGE, TIMEOUT_DETAILS, DURATION_MS, cause);
-        assertEquals(ERROR_MESSAGE + " after " + DURATION_MS + "ms", exception.getMessage());
+        assertEquals(ERROR_MESSAGE, exception.getMessage());
     }
 
     @Test
@@ -77,31 +77,31 @@ public class SocketTimeoutTest {
 
         // Constructor 1: message + details
         SocketTimeoutException ex1 = new SocketTimeoutException("Test message 1", "Test details 1");
-        assertEquals("Test message 1", ex1.getOriginalMessage());
+        assertEquals("Test message 1", ex1.getMessage());
         assertEquals("Test details 1", ex1.getDetails());
-        assertEquals(0L, ex1.getDurationMs());
+        assertEquals(0L, ex1.getDuration());
         assertNull(ex1.getCause());
 
         // Constructor 2: message + details + duration
         SocketTimeoutException ex2 = new SocketTimeoutException("Test message 2", "Test details 2", 1500L);
-        assertEquals("Test message 2", ex2.getOriginalMessage());
+        assertEquals("Test message 2", ex2.getMessage());
         assertEquals("Test details 2", ex2.getDetails());
-        assertEquals(1500L, ex2.getDurationMs());
+        assertEquals(1500L, ex2.getDuration());
         assertNull(ex2.getCause());
 
         // Constructor 3: message + details + cause (no duration)
         Exception testCause = new Exception("Test cause");
         SocketTimeoutException ex3 = new SocketTimeoutException("Test message 3", "Test details 3", testCause);
-        assertEquals("Test message 3", ex3.getOriginalMessage());
+        assertEquals("Test message 3", ex3.getMessage());
         assertEquals("Test details 3", ex3.getDetails());
-        assertEquals(0L, ex3.getDurationMs()); // Should default to 0
+        assertEquals(0L, ex3.getDuration()); // Should default to 0
         assertEquals(testCause, ex3.getCause());
 
         // Constructor 4: message + details + cause + duration (all parameters)
         SocketTimeoutException ex4 = new SocketTimeoutException("Test message 4", "Test details 4", testCause, 2500L);
-        assertEquals("Test message 4", ex4.getOriginalMessage());
+        assertEquals("Test message 4", ex4.getMessage());
         assertEquals("Test details 4", ex4.getDetails());
-        assertEquals(2500L, ex4.getDurationMs());
+        assertEquals(2500L, ex4.getDuration());
         assertEquals(testCause, ex4.getCause());
     }
 

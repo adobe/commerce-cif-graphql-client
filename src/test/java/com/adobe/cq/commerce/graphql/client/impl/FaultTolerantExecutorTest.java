@@ -154,7 +154,7 @@ public class FaultTolerantExecutorTest {
                 graphqlClient.execute(dummy, Data.class, Error.class);
                 fail("Expected ServerError for status code " + serverErrorCodes[i]);
             } catch (GraphqlRequestException e) {
-                assertEquals("GraphQL query failed with response code " + serverErrorCodes[i], e.getOriginalMessage());
+                assertEquals("GraphQL query failed with response code " + serverErrorCodes[i], e.getMessage());
             }
 
             verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
@@ -240,7 +240,7 @@ public class FaultTolerantExecutorTest {
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
         } catch (SocketTimeoutException e) {
-            assertEquals("Read timeout occurred while sending GraphQL request", e.getOriginalMessage());
+            assertEquals("Read timeout occurred while sending GraphQL request", e.getMessage());
             assertEquals("Timeout details: Read timed out in half-open state", e.getDetails());
         }
 
@@ -271,7 +271,7 @@ public class FaultTolerantExecutorTest {
             graphqlClient.execute(dummy, Data.class, Error.class);
             fail("Expected GraphqlRequestException");
         } catch (GraphqlRequestException e) {
-            assertEquals("Failed to execute GraphQL request: Failsafe error occurred", e.getOriginalMessage());
+            assertEquals("Failed to execute GraphQL request: Failsafe error occurred", e.getMessage());
             assertTrue(e.getCause() instanceof FailsafeException);
         }
 
@@ -336,7 +336,7 @@ public class FaultTolerantExecutorTest {
                 graphqlClient.execute(dummy, Data.class, Error.class);
                 fail("Expected RuntimeException for status code " + clientErrorCodes[i]);
             } catch (GraphqlRequestException e) {
-                assertEquals("GraphQL query failed with response code " + clientErrorCodes[i], e.getOriginalMessage());
+                assertEquals("GraphQL query failed with response code " + clientErrorCodes[i], e.getMessage());
             }
         }
     }
@@ -397,7 +397,7 @@ public class FaultTolerantExecutorTest {
             graphqlClient.execute(dummy, Data.class, Error.class);
             fail("Expected GraphqlRequestException from handleErrorResponse");
         } catch (GraphqlRequestException e) {
-            assertEquals("GraphQL query failed with response code 400", e.getOriginalMessage());
+            assertEquals("GraphQL query failed with response code 400", e.getMessage());
         }
 
         verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
@@ -472,7 +472,7 @@ public class FaultTolerantExecutorTest {
                 }
             } catch (SocketTimeoutException e) {
                 if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
-                    assertEquals("Read timeout occurred while sending GraphQL request", e.getOriginalMessage());
+                    assertEquals("Read timeout occurred while sending GraphQL request", e.getMessage());
                     assertEquals("Timeout details: Read timed out", e.getDetails());
                 } else {
                     fail("Expected GraphqlRequestException error");

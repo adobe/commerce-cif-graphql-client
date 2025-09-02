@@ -54,7 +54,7 @@ public class SocketTimeoutException extends GraphqlRequestException {
      * @param cause The throwable that caused this exception
      */
     public SocketTimeoutException(String message, String details, Throwable cause) {
-        super(message, cause, 0);
+        super(message, 0, cause);
         this.details = details;
     }
 
@@ -67,7 +67,7 @@ public class SocketTimeoutException extends GraphqlRequestException {
      * @param durationMs The duration in milliseconds
      */
     public SocketTimeoutException(String message, String details, Throwable cause, long durationMs) {
-        super(message, cause, durationMs);
+        super(message, durationMs, cause);
         this.details = details;
     }
 

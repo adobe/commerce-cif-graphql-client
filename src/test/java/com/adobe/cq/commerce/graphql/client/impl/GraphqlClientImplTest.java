@@ -278,7 +278,7 @@ public class GraphqlClientImplTest {
         }
         assertEquals(
             "GraphQL query failed with response code 503",
-            ((GraphqlRequestException) exception).getOriginalMessage());
+            ((GraphqlRequestException) exception).getMessage());
     }
 
     @Test
@@ -291,7 +291,7 @@ public class GraphqlClientImplTest {
         } catch (Exception e) {
             exception = e;
         }
-        assertEquals("Failed to send GraphQL request", ((GraphqlRequestException) exception).getOriginalMessage());
+        assertEquals("Failed to send GraphQL request", ((GraphqlRequestException) exception).getMessage());
     }
 
     @Test
@@ -315,7 +315,7 @@ public class GraphqlClientImplTest {
         } catch (Exception e) {
             exception = e;
         }
-        assertEquals("Failed to read HTTP response content", ((GraphqlRequestException) exception).getOriginalMessage());
+        assertEquals("Failed to read HTTP response content", ((GraphqlRequestException) exception).getMessage());
     }
 
     @Test

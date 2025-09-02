@@ -21,7 +21,7 @@ package com.adobe.cq.commerce.graphql.client;
  */
 public class GraphqlRequestException extends RuntimeException {
 
-    private final long durationMs;
+    private final long duration;
 
     /**
      * Creates a new GraphqlRequestException with a message only.
@@ -41,56 +41,38 @@ public class GraphqlRequestException extends RuntimeException {
      * @param cause the underlying cause
      */
     public GraphqlRequestException(String message, Throwable cause) {
-        this(message, cause, 0L);
-    }
-
-    /**
-     * Creates a new GraphqlRequestException with a message, cause, and duration.
-     * 
-     * @param message the exception message
-     * @param cause the underlying cause
-     * @param durationMs the duration in milliseconds when the exception occurred
-     */
-    public GraphqlRequestException(String message, Throwable cause, long durationMs) {
-        super(message, cause);
-        this.durationMs = durationMs;
+        this(message, 0L, cause);
     }
 
     /**
      * Creates a new GraphqlRequestException with a message and duration.
      * 
      * @param message the exception message
-     * @param durationMs the duration in milliseconds when the exception occurred
+     * @param duration the execution duration in milliseconds of the failing request
      */
-    public GraphqlRequestException(String message, long durationMs) {
+    public GraphqlRequestException(String message, long duration) {
         super(message);
-        this.durationMs = durationMs;
+        this.duration = duration;
     }
 
     /**
-     * Gets the duration in milliseconds when the exception occurred.
+     * Creates a new GraphqlRequestException with a message, duration, and cause.
      * 
-     * @return the duration in milliseconds
+     * @param message the exception message
+     * @param duration the execution duration in milliseconds of the failing request
+     * @param cause the underlying cause
      */
-    public long getDurationMs() {
-        return durationMs;
+    public GraphqlRequestException(String message, long duration, Throwable cause) {
+        super(message, cause);
+        this.duration = duration;
     }
 
     /**
-     * Gets the original exception message without duration information.
+     * Gets the execution duration in milliseconds of the failing request.
      * 
-     * @return the original exception message
+     * @return the execution duration in milliseconds
      */
-    public String getOriginalMessage() {
-        return super.getMessage();
-    }
-
-    @Override
-    public String getMessage() {
-        String originalMessage = super.getMessage();
-        if (durationMs > 0) {
-            return originalMessage + " after " + durationMs + "ms";
-        }
-        return originalMessage;
+    public long getDuration() {
+        return duration;
     }
 }

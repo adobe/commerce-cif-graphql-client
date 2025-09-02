@@ -54,11 +54,11 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                 () -> executeHttpRequest(request, typeOfT, typeofU, options));
         } catch (CircuitBreakerOpenException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.", e,
-                calculateDuration());
+            throw new GraphqlRequestException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.",
+                calculateDuration(), e);
         } catch (FailsafeException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to execute GraphQL request: " + e.getMessage(), e, calculateDuration());
+            throw new GraphqlRequestException("Failed to execute GraphQL request: " + e.getMessage(), calculateDuration(), e);
         }
     }
 
@@ -90,7 +90,7 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                 "Timeout details: " + e.getMessage(), e, calculateDuration());
         } catch (IOException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to send GraphQL request", e, calculateDuration());
+            throw new GraphqlRequestException("Failed to send GraphQL request", calculateDuration(), e);
         }
     }
 

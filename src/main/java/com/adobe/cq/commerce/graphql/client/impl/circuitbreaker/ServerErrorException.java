@@ -62,7 +62,7 @@ public class ServerErrorException extends GraphqlRequestException {
      * @param cause The throwable that caused this exception
      */
     public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause) {
-        super(message, cause, 0);
+        super(message, 0, cause);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
     }
@@ -77,7 +77,7 @@ public class ServerErrorException extends GraphqlRequestException {
      * @param durationMs The duration in milliseconds
      */
     public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause, long durationMs) {
-        super(message, cause, durationMs);
+        super(message, durationMs, cause);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
     }

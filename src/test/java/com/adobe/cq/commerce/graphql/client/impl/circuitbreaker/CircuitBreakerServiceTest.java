@@ -81,9 +81,9 @@ public class CircuitBreakerServiceTest {
             });
             fail("Expected SocketTimeoutException to be thrown");
         } catch (SocketTimeoutException e) {
-            assertEquals("Socket timeout", e.getOriginalMessage());
+            assertEquals("Socket timeout", e.getMessage());
             assertEquals("Connection timed out", e.getDetails());
-            assertEquals(5000L, e.getDurationMs());
+            assertEquals(5000L, e.getDuration());
         }
     }
 
@@ -129,7 +129,7 @@ public class CircuitBreakerServiceTest {
             });
             fail("Expected ServiceUnavailableException");
         } catch (ServiceUnavailableException e) {
-            assertEquals("Service down", e.getOriginalMessage());
+            assertEquals("Service down", e.getMessage());
         }
 
         // Test ServerError handling
@@ -139,7 +139,7 @@ public class CircuitBreakerServiceTest {
             });
             fail("Expected ServerErrorException");
         } catch (ServerErrorException e) {
-            assertEquals("Internal error", e.getOriginalMessage());
+            assertEquals("Internal error", e.getMessage());
         }
 
         // Test SocketTimeout handling
@@ -149,7 +149,7 @@ public class CircuitBreakerServiceTest {
             });
             fail("Expected SocketTimeoutException");
         } catch (SocketTimeoutException e) {
-            assertEquals("Timeout", e.getOriginalMessage());
+            assertEquals("Timeout", e.getMessage());
         }
     }
 }
