@@ -39,7 +39,7 @@ public class GraphqlResponse<T, U> {
     }
 
     /**
-     * Returns the execution duration in milliseconds, or null if not available.
+     * Returns the execution duration in milliseconds, or zero if not available.
      * 
      * @return execution duration in milliseconds
      */
