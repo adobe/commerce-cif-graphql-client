@@ -32,9 +32,11 @@ import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
+import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException;
 import dev.failsafe.CircuitBreakerOpenException;
 import dev.failsafe.FailsafeException;
 
@@ -150,8 +152,8 @@ public class FaultTolerantExecutorTest {
 
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
-                fail("Expected ServerErrorException for status code " + serverErrorCodes[i]);
-            } catch (RuntimeException e) {
+                fail("Expected ServerError for status code " + serverErrorCodes[i]);
+            } catch (GraphqlRequestException e) {
                 assertEquals("GraphQL query failed with response code " + serverErrorCodes[i], e.getMessage());
             }
 
@@ -207,6 +209,55 @@ public class FaultTolerantExecutorTest {
 
         // Verify the HTTP client was called again (circuit breaker is now closed)
         verify(httpClient, times(SERVICE_UNAVAILABLE_THRESHOLD + 2)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testSocketTimeoutCircuitBreakerClosedWithFaultTolerance() throws Exception {
+        testSocketTimeoutWithFaultTolerance();
+        Thread.sleep(10);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class);
+        verify(httpClient, times(SERVICE_UNAVAILABLE_THRESHOLD + 1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testSocketTimeoutCircuitBreakerContinuousOpenStateWithFaultTolerance() throws Exception {
+        // First, trigger circuit breaker to open state by exceeding threshold
+        testSocketTimeoutWithFaultTolerance();
+
+        // Wait for circuit breaker to transition to half-open state
+        Thread.sleep(10);
+
+        // Simulate another socket timeout to test circuit breaker behavior in half-open state
+        // Reset the mock to set up new behavior (similar to how TestUtils.setupHttpResponse works)
+        reset(httpClient);
+        java.net.SocketTimeoutException socketTimeout = new java.net.SocketTimeoutException("Read timed out in half-open state");
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenThrow(socketTimeout);
+
+        // Attempt execution - should throw SocketTimeoutException and re-open circuit breaker
+        // The circuit breaker will return to open state due to the socket timeout
+        try {
+            graphqlClient.execute(dummy, Data.class, Error.class);
+        } catch (SocketTimeoutException e) {
+            assertEquals("Read timeout occurred while sending GraphQL request", e.getMessage());
+            assertEquals("Timeout details: Read timed out in half-open state", e.getDetails());
+        }
+
+        // Verify the HTTP client was called (circuit breaker was in half-open state)
+        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+
+        // Wait for circuit breaker timeout to transition back to half-open state
+        Thread.sleep(12);
+
+        // Simulate successful response to test circuit breaker closing
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+
+        // Execute again - should succeed and close the circuit breaker
+        graphqlClient.execute(dummy, Data.class, Error.class);
+
+        // Verify the HTTP client was called again (circuit breaker is now closed)
+        verify(httpClient, times(2)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
     }
 
     @Test
@@ -284,14 +335,14 @@ public class FaultTolerantExecutorTest {
             try {
                 graphqlClient.execute(dummy, Data.class, Error.class);
                 fail("Expected RuntimeException for status code " + clientErrorCodes[i]);
-            } catch (RuntimeException e) {
+            } catch (GraphqlRequestException e) {
                 assertEquals("GraphQL query failed with response code " + clientErrorCodes[i], e.getMessage());
             }
         }
     }
 
     @Test
-    public void testServerErrorExceptionWithoutCause() {
+    public void testServerErrorWithoutCause() {
         // Test ServerErrorException constructor without cause
         ServerErrorException exception = new ServerErrorException("Test error", 500, "Error body");
 
@@ -302,7 +353,7 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
-    public void testServerErrorExceptionWithCause() {
+    public void testServerErrorWithCause() {
         // Test ServerErrorException constructor with cause
         Throwable cause = new RuntimeException("Original cause");
         ServerErrorException exception = new ServerErrorException("Server error", 500, "Error body", cause);
@@ -314,7 +365,7 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
-    public void testServiceUnavailableExceptionWithoutCause() {
+    public void testServiceUnavailableWithoutCause() {
         // Test ServiceUnavailableException constructor without cause
         ServiceUnavailableException exception = new ServiceUnavailableException("Service unavailable", "Service down");
 
@@ -325,7 +376,7 @@ public class FaultTolerantExecutorTest {
     }
 
     @Test
-    public void testServiceUnavailableExceptionWithCause() {
+    public void testServiceUnavailableWithCause() {
         // Test ServiceUnavailableException constructor with cause
         Throwable cause = new RuntimeException("Original cause");
         ServiceUnavailableException exception = new ServiceUnavailableException("Service unavailable", "Service down", cause);
@@ -344,8 +395,8 @@ public class FaultTolerantExecutorTest {
 
         try {
             graphqlClient.execute(dummy, Data.class, Error.class);
-            fail("Expected RuntimeException from handleErrorResponse");
-        } catch (RuntimeException e) {
+            fail("Expected GraphqlRequestException from handleErrorResponse");
+        } catch (GraphqlRequestException e) {
             assertEquals("GraphQL query failed with response code 400", e.getMessage());
         }
 
@@ -402,6 +453,34 @@ public class FaultTolerantExecutorTest {
             }
         }
 
+        verify(httpClient, times(3)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
+    }
+
+    private void testSocketTimeoutWithFaultTolerance() throws Exception {
+        // Set up mock to throw socket timeout exception on each call
+        java.net.SocketTimeoutException socketTimeout = new java.net.SocketTimeoutException("Read timed out");
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class)))
+            .thenThrow(socketTimeout);
+
+        for (int i = 0; i <= SERVICE_UNAVAILABLE_THRESHOLD; i++) {
+            try {
+                graphqlClient.execute(dummy, Data.class, Error.class);
+                if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
+                    fail("Expected SocketTimeout for iteration " + i);
+                } else {
+                    fail("Expected GraphqlRequestException for iteration " + i);
+                }
+            } catch (SocketTimeoutException e) {
+                if (i < SERVICE_UNAVAILABLE_THRESHOLD) {
+                    assertEquals("Read timeout occurred while sending GraphQL request", e.getMessage());
+                    assertEquals("Timeout details: Read timed out", e.getDetails());
+                } else {
+                    fail("Expected GraphqlRequestException error");
+                }
+            } catch (GraphqlRequestException e) {
+                assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
+            }
+        }
         verify(httpClient, times(3)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
     }
 }

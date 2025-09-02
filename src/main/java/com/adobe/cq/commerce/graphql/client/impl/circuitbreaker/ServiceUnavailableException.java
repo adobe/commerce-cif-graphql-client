@@ -13,12 +13,14 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
+import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
+
 /**
  * Custom exception for 503 Service Unavailable errors.
  * This exception is used by the circuit breaker policies to handle 503 errors with a progressive delay strategy.
  * The exception type itself indicates the error category, eliminating the need for status code checking.
  */
-public class ServiceUnavailableException extends RuntimeException {
+public class ServiceUnavailableException extends GraphqlRequestException {
     private final String responseBody;
 
     /**
@@ -28,7 +30,19 @@ public class ServiceUnavailableException extends RuntimeException {
      * @param responseBody The response body, may contain details about the error
      */
     public ServiceUnavailableException(String message, String responseBody) {
-        super(message);
+        super(message, 0);
+        this.responseBody = responseBody;
+    }
+
+    /**
+     * Creates a new ServiceUnavailableException with the given message, response body and duration.
+     * 
+     * @param message The error message
+     * @param responseBody The response body, may contain details about the error
+     * @param durationMs The duration in milliseconds
+     */
+    public ServiceUnavailableException(String message, String responseBody, long durationMs) {
+        super(message, durationMs);
         this.responseBody = responseBody;
     }
 
@@ -40,7 +54,20 @@ public class ServiceUnavailableException extends RuntimeException {
      * @param cause The throwable that caused this exception
      */
     public ServiceUnavailableException(String message, String responseBody, Throwable cause) {
-        super(message, cause);
+        super(message, 0, cause);
+        this.responseBody = responseBody;
+    }
+
+    /**
+     * Creates a new ServiceUnavailableException with the given message, response body, cause and duration.
+     * 
+     * @param message The error message
+     * @param responseBody The response body, may contain details about the error
+     * @param cause The throwable that caused this exception
+     * @param durationMs The duration in milliseconds
+     */
+    public ServiceUnavailableException(String message, String responseBody, Throwable cause, long durationMs) {
+        super(message, durationMs, cause);
         this.responseBody = responseBody;
     }
 

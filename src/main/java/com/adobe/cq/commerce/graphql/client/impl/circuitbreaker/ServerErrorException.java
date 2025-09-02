@@ -13,6 +13,8 @@
  ******************************************************************************/
 package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
+import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
+
 /**
  * Custom exception for server errors with status code and response body.
  * This exception is used by the circuit breaker policies to differentiate between different types of server errors:
@@ -20,7 +22,7 @@ package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
  * - Other 5xx errors are handled with a constant delay policy
  * Each type of error has its own circuit breaker with specific thresholds and delay strategies.
  */
-public class ServerErrorException extends RuntimeException {
+public class ServerErrorException extends GraphqlRequestException {
     private final int statusCode;
     private final String responseBody;
 
@@ -32,7 +34,21 @@ public class ServerErrorException extends RuntimeException {
      * @param responseBody The response body, may contain details about the error
      */
     public ServerErrorException(String message, int statusCode, String responseBody) {
-        super(message);
+        super(message, 0);
+        this.statusCode = statusCode;
+        this.responseBody = responseBody;
+    }
+
+    /**
+     * Creates a new ServerErrorException with the given message, status code, response body and duration.
+     * 
+     * @param message The error message
+     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
+     * @param responseBody The response body, may contain details about the error
+     * @param durationMs The duration in milliseconds
+     */
+    public ServerErrorException(String message, int statusCode, String responseBody, long durationMs) {
+        super(message, durationMs);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
     }
@@ -46,7 +62,22 @@ public class ServerErrorException extends RuntimeException {
      * @param cause The throwable that caused this exception
      */
     public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause) {
-        super(message, cause);
+        super(message, 0, cause);
+        this.statusCode = statusCode;
+        this.responseBody = responseBody;
+    }
+
+    /**
+     * Creates a new ServerErrorException with the given message, status code, response body, cause and duration.
+     * 
+     * @param message The error message
+     * @param statusCode The HTTP status code (used by circuit breaker policies to determine handling strategy)
+     * @param responseBody The response body, may contain details about the error
+     * @param cause The throwable that caused this exception
+     * @param durationMs The duration in milliseconds
+     */
+    public ServerErrorException(String message, int statusCode, String responseBody, Throwable cause, long durationMs) {
+        super(message, durationMs, cause);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
     }

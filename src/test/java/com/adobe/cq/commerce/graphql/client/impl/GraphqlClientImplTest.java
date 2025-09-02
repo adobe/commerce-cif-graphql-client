@@ -52,12 +52,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
-import com.adobe.cq.commerce.graphql.client.GraphqlClient;
-import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
-import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
-import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
-import com.adobe.cq.commerce.graphql.client.HttpMethod;
-import com.adobe.cq.commerce.graphql.client.RequestOptions;
+import com.adobe.cq.commerce.graphql.client.*;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.GetQueryMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.HeadersMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.RequestBodyMatcher;
@@ -281,7 +276,9 @@ public class GraphqlClientImplTest {
         } catch (Exception e) {
             exception = e;
         }
-        assertEquals("GraphQL query failed with response code 503", exception.getMessage());
+        assertEquals(
+            "GraphQL query failed with response code 503",
+            ((GraphqlRequestException) exception).getMessage());
     }
 
     @Test
@@ -294,7 +291,7 @@ public class GraphqlClientImplTest {
         } catch (Exception e) {
             exception = e;
         }
-        assertEquals("Failed to send GraphQL request", exception.getMessage());
+        assertEquals("Failed to send GraphQL request", ((GraphqlRequestException) exception).getMessage());
     }
 
     @Test
@@ -318,7 +315,7 @@ public class GraphqlClientImplTest {
         } catch (Exception e) {
             exception = e;
         }
-        assertEquals("Failed to read HTTP response content", exception.getMessage());
+        assertEquals("Failed to read HTTP response content", ((GraphqlRequestException) exception).getMessage());
     }
 
     @Test

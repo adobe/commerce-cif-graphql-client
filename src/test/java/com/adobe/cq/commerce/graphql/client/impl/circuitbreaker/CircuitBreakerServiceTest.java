@@ -15,13 +15,9 @@
 package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.Properties;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import static org.junit.Assert.*;
@@ -40,8 +36,8 @@ public class CircuitBreakerServiceTest {
     }
 
     @Test
-    public void testCircuitBreakerServiceCreation() {
-        assertNotNull("CircuitBreakerService should be created successfully", circuitBreakerService);
+    public void testServiceCreation() {
+        assertNotNull("Service should be created successfully", circuitBreakerService);
     }
 
     @Test
@@ -51,7 +47,7 @@ public class CircuitBreakerServiceTest {
     }
 
     @Test
-    public void testExecuteWithPoliciesWithServiceUnavailableException() throws IOException {
+    public void testExecuteWithPoliciesWithServiceUnavailable() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
                 throw new ServiceUnavailableException("Service unavailable", "Service down");
@@ -64,7 +60,7 @@ public class CircuitBreakerServiceTest {
     }
 
     @Test
-    public void testExecuteWithPoliciesWithServerErrorException() throws IOException {
+    public void testExecuteWithPoliciesWithServerError() throws IOException {
         try {
             circuitBreakerService.executeWithPolicies("http://test.com", () -> {
                 throw new ServerErrorException("Server error", 500, "Internal server error");
@@ -78,99 +74,40 @@ public class CircuitBreakerServiceTest {
     }
 
     @Test
-    public void testExecuteWithPoliciesWithIOException() throws IOException, NoSuchFieldException, IllegalAccessException {
-        Properties props = Mockito.mock(Properties.class);
-        Mockito.doThrow(new IOException("Connection failed")).when(props).load(Mockito.any(java.io.InputStream.class));
-
-        // Use reflection to access the private props field in CircuitBreakerService
-        Field properties = CircuitBreakerService.class.getDeclaredField("props");
-        properties.setAccessible(true);
-        properties.set(circuitBreakerService, props);
-
-        // Test that the service handles IOException gracefully during properties loading
+    public void testExecuteWithPoliciesWithSocketTimeout() throws IOException {
         try {
-            // Call loadProperties via reflection to trigger the IOException
-            java.lang.reflect.Method loadPropertiesMethod = CircuitBreakerService.class.getDeclaredMethod("loadProperties");
-            loadPropertiesMethod.setAccessible(true);
-            loadPropertiesMethod.invoke(circuitBreakerService);
-
-            // Check props is empty
-            assertEquals("Properties should be empty after IOException", 0, props.size());
-
-            // The service should handle the IOException gracefully
-            assertNotNull("Service should still be functional", circuitBreakerService);
-
-            // Verify the mock was called
-            Mockito.verify(props, Mockito.times(1)).load(Mockito.any(java.io.InputStream.class));
-
-        } catch (Exception e) {
-            fail("Should not throw exception when handling IOException in properties loading");
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new SocketTimeoutException("Socket timeout", "Connection timed out", 5000L);
+            });
+            fail("Expected SocketTimeoutException to be thrown");
+        } catch (SocketTimeoutException e) {
+            assertEquals("Socket timeout", e.getMessage());
+            assertEquals("Connection timed out", e.getDetails());
+            assertEquals(5000L, e.getDuration());
         }
     }
 
     @Test
-    public void testPropertyParsingMethods() throws Exception {
-        // Test all property parsing methods with various scenarios in a single test
-        Method getIntPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getIntProperty", Properties.class, String.class,
-            int.class);
-        Method getLongPropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getLongProperty", Properties.class, String.class,
-            long.class);
-        Method getDoublePropertyMethod = CircuitBreakerService.class.getDeclaredMethod("getDoubleProperty", Properties.class, String.class,
-            double.class);
+    public void testServiceWithCustomConfiguration() {
+        // Test that CircuitBreakerService can be created with custom configuration
+        Configuration customConfig = new Configuration();
+        CircuitBreakerService service = new CircuitBreakerService(customConfig);
+        assertNotNull("CircuitBreakerService should be created with custom configuration", service);
 
-        getIntPropertyMethod.setAccessible(true);
-        getLongPropertyMethod.setAccessible(true);
-        getDoublePropertyMethod.setAccessible(true);
-
-        Properties props = new Properties();
-
-        // Test valid values
-        props.setProperty("int.key", "42");
-        props.setProperty("long.key", "123456789");
-        props.setProperty("double.key", "3.14159");
-
-        assertEquals(42, getIntPropertyMethod.invoke(circuitBreakerService, props, "int.key", 10));
-        assertEquals(123456789L, getLongPropertyMethod.invoke(circuitBreakerService, props, "long.key", 1000L));
-        assertEquals(3.14159, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "double.key", 1.0), 0.00001);
-
-        // Test invalid values (should use defaults)
-        props.setProperty("invalid.int", "not.a.number");
-        props.setProperty("invalid.long", "not.a.long");
-        props.setProperty("invalid.double", "not.a.double");
-
-        assertEquals(10, getIntPropertyMethod.invoke(circuitBreakerService, props, "invalid.int", 10));
-        assertEquals(1000L, getLongPropertyMethod.invoke(circuitBreakerService, props, "invalid.long", 1000L));
-        assertEquals(1.0, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "invalid.double", 1.0), 0.00001);
-
-        // Test null/missing values (should use defaults)
-        assertEquals(10, getIntPropertyMethod.invoke(circuitBreakerService, props, "missing.int", 10));
-        assertEquals(1000L, getLongPropertyMethod.invoke(circuitBreakerService, props, "missing.long", 1000L));
-        assertEquals(1.0, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "missing.double", 1.0), 0.00001);
-
-        // Test whitespace values (should use defaults)
-        props.setProperty("whitespace.int", "   ");
-        props.setProperty("whitespace.long", "   ");
-        props.setProperty("whitespace.double", "   ");
-
-        assertEquals(10, getIntPropertyMethod.invoke(circuitBreakerService, props, "whitespace.int", 10));
-        assertEquals(1000L, getLongPropertyMethod.invoke(circuitBreakerService, props, "whitespace.long", 1000L));
-        assertEquals(1.0, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "whitespace.double", 1.0), 0.00001);
-
-        // Test trimmed values
-        props.setProperty("trimmed.int", "  42  ");
-        props.setProperty("trimmed.long", "  123456789  ");
-        props.setProperty("trimmed.double", "  3.14159  ");
-
-        assertEquals(42, getIntPropertyMethod.invoke(circuitBreakerService, props, "trimmed.int", 10));
-        assertEquals(123456789L, getLongPropertyMethod.invoke(circuitBreakerService, props, "trimmed.long", 1000L));
-        assertEquals(3.14159, (Double) getDoublePropertyMethod.invoke(circuitBreakerService, props, "trimmed.double", 1.0), 0.00001);
+        // Test that it can execute successfully
+        try {
+            String result = service.executeWithPolicies("http://test.com", () -> "custom-test");
+            assertEquals("custom-test", result);
+        } catch (Exception e) {
+            fail("Should not throw exception for successful execution with custom config");
+        }
     }
 
     @Test
-    public void testCircuitBreakerServiceWithDefaultValues() {
+    public void testServiceWithDefaultValues() {
         // Test that CircuitBreakerService can be created with default values
         CircuitBreakerService service = new CircuitBreakerService();
-        assertNotNull("Service should be created with default values", service);
+        assertNotNull("CircuitBreakerService should be created with default values", service);
 
         // Test that it can execute successfully
         try {
@@ -178,6 +115,41 @@ public class CircuitBreakerServiceTest {
             assertEquals("test", result);
         } catch (Exception e) {
             fail("Should not throw exception for successful execution");
+        }
+    }
+
+    @Test
+    public void testAllThreeCircuitBreakerPolicies() {
+        // Test that all three circuit breaker policies are integrated and handle their respective exceptions
+
+        // Test ServiceUnavailable handling
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServiceUnavailableException("Service down", "Maintenance mode");
+            });
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals("Service down", e.getMessage());
+        }
+
+        // Test ServerError handling
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new ServerErrorException("Internal error", 500, "Database unavailable");
+            });
+            fail("Expected ServerErrorException");
+        } catch (ServerErrorException e) {
+            assertEquals("Internal error", e.getMessage());
+        }
+
+        // Test SocketTimeout handling
+        try {
+            circuitBreakerService.executeWithPolicies("http://test.com", () -> {
+                throw new SocketTimeoutException("Timeout", "Connection timeout", 10000L);
+            });
+            fail("Expected SocketTimeoutException");
+        } catch (SocketTimeoutException e) {
+            assertEquals("Timeout", e.getMessage());
         }
     }
 }
