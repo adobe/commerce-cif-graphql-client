@@ -262,11 +262,14 @@ public class GraphqlClientImpl implements GraphqlClient {
         if (cache != null) {
             CacheKey key = new CacheKey(request, options);
             try {
+                LOGGER.debug("Cache HIT : Returning response from cache for key {}", key);
                 return (GraphqlResponse<T, U>) cache.get(key, () -> executeImpl(request, typeOfT, typeofU, options));
             } catch (ExecutionException e) {
+                LOGGER.error("Failed to return response from Cache", e);
                 return null;
             }
         }
+        LOGGER.debug("Cache MISS : Executing GraphQL call with Commerce");
         return executeImpl(request, typeOfT, typeofU, options);
     }
 
