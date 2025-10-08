@@ -25,6 +25,8 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     private String url;
     private String identifier = GraphqlClientConfiguration.DEFAULT_IDENTIFIER;
+    private String type = GraphqlClientConfiguration.DEFAULT_TYPE;
+    private HttpMethod method = HttpMethod.GET;
     private HttpMethod httpMethod = HttpMethod.POST;
     private boolean acceptSelfSignedCertificates = GraphqlClientConfiguration.ACCEPT_SELF_SIGNED_CERTIFICATES;
     private boolean allowHttpProtocol = GraphqlClientConfiguration.ALLOW_HTTP_PROTOCOL;
@@ -45,6 +47,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     GraphqlClientConfigurationImpl(GraphqlClientConfiguration configuration) {
         identifier = configuration.identifier();
+        type = configuration.type();
         url = configuration.url();
         httpMethod = configuration.httpMethod();
         acceptSelfSignedCertificates = configuration.acceptSelfSignedCertificates();
@@ -73,6 +76,15 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setIdentifier(String identifier) {
         this.identifier = identifier;
+    }
+
+    @Override
+    public String type() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     @Override
