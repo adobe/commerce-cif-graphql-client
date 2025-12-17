@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: openjdk:8-jdk
+      - image: cimg/openjdk:8.0.372
     steps:
       - checkout
       - restore_cache:
@@ -29,7 +29,7 @@ jobs:
           
   release:
     docker:
-      - image: openjdk:8-jdk
+      - image: cimg/openjdk:8.0.372
     steps:
       - checkout
       - restore_cache:
