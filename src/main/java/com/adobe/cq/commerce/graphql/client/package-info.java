@@ -12,5 +12,5 @@
  *
  ******************************************************************************/
 
-@org.osgi.annotation.versioning.Version("1.13.0")
+@org.osgi.annotation.versioning.Version("1.14.0")
 package com.adobe.cq.commerce.graphql.client;
