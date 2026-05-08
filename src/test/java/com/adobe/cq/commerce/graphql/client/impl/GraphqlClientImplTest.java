@@ -486,6 +486,42 @@ public class GraphqlClientImplTest {
     }
 
     @Test
+    public void testValidUrlRegistersServiceExactlyOnce() throws Exception {
+        BundleContext bundleContext = mock(BundleContext.class);
+        ServiceRegistration registration = mock(ServiceRegistration.class);
+        when(bundleContext.registerService(eq(GraphqlClient.class), eq(graphqlClient), any())).thenReturn(registration);
+
+        graphqlClient.activate(mockConfig, bundleContext);
+
+        verify(bundleContext, times(1)).registerService(eq(GraphqlClient.class), eq(graphqlClient), any());
+    }
+
+    @Test
+    public void testBlankUrlRegistersNoService() throws Exception {
+        GraphqlClientImpl freshClient = new GraphqlClientImpl();
+        Field clientBuilderFactoryField = GraphqlClientImpl.class.getDeclaredField("clientBuilderFactory");
+        clientBuilderFactoryField.setAccessible(true);
+        clientBuilderFactoryField.set(freshClient, mock(HttpClientBuilderFactory.class));
+
+        BundleContext bundleContext = mock(BundleContext.class);
+        mockConfig.setUrl("");
+        freshClient.activate(mockConfig, bundleContext);
+
+        verify(bundleContext, never()).registerService(any(Class.class), any(GraphqlClientImpl.class), any());
+
+        Field metricsField = GraphqlClientImpl.class.getDeclaredField("metrics");
+        metricsField.setAccessible(true);
+        assertNull(metricsField.get(freshClient));
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void testNullMetricsOnExecutorCausesNPE() throws Exception {
+        graphqlClient.executor = new DefaultExecutor(httpClient, null, mockConfig);
+        graphqlClient.execute(new GraphqlRequest("{dummy}"), (java.lang.reflect.Type) Object.class,
+            (java.lang.reflect.Type) Object.class);
+    }
+
+    @Test
     public void testDeactivateWhenExecutorIsNull() throws Exception {
         // given - create a client with no executor (simulating early return from activate)
         GraphqlClientImpl clientWithNoExecutor = new GraphqlClientImpl();
