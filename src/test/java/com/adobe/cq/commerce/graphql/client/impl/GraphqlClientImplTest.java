@@ -515,7 +515,7 @@ public class GraphqlClientImplTest {
     }
 
     @Test(expected = NullPointerException.class)
-    public void testNullMetricsOnExecutorCausesNPE() throws Exception {
+    public void testDefaultExecutorThrowsNpeWhenMetricsIsNull() throws Exception {
         graphqlClient.executor = new DefaultExecutor(httpClient, null, mockConfig);
         graphqlClient.execute(new GraphqlRequest("{dummy}"), (java.lang.reflect.Type) Object.class,
             (java.lang.reflect.Type) Object.class);
