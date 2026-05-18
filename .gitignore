@@ -7,3 +7,5 @@
 /target/
 pom.xml.releaseBackup
 release.properties
+.DS_Store
+**/.DS_Store

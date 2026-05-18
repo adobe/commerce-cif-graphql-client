@@ -64,7 +64,10 @@ import com.codahale.metrics.MetricRegistry;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
-@Component(service = { GraphqlClient.class })
+// service = {} disables OSGi DS auto-registration. The service is registered manually in activate()
+// only after all fields are initialized and the URL is valid, preventing partially-initialized
+// instances from being published to the OSGi registry.
+@Component(service = {})
 @Designate(ocd = GraphqlClientConfiguration.class, factory = true)
 public class GraphqlClientImpl implements GraphqlClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(GraphqlClientImpl.class);
