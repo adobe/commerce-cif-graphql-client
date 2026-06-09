@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/adobe/commerce-cif-graphql-client.svg?style=svg)](https://circleci.com/gh/adobe/commerce-cif-graphql-client)
+[![CI](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/ci.yml/badge.svg)](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/adobe/commerce-cif-graphql-client/branch/master/graph/badge.svg)](https://codecov.io/gh/adobe/commerce-cif-graphql-client)
 [![Maven Central](https://img.shields.io/maven-central/v/com.adobe.commerce.cif/graphql-client.svg)](https://search.maven.org/search?q=g:com.adobe.commerce.cif%20AND%20a:graphql-client)
 
@@ -57,7 +57,7 @@ Note that even if it is enabled, a cache is only used if the `RequestOptions` se
 
 ## Releases to Maven Central
 
-Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated `CircleCI` build that performs the deployment of the artifact to Maven Central.
+Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated GitHub Actions release workflow that performs the deployment of the artifact to Maven Central.
 
 ## Code Formatting
 You can find the code formatting rules in the `eclipse-formatter.xml` file. The code formatting is automatically checked for each build. To automatically format your code, please run:
