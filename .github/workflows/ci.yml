@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      checks: write
-      pull-requests: write
 
     steps:
       - name: Checkout
@@ -145,27 +143,9 @@ jobs:
           fi
           cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Post test files report to PR
-        if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: test-files-report
-          path: test-files-report.md
-
       - name: Generate HTML test report
         if: always()
         run: mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
-
-      - name: Publish test results to PR
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          files: target/surefire-reports/*.xml
-          check_name: Maven Test Results
-          comment_mode: off
-          check_run: false
-          job_summary: true
-          action_fail: false
 
       - name: Upload Surefire XML reports
         uses: actions/upload-artifact@v4
