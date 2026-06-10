@@ -1,4 +1,4 @@
-name: build-and-release
+name: github-actions
 
 # Same workflow name as CircleCI — only triggered by release tags.
 on:
@@ -7,7 +7,7 @@ on:
       - 'graphql-client-*'
 
 concurrency:
-  group: build-and-release-${{ github.ref }}
+  group: github-actions-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

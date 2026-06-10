@@ -1,4 +1,4 @@
-name: build-and-release
+name: github-actions
 
 on:
   pull_request:
@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: write
 
     steps:
       - name: Checkout
@@ -34,6 +35,28 @@ jobs:
           java -version
           mvn -v
           mvn -B clean install
+          echo ""
+          echo "=============== TEST RESULTS ==============="
+          total=0
+          for xml in target/surefire-reports/TEST-*.xml; do
+            [ -f "$xml" ] || continue
+            class=$(basename "$xml" .xml | sed 's/^TEST-//')
+            attrs=$(grep -m1 '<testsuite ' "$xml" || true)
+            tests=$(echo "$attrs" | sed -n 's/.* tests="\([^"]*\)".*/\1/p')
+            failures=$(echo "$attrs" | sed -n 's/.* failures="\([^"]*\)".*/\1/p')
+            errors=$(echo "$attrs" | sed -n 's/.* errors="\([^"]*\)".*/\1/p')
+            tests=${tests:-0}
+            failures=${failures:-0}
+            errors=${errors:-0}
+            total=$((total + tests))
+            if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
+              echo "FAIL  ${class} (${tests} tests, ${failures} failures, ${errors} errors)"
+            else
+              echo "PASS  ${class} (${tests} tests)"
+            fi
+          done
+          echo "TOTAL: ${total} tests"
+          echo "================================================================"
 
       - name: Tests
         if: always()
@@ -151,43 +174,33 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           cat "$report" >> "$GITHUB_STEP_SUMMARY"
           echo "Tests: ${total_tests} passed in ${file_count} test files (${total_failures} failures, ${total_errors} errors)"
+          echo "::notice title=Tests::${total_tests} tests passed in ${file_count} test files"
 
       - name: Generate HTML test report
         if: always()
         run: mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
 
-      - name: Artifacts
-        if: always()
-        run: |
-          echo "Uploading surefire-reports, test-files-report, and surefire-html-report artifacts."
-          ls -la target/surefire-reports/ | head -30
-
-      - name: Upload surefire-reports
+      - name: Upload test artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: surefire-reports
-          path: target/surefire-reports/
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/site/surefire-report.html
+            test-files-report.md
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload test files report
-        uses: actions/upload-artifact@v4
+      - name: Artifacts summary
         if: always()
-        with:
-          name: test-files-report
-          path: test-files-report.md
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload HTML test report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: surefire-html-report
-          path: target/site/surefire-report.html
-          if-no-files-found: warn
-          retention-days: 14
+        run: |
+          echo "::notice title=Artifacts::Download artifact test-reports from the Artifacts section below this job"
+          echo "Artifact: test-reports"
+          echo "  - surefire-reports/*.xml (JUnit XML, same as CircleCI)"
+          echo "  - surefire-report.html (HTML test report)"
+          echo "  - test-files-report.md (markdown summary)"
+          ls -la target/surefire-reports/
 
       - name: Upload JaCoCo HTML coverage report
         uses: actions/upload-artifact@v4
