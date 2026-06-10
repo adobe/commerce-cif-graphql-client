@@ -1,3 +1,4 @@
+[![CircleCI](https://circleci.com/gh/adobe/commerce-cif-graphql-client.svg?style=svg)](https://circleci.com/gh/adobe/commerce-cif-graphql-client)
 [![CI](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/ci.yml/badge.svg)](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/ci.yml)
 [![Release](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/release.yml/badge.svg)](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/release.yml)
 [![codecov](https://codecov.io/gh/adobe/commerce-cif-graphql-client/branch/master/graph/badge.svg)](https://codecov.io/gh/adobe/commerce-cif-graphql-client)
@@ -58,7 +59,7 @@ Note that even if it is enabled, a cache is only used if the `RequestOptions` se
 
 ## Releases to Maven Central
 
-Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated GitHub Actions release workflow that performs the deployment of the artifact to Maven Central.
+Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers release workflows on CircleCI and GitHub Actions. CircleCI currently performs the deployment to Maven Central while GitHub Actions is being introduced alongside it.
 
 ## Code Formatting
 You can find the code formatting rules in the `eclipse-formatter.xml` file. The code formatting is automatically checked for each build. To automatically format your code, please run:

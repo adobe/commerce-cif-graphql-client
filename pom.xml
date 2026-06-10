@@ -123,6 +123,7 @@
                         <exclude>target/*</exclude>
                         <exclude>src/test/resources/**/*</exclude>
                         <exclude>**/*.md</exclude>
+                        <exclude>.circleci/*</exclude>
                         <exclude>.github/workflows/*</exclude>
                         <exclude>.github/maven/*</exclude>
                         <exclude>.claude/*</exclude>
@@ -282,7 +283,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M3</version>
                 <configuration>
-                    <useSystemClassLoader>false</useSystemClassLoader>
+                    <useSystemClassLoader>false</useSystemClassLoader> <!-- Required for CircleCI -->
                     <systemPropertyVariables>
                         <jacoco-agent.destfile>${jacoco.data.file}</jacoco-agent.destfile>
                     </systemPropertyVariables>
