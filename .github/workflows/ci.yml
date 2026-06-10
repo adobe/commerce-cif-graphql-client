@@ -35,7 +35,7 @@ jobs:
           mvn -v
           mvn -B clean install
 
-      - name: Generate test files report
+      - name: Tests
         if: always()
         run: |
           report="test-files-report.md"
@@ -141,18 +141,43 @@ jobs:
           if [ "$failed_methods" -eq 0 ]; then
             echo "No failed test methods." >> "$report"
           fi
+          {
+            echo "# Tests: ${total_tests} passed, ${total_failures} failed, ${total_errors} errors"
+            echo ""
+            echo "${file_count} test files — ${passed_files} passed, ${failed_files} failed"
+            echo ""
+            echo "Download XML reports from the **Artifacts** section on this workflow run page."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
           cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tests: ${total_tests} passed in ${file_count} test files (${total_failures} failures, ${total_errors} errors)"
 
       - name: Generate HTML test report
         if: always()
         run: mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
 
-      - name: Upload Surefire XML reports
+      - name: Artifacts
+        if: always()
+        run: |
+          echo "Uploading surefire-reports, test-files-report, and surefire-html-report artifacts."
+          ls -la target/surefire-reports/ | head -30
+
+      - name: Upload surefire-reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: surefire-reports
           path: target/surefire-reports/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test files report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-files-report
+          path: test-files-report.md
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload HTML test report
@@ -161,6 +186,7 @@ jobs:
         with:
           name: surefire-html-report
           path: target/site/surefire-report.html
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload JaCoCo HTML coverage report
