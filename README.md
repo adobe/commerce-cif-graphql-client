@@ -1,5 +1,4 @@
 [![CI](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/ci.yml/badge.svg)](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/ci.yml)
-[![Release](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/release.yml/badge.svg)](https://github.com/adobe/commerce-cif-graphql-client/actions/workflows/release.yml)
 [![codecov](https://codecov.io/gh/adobe/commerce-cif-graphql-client/branch/master/graph/badge.svg)](https://codecov.io/gh/adobe/commerce-cif-graphql-client)
 [![Maven Central](https://img.shields.io/maven-central/v/com.adobe.commerce.cif/graphql-client.svg)](https://search.maven.org/search?q=g:com.adobe.commerce.cif%20AND%20a:graphql-client)
 
