@@ -21,26 +21,31 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 8
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '8'
           cache: maven
 
       - name: Build
-        run: mvn -B clean install
+        id: build
+        run: |
+          {
+            echo "## Build environment"
+            java -version 2>&1
+            mvn -v
+          } | tee build-log.txt
+          mvn -B clean install
+          echo "result=success" >> "$GITHUB_OUTPUT"
 
-      - name: Test report (click this step to see pass/fail list)
+      - name: Tests and summary
         if: always()
         run: |
           mkdir -p build-output/surefire-reports
           cp -r target/surefire-reports/. build-output/surefire-reports/
-          if [ -f target/site/surefire-report.html ]; then
-            cp target/site/surefire-report.html build-output/
-          fi
 
           total_tests=0
           total_failures=0
@@ -49,11 +54,8 @@ jobs:
           passed_files=0
           failed_files=0
 
-          echo "============================================================"
-          echo "  TEST RESULTS"
-          echo "============================================================"
-          printf "%-8s %-70s %s\n" "STATUS" "TEST CLASS (JAVA FILE)" "TESTS"
-          echo "------------------------------------------------------------"
+          test_table="| Status | Test class (Java file) | Tests | Failures | Errors |"
+          test_table="${test_table}\n|---|---|--:|--:|--:|"
 
           for xml in target/surefire-reports/TEST-*.xml; do
             [ -f "$xml" ] || continue
@@ -76,48 +78,54 @@ jobs:
               status="PASSED"
               passed_files=$((passed_files + 1))
             fi
-            printf "%-8s %-70s %s\n" "$status" "$class" "$tests"
+            test_table="${test_table}\n| ${status} | \`${class}\` | ${tests} | ${failures} | ${errors} |"
           done
 
-          echo "------------------------------------------------------------"
-          echo "TOTAL:   ${total_tests} tests in ${file_count} files"
-          echo "PASSED:  ${passed_files} files"
-          echo "FAILED:  ${failed_files} files"
-          echo "ERRORS:  ${total_errors} test errors"
-          echo "============================================================"
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            build_status="SUCCESS"
+          else
+            build_status="FAILED"
+          fi
 
           {
-            echo "# Test results"
+            echo "# github-actions build report"
+            echo ""
+            echo "> Click **Summary** in the left sidebar for this page. PR checks open the build log by default."
+            echo ""
+            echo "<details>"
+            echo "<summary><strong>Build</strong> — ${build_status}</summary>"
+            echo ""
+            echo "\`\`\`"
+            cat build-log.txt
+            echo "mvn clean install: ${build_status}"
+            echo "\`\`\`"
+            echo "</details>"
+            echo ""
+            echo "<details>"
+            echo "<summary><strong>Test Results</strong> — ${total_tests} tests, ${passed_files} files passed, ${failed_files} files failed</summary>"
             echo ""
             echo "**${total_tests} tests** in **${file_count} files** — **${passed_files} passed**, **${failed_files} failed**"
             echo ""
-            echo "| Status | Test class (Java file) | Tests |"
-            echo "|---|---|--:|"
-          } > build-output/test-summary.md
+            echo -e "$test_table"
+            echo "</details>"
+            echo ""
+            echo "<details>"
+            echo "<summary><strong>Artifacts</strong> — download from the Artifacts section below</summary>"
+            echo ""
+            echo "| Artifact | Contents |"
+            echo "|---|---|"
+            echo "| \`surefire-reports\` | JUnit XML files + test-summary.md + HTML report |"
+            echo "| \`jacoco-html-report\` | Code coverage HTML report |"
+            echo ""
+            echo "Files in surefire-reports artifact:"
+            echo "\`\`\`"
+            find build-output -type f | sort
+            echo "\`\`\`"
+            echo "</details>"
+          } > "$GITHUB_STEP_SUMMARY"
 
-          for xml in target/surefire-reports/TEST-*.xml; do
-            [ -f "$xml" ] || continue
-            class=$(basename "$xml" .xml | sed 's/^TEST-//')
-            attrs=$(grep -m1 '<testsuite ' "$xml" || true)
-            tests=$(echo "$attrs" | sed -n 's/.* tests="\([^"]*\)".*/\1/p')
-            failures=$(echo "$attrs" | sed -n 's/.* failures="\([^"]*\)".*/\1/p')
-            errors=$(echo "$attrs" | sed -n 's/.* errors="\([^"]*\)".*/\1/p')
-            tests=${tests:-0}
-            failures=${failures:-0}
-            errors=${errors:-0}
-            if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
-              row_status="FAILED"
-            else
-              row_status="PASSED"
-            fi
-            echo "| ${row_status} | \`${class}\` | ${tests} |" >> build-output/test-summary.md
-          done
-
-          cp build-output/test-summary.md "$GITHUB_STEP_SUMMARY"
-          echo "::notice title=Tests::${total_tests} tests passed in ${file_count} files (${failed_files} failed)"
-
-          echo "Files packaged for artifact upload:"
-          find build-output -type f | sort
+          echo -e "$test_table" > build-output/test-summary.md
+          echo "::notice title=Tests::${total_tests} tests in ${file_count} files (${failed_files} failed)"
 
       - name: Generate HTML test report
         if: always()
@@ -127,8 +135,8 @@ jobs:
             cp target/site/surefire-report.html build-output/
           fi
 
-      - name: Upload surefire-reports artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload surefire-reports
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: surefire-reports
@@ -136,8 +144,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload JaCoCo HTML coverage report
-        uses: actions/upload-artifact@v4
+      - name: Upload jacoco-html-report
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: jacoco-html-report
