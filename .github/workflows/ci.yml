@@ -107,7 +107,7 @@ jobs:
           comment_mode: always
           comment_title: Test Results (${{ job.status }})
           check_run_annotations: all tests
-          report_suite_logs: all
+          report_suite_logs: any
           action_fail: false
 
       - name: Upload Surefire XML reports
