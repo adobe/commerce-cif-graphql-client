@@ -31,49 +31,30 @@ jobs:
           cache: maven
 
       - name: Build
-        run: |
-          java -version
-          mvn -v
-          mvn -B clean install
-          echo ""
-          echo "=============== TEST RESULTS ==============="
-          total=0
-          for xml in target/surefire-reports/TEST-*.xml; do
-            [ -f "$xml" ] || continue
-            class=$(basename "$xml" .xml | sed 's/^TEST-//')
-            attrs=$(grep -m1 '<testsuite ' "$xml" || true)
-            tests=$(echo "$attrs" | sed -n 's/.* tests="\([^"]*\)".*/\1/p')
-            failures=$(echo "$attrs" | sed -n 's/.* failures="\([^"]*\)".*/\1/p')
-            errors=$(echo "$attrs" | sed -n 's/.* errors="\([^"]*\)".*/\1/p')
-            tests=${tests:-0}
-            failures=${failures:-0}
-            errors=${errors:-0}
-            total=$((total + tests))
-            if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
-              echo "FAIL  ${class} (${tests} tests, ${failures} failures, ${errors} errors)"
-            else
-              echo "PASS  ${class} (${tests} tests)"
-            fi
-          done
-          echo "TOTAL: ${total} tests"
-          echo "================================================================"
+        run: mvn -B clean install
 
-      - name: Tests
+      - name: Test report (click this step to see pass/fail list)
         if: always()
         run: |
-          report="test-files-report.md"
-          {
-            echo "## Test results by test class (Java file)"
-            echo ""
-            echo "| # | Test class (Java file) | Tests | Failures | Errors | Skipped | Status |"
-            echo "|--:|---|--:|--:|--:|--:|---|"
-          } > "$report"
-          file_count=0
-          passed_files=0
-          failed_files=0
+          mkdir -p build-output/surefire-reports
+          cp -r target/surefire-reports/. build-output/surefire-reports/
+          if [ -f target/site/surefire-report.html ]; then
+            cp target/site/surefire-report.html build-output/
+          fi
+
           total_tests=0
           total_failures=0
           total_errors=0
+          file_count=0
+          passed_files=0
+          failed_files=0
+
+          echo "============================================================"
+          echo "  TEST RESULTS"
+          echo "============================================================"
+          printf "%-8s %-70s %s\n" "STATUS" "TEST CLASS (JAVA FILE)" "TESTS"
+          echo "------------------------------------------------------------"
+
           for xml in target/surefire-reports/TEST-*.xml; do
             [ -f "$xml" ] || continue
             file_count=$((file_count + 1))
@@ -82,11 +63,9 @@ jobs:
             tests=$(echo "$attrs" | sed -n 's/.* tests="\([^"]*\)".*/\1/p')
             failures=$(echo "$attrs" | sed -n 's/.* failures="\([^"]*\)".*/\1/p')
             errors=$(echo "$attrs" | sed -n 's/.* errors="\([^"]*\)".*/\1/p')
-            skipped=$(echo "$attrs" | sed -n 's/.* skipped="\([^"]*\)".*/\1/p')
             tests=${tests:-0}
             failures=${failures:-0}
             errors=${errors:-0}
-            skipped=${skipped:-0}
             total_tests=$((total_tests + tests))
             total_failures=$((total_failures + failures))
             total_errors=$((total_errors + errors))
@@ -97,15 +76,25 @@ jobs:
               status="PASSED"
               passed_files=$((passed_files + 1))
             fi
-            echo "| ${file_count} | \`${class}\` | ${tests} | ${failures} | ${errors} | ${skipped} | ${status} |" >> "$report"
+            printf "%-8s %-70s %s\n" "$status" "$class" "$tests"
           done
+
+          echo "------------------------------------------------------------"
+          echo "TOTAL:   ${total_tests} tests in ${file_count} files"
+          echo "PASSED:  ${passed_files} files"
+          echo "FAILED:  ${failed_files} files"
+          echo "ERRORS:  ${total_errors} test errors"
+          echo "============================================================"
+
           {
+            echo "# Test results"
             echo ""
-            echo "**Summary:** ${file_count} test files — ${passed_files} passed, ${failed_files} failed — ${total_tests} test methods (${total_failures} failures, ${total_errors} errors)"
+            echo "**${total_tests} tests** in **${file_count} files** — **${passed_files} passed**, **${failed_files} failed**"
             echo ""
-            echo "### Passed test files"
-            echo ""
-          } >> "$report"
+            echo "| Status | Test class (Java file) | Tests |"
+            echo "|---|---|--:|"
+          } > build-output/test-summary.md
+
           for xml in target/surefire-reports/TEST-*.xml; do
             [ -f "$xml" ] || continue
             class=$(basename "$xml" .xml | sed 's/^TEST-//')
@@ -116,91 +105,36 @@ jobs:
             tests=${tests:-0}
             failures=${failures:-0}
             errors=${errors:-0}
-            if [ "$failures" = "0" ] && [ "$errors" = "0" ]; then
-              echo "- \`${class}\` (${tests} tests)" >> "$report"
-            fi
-          done
-          {
-            echo ""
-            echo "### Failed test files"
-            echo ""
-          } >> "$report"
-          failed_list=0
-          for xml in target/surefire-reports/TEST-*.xml; do
-            [ -f "$xml" ] || continue
-            class=$(basename "$xml" .xml | sed 's/^TEST-//')
-            attrs=$(grep -m1 '<testsuite ' "$xml" || true)
-            failures=$(echo "$attrs" | sed -n 's/.* failures="\([^"]*\)".*/\1/p')
-            errors=$(echo "$attrs" | sed -n 's/.* errors="\([^"]*\)".*/\1/p')
-            failures=${failures:-0}
-            errors=${errors:-0}
             if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
-              failed_list=1
-              tests=$(echo "$attrs" | sed -n 's/.* tests="\([^"]*\)".*/\1/p')
-              tests=${tests:-0}
-              echo "- \`${class}\` (${tests} tests, ${failures} failures, ${errors} errors)" >> "$report"
+              row_status="FAILED"
+            else
+              row_status="PASSED"
             fi
+            echo "| ${row_status} | \`${class}\` | ${tests} |" >> build-output/test-summary.md
           done
-          if [ "$failed_list" -eq 0 ]; then
-            echo "No failed test files." >> "$report"
-          fi
-          {
-            echo ""
-            echo "### Failed test methods"
-            echo ""
-          } >> "$report"
-          failed_methods=0
-          for xml in target/surefire-reports/TEST-*.xml; do
-            [ -f "$xml" ] || continue
-            class=$(basename "$xml" .xml | sed 's/^TEST-//')
-            while IFS= read -r testcase; do
-              name=$(echo "$testcase" | sed -n 's/.* name="\([^"]*\)".*/\1/p')
-              if echo "$testcase" | grep -q '<failure\|<error'; then
-                failed_methods=1
-                echo "- \`${class}.${name}\`" >> "$report"
-              fi
-            done < <(grep '<testcase ' "$xml" || true)
-          done
-          if [ "$failed_methods" -eq 0 ]; then
-            echo "No failed test methods." >> "$report"
-          fi
-          {
-            echo "# Tests: ${total_tests} passed, ${total_failures} failed, ${total_errors} errors"
-            echo ""
-            echo "${file_count} test files — ${passed_files} passed, ${failed_files} failed"
-            echo ""
-            echo "Download XML reports from the **Artifacts** section on this workflow run page."
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-          cat "$report" >> "$GITHUB_STEP_SUMMARY"
-          echo "Tests: ${total_tests} passed in ${file_count} test files (${total_failures} failures, ${total_errors} errors)"
-          echo "::notice title=Tests::${total_tests} tests passed in ${file_count} test files"
+
+          cp build-output/test-summary.md "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Tests::${total_tests} tests passed in ${file_count} files (${failed_files} failed)"
+
+          echo "Files packaged for artifact upload:"
+          find build-output -type f | sort
 
       - name: Generate HTML test report
         if: always()
-        run: mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
+        run: |
+          mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
+          if [ -f target/site/surefire-report.html ]; then
+            cp target/site/surefire-report.html build-output/
+          fi
 
-      - name: Upload test artifacts
+      - name: Upload surefire-reports artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-reports
-          path: |
-            target/surefire-reports/
-            target/site/surefire-report.html
-            test-files-report.md
+          name: surefire-reports
+          path: build-output/
           if-no-files-found: error
           retention-days: 14
-
-      - name: Artifacts summary
-        if: always()
-        run: |
-          echo "::notice title=Artifacts::Download artifact test-reports from the Artifacts section below this job"
-          echo "Artifact: test-reports"
-          echo "  - surefire-reports/*.xml (JUnit XML, same as CircleCI)"
-          echo "  - surefire-report.html (HTML test report)"
-          echo "  - test-files-report.md (markdown summary)"
-          ls -la target/surefire-reports/
 
       - name: Upload JaCoCo HTML coverage report
         uses: actions/upload-artifact@v4
@@ -208,6 +142,7 @@ jobs:
         with:
           name: jacoco-html-report
           path: target/site/jacoco/
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload coverage to Codecov
