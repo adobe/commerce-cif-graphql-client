@@ -34,29 +34,34 @@ jobs:
         id: build
         run: |
           mkdir -p target
+          start_time=$(date +%s)
           {
             echo "## Build environment"
             java -version 2>&1
             mvn -v
           } | tee target/build-log.txt
           mvn -B clean install
+          end_time=$(date +%s)
+          echo "duration=$((end_time - start_time))" >> "$GITHUB_OUTPUT"
           echo "result=success" >> "$GITHUB_OUTPUT"
 
-      - name: Tests and summary
-        if: always()
+      - name: Prepare test reports
+        if: success()
         run: |
-          mkdir -p build-output/surefire-reports
-          if [ -d target/surefire-reports ]; then
-            cp -r target/surefire-reports/. build-output/surefire-reports/
+          mkdir -p build-reports/surefire-reports build-reports/jacoco
+          cp -r target/surefire-reports/. build-reports/surefire-reports/
+          if [ -d target/site/jacoco ]; then
+            cp -r target/site/jacoco/. build-reports/jacoco/
+          fi
+          mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
+          if [ -f target/site/surefire-report.html ]; then
+            cp target/site/surefire-report.html build-reports/
           fi
 
           total_tests=0
-          total_failures=0
-          total_errors=0
           file_count=0
           passed_files=0
           failed_files=0
-
           test_table="| Status | Test class (Java file) | Tests | Failures | Errors |"
           test_table="${test_table}\n|---|---|--:|--:|--:|"
 
@@ -72,8 +77,6 @@ jobs:
             failures=${failures:-0}
             errors=${errors:-0}
             total_tests=$((total_tests + tests))
-            total_failures=$((total_failures + failures))
-            total_errors=$((total_errors + errors))
             if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
               status="FAILED"
               failed_files=$((failed_files + 1))
@@ -84,77 +87,48 @@ jobs:
             test_table="${test_table}\n| ${status} | \`${class}\` | ${tests} | ${failures} | ${errors} |"
           done
 
-          if [ "${{ steps.build.outcome }}" = "success" ]; then
-            build_status="SUCCESS"
-          else
-            build_status="FAILED"
-          fi
+          echo "${total_tests}" > build-reports/.total-tests
+          echo "${file_count}" > build-reports/.file-count
+          echo "${passed_files}" > build-reports/.passed-files
+          echo "${failed_files}" > build-reports/.failed-files
+          echo -e "$test_table" > build-reports/test-summary.md
 
-          {
-            echo "# github-actions build report"
-            echo ""
-            echo "> Click **Summary** in the left sidebar for this page. PR checks open the build log by default."
-            echo ""
-            echo "<details>"
-            echo "<summary><strong>Build</strong> — ${build_status}</summary>"
-            echo ""
-            echo "\`\`\`"
-            if [ -f target/build-log.txt ]; then cat target/build-log.txt; else echo "Build log not available."; fi
-            echo "mvn clean install: ${build_status}"
-            echo "\`\`\`"
-            echo "</details>"
-            echo ""
-            echo "<details>"
-            echo "<summary><strong>Test Results</strong> — ${total_tests} tests, ${passed_files} files passed, ${failed_files} files failed</summary>"
-            echo ""
-            echo "**${total_tests} tests** in **${file_count} files** — **${passed_files} passed**, **${failed_files} failed**"
-            echo ""
-            echo -e "$test_table"
-            echo "</details>"
-            echo ""
-            echo "<details>"
-            echo "<summary><strong>Artifacts</strong> — download from the Artifacts section below</summary>"
-            echo ""
-            echo "| Artifact | Contents |"
-            echo "|---|---|"
-            echo "| \`surefire-reports\` | JUnit XML files + test-summary.md + HTML report |"
-            echo "| \`jacoco-html-report\` | Code coverage HTML report |"
-            echo ""
-            echo "Files in surefire-reports artifact:"
-            echo "\`\`\`"
-            find build-output -type f | sort
-            echo "\`\`\`"
-            echo "</details>"
-          } > "$GITHUB_STEP_SUMMARY"
-
-          echo -e "$test_table" > build-output/test-summary.md
-          echo "::notice title=Tests::${total_tests} tests in ${file_count} files (${failed_files} failed)"
-
-      - name: Generate HTML test report
+      - name: Upload build-reports
+        id: reports
         if: success()
-        run: |
-          mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
-          if [ -f target/site/surefire-report.html ]; then
-            cp target/site/surefire-report.html build-output/
-          fi
-
-      - name: Upload surefire-reports
         uses: actions/upload-artifact@v5
-        if: success()
         with:
-          name: surefire-reports
-          path: build-output/
+          name: build-reports
+          path: build-reports/
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload jacoco-html-report
-        uses: actions/upload-artifact@v5
-        if: success()
-        with:
-          name: jacoco-html-report
-          path: target/site/jacoco/
-          if-no-files-found: warn
-          retention-days: 14
+      - name: Publish summary
+        if: always()
+        run: |
+          if [ -f build-reports/.total-tests ]; then
+            total_tests=$(cat build-reports/.total-tests)
+            file_count=$(cat build-reports/.file-count)
+            passed_files=$(cat build-reports/.passed-files)
+            failed_files=$(cat build-reports/.failed-files)
+          else
+            total_tests=0
+            file_count=0
+            passed_files=0
+            failed_files=0
+          fi
+
+          {
+            echo "<details open>"
+            echo "<summary><strong>Test Results</strong> — ${total_tests} tests · ${file_count} files · ${failed_files} failed</summary>"
+            echo ""
+            if [ -f build-reports/test-summary.md ]; then
+              cat build-reports/test-summary.md
+            else
+              echo "Build did not complete — no test results."
+            fi
+            echo "</details>"
+          } > "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage to Codecov
         if: success()
