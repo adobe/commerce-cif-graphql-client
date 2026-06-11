@@ -6,6 +6,9 @@ on:
     tags:
       - 'graphql-client-*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: github-actions-release-${{ github.ref }}
   cancel-in-progress: false
@@ -30,7 +33,7 @@ jobs:
         run: mvn -B clean install
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: target/site/jacoco/jacoco.xml
           fail_ci_if_error: false
