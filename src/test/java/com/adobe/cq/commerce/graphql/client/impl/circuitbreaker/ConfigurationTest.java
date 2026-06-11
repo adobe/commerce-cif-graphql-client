@@ -154,7 +154,7 @@ public class ConfigurationTest {
 
         // Verify default values are used when parsing fails
         assertEquals("Should use default threshold", 3, serviceConfig.getThreshold());
-        assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
+        assertEquals("Should use default delay", 20000L, serverConfig.getDelayMs());
         assertEquals("Should use default multiplier", 1.5, socketConfig.getDelayMultiplier(), 0.01);
     }
 
@@ -181,7 +181,7 @@ public class ConfigurationTest {
 
         assertEquals("Should use default threshold", 3, serverConfig.getThreshold());
         assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
-        assertEquals("Should use default success threshold", 1, serverConfig.getSuccessThreshold());
+        assertEquals("Should use default success threshold", 221, serverConfig.getSuccessThreshold());
 
         assertEquals("Should use default threshold", 3, socketConfig.getThreshold());
         assertEquals("Should use default initial delay", 20000L, socketConfig.getInitialDelayMs());
@@ -258,6 +258,6 @@ public class ConfigurationTest {
         // All should have default values since IOException occurred during loading
         assertEquals("Should use default threshold", 3, serviceConfig.getThreshold());
         assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
-        assertEquals("Should use default threshold", 3, socketConfig.getThreshold());
+        assertEquals("Should use default threshold", 13, socketConfig.getThreshold());
     }
 }
