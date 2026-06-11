@@ -7,6 +7,9 @@ on:
       - master
       - main
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -46,8 +49,12 @@ jobs:
           echo "result=success" >> "$GITHUB_OUTPUT"
 
       - name: Prepare test reports
-        if: success()
+        if: always()
         run: |
+          if [ ! -d target/surefire-reports ]; then
+            echo "No surefire reports found."
+            exit 0
+          fi
           mkdir -p build-reports/surefire-reports build-reports/jacoco
           cp -r target/surefire-reports/. build-reports/surefire-reports/
           if [ -d target/site/jacoco ]; then
@@ -95,7 +102,7 @@ jobs:
 
       - name: Upload build-reports
         id: reports
-        if: success()
+        if: always() && hashFiles('build-reports/surefire-reports/**') != ''
         uses: actions/upload-artifact@v5
         with:
           name: build-reports
@@ -124,15 +131,17 @@ jobs:
             echo ""
             if [ -f build-reports/test-summary.md ]; then
               cat build-reports/test-summary.md
+            elif [ -d target/surefire-reports ]; then
+              echo "Tests ran but summary was not generated."
             else
-              echo "Build did not complete — no test results."
+              echo "Build failed before tests ran."
             fi
             echo "</details>"
           } > "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage to Codecov
         if: success()
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: target/site/jacoco/jacoco.xml
           fail_ci_if_error: false

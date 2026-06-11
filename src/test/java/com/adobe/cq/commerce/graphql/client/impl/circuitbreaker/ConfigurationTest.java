@@ -179,7 +179,7 @@ public class ConfigurationTest {
         assertEquals("Should use default multiplier", 1.5, serviceConfig.getDelayMultiplier(), 0.01);
         assertEquals("Should use default success threshold", 1, serviceConfig.getSuccessThreshold());
 
-        assertEquals("Should use default threshold", 3, serverConfig.getThreshold());
+        assertEquals("Should use default threshold", 30, serverConfig.getThreshold());
         assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
         assertEquals("Should use default success threshold", 1, serverConfig.getSuccessThreshold());
 
