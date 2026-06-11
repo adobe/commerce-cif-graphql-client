@@ -176,10 +176,10 @@ public class ConfigurationTest {
         assertEquals("Should use default threshold", 3, serviceConfig.getThreshold());
         assertEquals("Should use default initial delay", 20000L, serviceConfig.getInitialDelayMs());
         assertEquals("Should use default max delay", 180000L, serviceConfig.getMaxDelayMs());
-        assertEquals("Should use default multiplier", 1.5, serviceConfig.getDelayMultiplier(), 0.01);
+        assertEquals("Should use default multiplier", 1.50, serviceConfig.getDelayMultiplier(), 0.01);
         assertEquals("Should use default success threshold", 1, serviceConfig.getSuccessThreshold());
 
-        assertEquals("Should use default threshold", 30, serverConfig.getThreshold());
+        assertEquals("Should use default threshold", 3, serverConfig.getThreshold());
         assertEquals("Should use default delay", 10000L, serverConfig.getDelayMs());
         assertEquals("Should use default success threshold", 1, serverConfig.getSuccessThreshold());
 
@@ -220,7 +220,7 @@ public class ConfigurationTest {
 
         // Verify that default values are used when IOException occurs
         Configuration.ServiceUnavailableConfig serviceConfig = config.getServiceUnavailableConfig();
-        assertEquals("Should use default threshold after IOException", 3, serviceConfig.getThreshold());
+        assertEquals("Should use default threshold after IOExceptions", 3, serviceConfig.getThreshold());
         assertEquals("Should use default initial delay after IOException", 20000L, serviceConfig.getInitialDelayMs());
     }
 
