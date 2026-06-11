@@ -33,11 +33,12 @@ jobs:
       - name: Build
         id: build
         run: |
+          mkdir -p target
           {
             echo "## Build environment"
             java -version 2>&1
             mvn -v
-          } | tee build-log.txt
+          } | tee target/build-log.txt
           mvn -B clean install
           echo "result=success" >> "$GITHUB_OUTPUT"
 
@@ -45,7 +46,9 @@ jobs:
         if: always()
         run: |
           mkdir -p build-output/surefire-reports
-          cp -r target/surefire-reports/. build-output/surefire-reports/
+          if [ -d target/surefire-reports ]; then
+            cp -r target/surefire-reports/. build-output/surefire-reports/
+          fi
 
           total_tests=0
           total_failures=0
@@ -96,7 +99,7 @@ jobs:
             echo "<summary><strong>Build</strong> — ${build_status}</summary>"
             echo ""
             echo "\`\`\`"
-            cat build-log.txt
+            if [ -f target/build-log.txt ]; then cat target/build-log.txt; else echo "Build log not available."; fi
             echo "mvn clean install: ${build_status}"
             echo "\`\`\`"
             echo "</details>"
@@ -128,7 +131,7 @@ jobs:
           echo "::notice title=Tests::${total_tests} tests in ${file_count} files (${failed_files} failed)"
 
       - name: Generate HTML test report
-        if: always()
+        if: success()
         run: |
           mvn -B org.apache.maven.plugins:maven-surefire-report-plugin:3.0.0-M3:report-only
           if [ -f target/site/surefire-report.html ]; then
@@ -137,7 +140,7 @@ jobs:
 
       - name: Upload surefire-reports
         uses: actions/upload-artifact@v5
-        if: always()
+        if: success()
         with:
           name: surefire-reports
           path: build-output/
@@ -146,7 +149,7 @@ jobs:
 
       - name: Upload jacoco-html-report
         uses: actions/upload-artifact@v5
-        if: always()
+        if: success()
         with:
           name: jacoco-html-report
           path: target/site/jacoco/
@@ -154,6 +157,7 @@ jobs:
           retention-days: 14
 
       - name: Upload coverage to Codecov
+        if: success()
         uses: codecov/codecov-action@v4
         with:
           files: target/site/jacoco/jacoco.xml
