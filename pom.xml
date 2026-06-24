@@ -74,6 +74,7 @@
                         <Import-Package>
                             !javax.annotation,
                             !sun.misc,
+                            com.adobe.cq.cif.common.http;resolution:=optional,
                             *
                         </Import-Package>
                         <!-- Enable processing of OSGI DS component annotations -->
@@ -446,7 +447,7 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>1.10.19</version>
+            <version>3.12.4</version>
             <scope>test</scope>
         </dependency>
         <dependency>

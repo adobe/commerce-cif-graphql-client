@@ -34,6 +34,9 @@ public @interface GraphqlClientConfiguration {
     int DEFAULT_CONNECTION_KEEP_ALIVE = -1;
     int DEFAULT_CONNECTION_TTL = -1;
 
+    String DEFAULT_SOURCE_REQUEST_HEADER = "X-Forwarded-For";
+    String DEFAULT_TARGET_OUTBOUND_HEADER = "X-Forwarded-By";
+
     @AttributeDefinition(
         name = "GraphQL Service Identifier",
         description = "A unique identifier for this GraphQL client, used by the JCR resource property " + CQ_GRAPHQL_CLIENT
@@ -143,4 +146,25 @@ public @interface GraphqlClientConfiguration {
         description = "Integer value defining the ranking of this queue configuration. If more than one GraphQL Client use the same "
             + "identifier the one with the higher ranking will be used. Defaults to 0")
     int service_ranking() default 0;
+
+    @AttributeDefinition(
+        name = "Forward client IP",
+        description = "When enabled, forwards the originating client IP from the incoming browser request to the GraphQL backend. "
+            + "Requires an IncomingRequestHeaderProvider OSGi service to supply the current request.",
+        type = AttributeType.BOOLEAN)
+    boolean forwardClientIpEnabled() default false;
+
+    @AttributeDefinition(
+        name = "Source request header",
+        description = "The HTTP header on the incoming browser request from which the client IP is read. "
+            + "Defaults to " + DEFAULT_SOURCE_REQUEST_HEADER,
+        type = AttributeType.STRING)
+    String sourceRequestHeader() default DEFAULT_SOURCE_REQUEST_HEADER;
+
+    @AttributeDefinition(
+        name = "Target outbound header",
+        description = "The HTTP header sent to the GraphQL backend containing the resolved client IP. "
+            + "Defaults to " + DEFAULT_TARGET_OUTBOUND_HEADER,
+        type = AttributeType.STRING)
+    String targetOutboundHeader() default DEFAULT_TARGET_OUTBOUND_HEADER;
 }

@@ -38,6 +38,9 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
     private int connectionTtl = GraphqlClientConfiguration.DEFAULT_CONNECTION_TTL;
     private int serviceRanking = 0;
     private boolean enableFaultTolerantFallback = false;
+    private boolean forwardClientIpEnabled = false;
+    private String sourceRequestHeader = GraphqlClientConfiguration.DEFAULT_SOURCE_REQUEST_HEADER;
+    private String targetOutboundHeader = GraphqlClientConfiguration.DEFAULT_TARGET_OUTBOUND_HEADER;
 
     GraphqlClientConfigurationImpl(String url) {
         this.url = url;
@@ -59,6 +62,9 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         connectionTtl = configuration.connectionTtl();
         serviceRanking = configuration.service_ranking();
         enableFaultTolerantFallback = configuration.enableFaultTolerantFallback();
+        forwardClientIpEnabled = configuration.forwardClientIpEnabled();
+        sourceRequestHeader = configuration.sourceRequestHeader();
+        targetOutboundHeader = configuration.targetOutboundHeader();
     }
 
     @Override
@@ -199,5 +205,32 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setEnableFaultTolerantFallback(boolean enableFaultTolerantFallback) {
         this.enableFaultTolerantFallback = enableFaultTolerantFallback;
+    }
+
+    @Override
+    public boolean forwardClientIpEnabled() {
+        return forwardClientIpEnabled;
+    }
+
+    public void setForwardClientIpEnabled(boolean forwardClientIpEnabled) {
+        this.forwardClientIpEnabled = forwardClientIpEnabled;
+    }
+
+    @Override
+    public String sourceRequestHeader() {
+        return sourceRequestHeader;
+    }
+
+    public void setSourceRequestHeader(String sourceRequestHeader) {
+        this.sourceRequestHeader = sourceRequestHeader;
+    }
+
+    @Override
+    public String targetOutboundHeader() {
+        return targetOutboundHeader;
+    }
+
+    public void setTargetOutboundHeader(String targetOutboundHeader) {
+        this.targetOutboundHeader = targetOutboundHeader;
     }
 }

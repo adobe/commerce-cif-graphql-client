@@ -16,7 +16,6 @@ package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 
@@ -35,11 +34,9 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicListHeaderIterator;
 import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.http.protocol.HTTP;
-import org.hamcrest.CustomMatcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
@@ -52,6 +49,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
+import ch.qos.logback.core.read.ListAppender;
 import com.adobe.cq.commerce.graphql.client.*;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.GetQueryMatcher;
 import com.adobe.cq.commerce.graphql.client.impl.TestUtils.HeadersMatcher;
@@ -100,8 +98,6 @@ public class GraphqlClientImplTest {
     private CacheInvalidator cacheInvalidator;
     private Field cacheInvalidatorField;
     private CloseableHttpClient httpClient;
-    @Mock
-    private org.slf4j.Logger logger;
 
     @Before
     public void setUp() throws Exception {
@@ -207,13 +203,12 @@ public class GraphqlClientImplTest {
             mockConfig.setHttpHeaders("");
             graphqlClient.activate(mockConfig, mock(BundleContext.class));
 
-            // verify the 3 warnings are logged
-            verify(appender, times(4)).doAppend(argThat(new CustomMatcher<ILoggingEvent>("log event of level warn") {
-                @Override
-                public boolean matches(Object o) {
-                    return o instanceof ILoggingEvent && ((ILoggingEvent) o).getLevel() == Level.WARN;
-                }
-            }));
+            // verify the 4 warnings are logged
+            ArgumentCaptor<ILoggingEvent> loggingCaptor = ArgumentCaptor.forClass(ILoggingEvent.class);
+            verify(appender, times(4)).doAppend(loggingCaptor.capture());
+            for (ILoggingEvent event : loggingCaptor.getAllValues()) {
+                assertEquals(Level.WARN, event.getLevel());
+            }
         } finally {
             logger.detachAppender(appender);
         }
@@ -463,26 +458,37 @@ public class GraphqlClientImplTest {
         // given
         CloseableHttpClient closeableHttpClient = mock(CloseableHttpClient.class);
         addExecutor(closeableHttpClient, graphqlClient);
-        // Setup logger capture
-        setLoggerField();
 
-        // First call - should work normally
-        graphqlClient.executor.close();
-        verify(closeableHttpClient).close();
-        verify(logger, never()).warn(anyString(), anyString(), any(IOException.class));
+        Logger executorLogger = (Logger) LoggerFactory.getLogger(DefaultExecutor.class);
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        executorLogger.addAppender(listAppender);
+        executorLogger.setLevel(Level.WARN);
 
-        // Reset mock
-        Mockito.reset(closeableHttpClient);
+        try {
+            // First call - should work normally
+            graphqlClient.executor.close();
+            verify(closeableHttpClient).close();
+            assertTrue(listAppender.list.isEmpty());
 
-        // Configure mock to throw exception
-        doThrow(new IOException("Connection reset")).when(closeableHttpClient).close();
+            // Reset mock
+            Mockito.reset(closeableHttpClient);
 
-        // when - should call close() and trigger exception
-        graphqlClient.executor.close();
+            // Configure mock to throw exception
+            doThrow(new IOException("Connection reset")).when(closeableHttpClient).close();
 
-        // then - verify close() was called and warning was logged
-        verify(closeableHttpClient).close();
-        verify(logger).warn(eq("Failed to close http client: {}"), eq("Connection reset"), any(IOException.class));
+            // when - should call close() and trigger exception
+            graphqlClient.executor.close();
+
+            // then - verify close() was called and warning was logged
+            verify(closeableHttpClient).close();
+            assertEquals(1, listAppender.list.size());
+            ILoggingEvent warnEvent = listAppender.list.get(0);
+            assertEquals(Level.WARN, warnEvent.getLevel());
+            assertEquals("Failed to close http client: Connection reset", warnEvent.getFormattedMessage());
+        } finally {
+            executorLogger.detachAppender(listAppender);
+        }
     }
 
     @Test
@@ -529,20 +535,6 @@ public class GraphqlClientImplTest {
         // when - call deactivate
         // then - no exception should be thrown, executor.close() should not be called
         clientWithNoExecutor.deactivate();
-    }
-
-    private void setLoggerField() {
-        try {
-            Field loggerField = DefaultExecutor.class.getDeclaredField("LOGGER");
-            loggerField.setAccessible(true);
-
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(loggerField, loggerField.getModifiers() & ~Modifier.FINAL);
-            loggerField.set(null, logger);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("Failed to set logger field", e);
-        }
     }
 
     // This method is used to add an executor to the GraphqlClientImpl instance.

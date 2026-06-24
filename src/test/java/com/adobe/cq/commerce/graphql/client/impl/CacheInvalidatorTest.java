@@ -14,20 +14,21 @@
 
 package com.adobe.cq.commerce.graphql.client.impl;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.*;
 
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
@@ -35,8 +36,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 public class CacheInvalidatorTest {
 
@@ -47,9 +46,6 @@ public class CacheInvalidatorTest {
     private Map<String, Integer> initialCounts;
 
     private Method checkIfStorePresentMethod;
-
-    @Mock
-    private Logger logger;
 
     private static class Data {
         String text;
@@ -117,10 +113,6 @@ public class CacheInvalidatorTest {
         for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
             initialCounts.put(entry.getKey(), entry.getValue().asMap().size());
         }
-
-        // Set the logger field to the mock logger
-        setLoggerField();
-
     }
 
     @Test
@@ -201,9 +193,22 @@ public class CacheInvalidatorTest {
 
     @Test
     public void testInvalidateCacheForEmptySpecificPattern() {
-        cacheInvalidator.invalidateCache("defaultTest", null, new String[] { null, "" });
-        verify(logger, times(2)).debug("Skipping null pattern in patterns array");
+        Logger logger = (Logger) LoggerFactory.getLogger(CacheInvalidator.class);
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        logger.addAppender(listAppender);
+        logger.setLevel(Level.DEBUG);
 
+        try {
+            cacheInvalidator.invalidateCache("defaultTest", null, new String[] { null, "" });
+
+            long skippedPatternLogs = listAppender.list.stream()
+                .filter(event -> "Skipping null pattern in patterns array".equals(event.getFormattedMessage()))
+                .count();
+            assertEquals(2, skippedPatternLogs);
+        } finally {
+            logger.detachAppender(listAppender);
+        }
     }
 
     @Test
@@ -385,20 +390,6 @@ public class CacheInvalidatorTest {
         // Verify that the count of entries in each cache is the same as before
         for (Map.Entry<String, Cache<CacheKey, GraphqlResponse<?, ?>>> entry : caches.entrySet()) {
             assertEquals(initialCounts.get(entry.getKey()).intValue(), entry.getValue().asMap().size());
-        }
-    }
-
-    private void setLoggerField() {
-        try {
-            Field loggerField = CacheInvalidator.class.getDeclaredField("LOGGER");
-            loggerField.setAccessible(true);
-
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(loggerField, loggerField.getModifiers() & ~Modifier.FINAL);
-            loggerField.set(null, logger);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("Failed to set logger field", e);
         }
     }
 }

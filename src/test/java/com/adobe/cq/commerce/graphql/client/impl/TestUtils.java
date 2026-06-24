@@ -44,7 +44,7 @@ public class TestUtils {
     /**
      * Matcher class used to check that the GraphQL request body is properly set.
      */
-    public static class RequestBodyMatcher extends ArgumentMatcher<HttpUriRequest> {
+    public static class RequestBodyMatcher implements ArgumentMatcher<HttpUriRequest> {
 
         private String body;
 
@@ -53,14 +53,14 @@ public class TestUtils {
         }
 
         @Override
-        public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest) && !(obj instanceof HttpEntityEnclosingRequest)) {
+        public boolean matches(HttpUriRequest req) {
+            if (!(req instanceof HttpEntityEnclosingRequest)) {
                 return false;
             }
-            HttpEntityEnclosingRequest req = (HttpEntityEnclosingRequest) obj;
+            HttpEntityEnclosingRequest enclosingRequest = (HttpEntityEnclosingRequest) req;
             try {
-                String body = IOUtils.toString(req.getEntity().getContent(), StandardCharsets.UTF_8);
-                return body.equals(this.body);
+                String actualBody = IOUtils.toString(enclosingRequest.getEntity().getContent(), StandardCharsets.UTF_8);
+                return body.equals(actualBody);
             } catch (Exception e) {
                 return false;
             }
@@ -71,7 +71,7 @@ public class TestUtils {
     /**
      * Matcher class used to check that the headers are properly passed to the HTTP client.
      */
-    public static class HeadersMatcher extends ArgumentMatcher<HttpUriRequest> {
+    public static class HeadersMatcher implements ArgumentMatcher<HttpUriRequest> {
 
         private List<Header> headers;
 
@@ -80,11 +80,10 @@ public class TestUtils {
         }
 
         @Override
-        public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest)) {
+        public boolean matches(HttpUriRequest req) {
+            if (req == null) {
                 return false;
             }
-            HttpUriRequest req = (HttpUriRequest) obj;
             for (Header header : headers) {
                 Header reqHeader = req.getFirstHeader(header.getName());
                 if (reqHeader == null || !reqHeader.getValue().equals(header.getValue())) {
@@ -102,7 +101,7 @@ public class TestUtils {
     /**
      * Matcher class used to check that the GraphQL query is properly set and encoded when sent with a GET request.
      */
-    public static class GetQueryMatcher extends ArgumentMatcher<HttpUriRequest> {
+    public static class GetQueryMatcher implements ArgumentMatcher<HttpUriRequest> {
 
         GraphqlRequest request;
 
@@ -111,11 +110,10 @@ public class TestUtils {
         }
 
         @Override
-        public boolean matches(Object obj) {
-            if (!(obj instanceof HttpUriRequest)) {
+        public boolean matches(HttpUriRequest req) {
+            if (req == null) {
                 return false;
             }
-            HttpUriRequest req = (HttpUriRequest) obj;
             String expectedEncodedQuery = MockGraphqlClientConfiguration.URL;
             try {
                 expectedEncodedQuery += "?query=" + encode(request.getQuery());
@@ -161,7 +159,7 @@ public class TestUtils {
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
         Mockito.doAnswer(inv -> {
-            ResponseHandler<?> responseHandler = inv.getArgumentAt(1, ResponseHandler.class);
+            ResponseHandler<?> responseHandler = inv.getArgument(1, ResponseHandler.class);
             return responseHandler.handleResponse(mockedHttpResponse);
         }).when(httpClient).execute(Mockito.any(HttpUriRequest.class), Mockito.any(ResponseHandler.class));
 
@@ -180,7 +178,7 @@ public class TestUtils {
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(mockedHttpEntity);
         Mockito.doAnswer(inv -> {
-            ResponseHandler<?> responseHandler = inv.getArgumentAt(1, ResponseHandler.class);
+            ResponseHandler<?> responseHandler = inv.getArgument(1, ResponseHandler.class);
             return responseHandler.handleResponse(mockedHttpResponse);
         }).when(httpClient).execute(Mockito.any(HttpUriRequest.class), Mockito.any(ResponseHandler.class));
 
@@ -194,7 +192,7 @@ public class TestUtils {
 
         Mockito.when(mockedHttpResponse.getEntity()).thenReturn(null);
         Mockito.doAnswer(inv -> {
-            ResponseHandler<?> responseHandler = inv.getArgumentAt(1, ResponseHandler.class);
+            ResponseHandler<?> responseHandler = inv.getArgument(1, ResponseHandler.class);
             return responseHandler.handleResponse(mockedHttpResponse);
         }).when(httpClient).execute(Mockito.any(HttpUriRequest.class), Mockito.any(ResponseHandler.class));
 

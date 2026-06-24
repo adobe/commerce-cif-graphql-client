@@ -16,17 +16,21 @@ package com.adobe.cq.commerce.graphql.client.impl;
 import java.lang.reflect.Type;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpResponse;
@@ -42,6 +46,7 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.apache.http.pool.PoolStats;
@@ -82,6 +87,9 @@ public class GraphqlClientImpl implements GraphqlClient {
     private MetricRegistry metricsRegistry;
     @Reference
     private HttpClientBuilderFactory clientBuilderFactory = HttpClientBuilder::create;
+
+    @Reference(cardinality = ReferenceCardinality.OPTIONAL, policyOption = ReferencePolicyOption.GREEDY)
+    private volatile IncomingRequestHeaderProvider incomingRequestHeaderProvider;
 
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private GraphqlClientMetrics metrics;
@@ -159,6 +167,14 @@ public class GraphqlClientImpl implements GraphqlClient {
                 LOGGER.warn("Configuration contains invalid HTTP headers, please review the configuration.");
                 this.configuration.setHttpHeaders(newHeaders);
             }
+        }
+
+        if (this.configuration.forwardClientIpEnabled()) {
+            LOGGER.info(
+                "Client IP forwarding enabled for GraphQL client '{}': {} -> {}",
+                this.configuration.identifier(),
+                this.configuration.sourceRequestHeader(),
+                this.configuration.targetOutboundHeader());
         }
 
         this.metrics = metricsRegistry != null
@@ -300,7 +316,67 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     private <T, U> GraphqlResponse<T, U> executeImpl(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         LOGGER.debug("Executing GraphQL query on endpoint '{}': {}", configuration.url(), request.getQuery());
-        return executor.execute(request, typeOfT, typeofU, options);
+        RequestOptions effectiveOptions = withForwardedClientIp(options);
+        return executor.execute(request, typeOfT, typeofU, effectiveOptions);
+    }
+
+    private RequestOptions withForwardedClientIp(RequestOptions options) {
+        if (!configuration.forwardClientIpEnabled()) {
+            return options;
+        }
+        IncomingRequestHeaderProvider provider = incomingRequestHeaderProvider;
+        if (provider == null) {
+            LOGGER.warn(
+                "Client IP forwarding enabled for GraphQL client '{}' but no IncomingRequestHeaderProvider is registered",
+                configuration.identifier());
+            return options;
+        }
+        HttpServletRequest servletRequest = provider.getCurrentRequest();
+        if (servletRequest == null) {
+            LOGGER.debug(
+                "Client IP forwarding skipped for GraphQL client '{}': no incoming HTTP request on current thread",
+                configuration.identifier());
+            return options;
+        }
+        String sourceHeader = configuration.sourceRequestHeader();
+        String sourceValue = servletRequest.getHeader(sourceHeader);
+        String clientIp = ClientIpResolver.resolveFirstIp(sourceValue);
+        if (StringUtils.isBlank(clientIp)) {
+            LOGGER.debug(
+                "Client IP forwarding skipped for GraphQL client '{}': header '{}' is missing or empty on incoming request",
+                configuration.identifier(),
+                sourceHeader);
+            return options;
+        }
+        String targetHeader = configuration.targetOutboundHeader();
+        LOGGER.info(
+            "Forwarding client IP for GraphQL client '{}': {}='{}' (from {}='{}')",
+            configuration.identifier(),
+            targetHeader,
+            clientIp,
+            sourceHeader,
+            sourceValue);
+        return copyWithAdditionalHeader(options, new BasicHeader(targetHeader, clientIp));
+    }
+
+    private RequestOptions copyWithAdditionalHeader(RequestOptions options, Header header) {
+        List<Header> mergedHeaders = new ArrayList<>();
+        if (options != null && options.getHeaders() != null) {
+            mergedHeaders.addAll(options.getHeaders());
+        }
+        mergedHeaders.add(header);
+
+        if (options == null) {
+            return new RequestOptions().withHeaders(mergedHeaders);
+        }
+        RequestOptions copy = new RequestOptions();
+        if (options.getGson() != null) {
+            copy.withGson(options.getGson());
+        }
+        if (options.getHttpMethod() != null) {
+            copy.withHttpMethod(options.getHttpMethod());
+        }
+        return copy.withHeaders(mergedHeaders);
     }
 
     HttpClientBuilder configureHttpClientBuilder() throws Exception {
