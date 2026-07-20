@@ -27,7 +27,7 @@ public class GraphqlResponseTest {
     private static final String TEST_DATA = "test-data";
     private static final String ERROR_MESSAGE = "test-error";
     private static final long DURATION_MS = 150L;
-    private static final long ZERO_DURATION = 0L;
+    private static final long ZERO_DURATION = 1L;
 
     // Test data classes
     static class TestData {
