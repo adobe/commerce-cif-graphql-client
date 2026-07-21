@@ -21,6 +21,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      checks: write
 
     steps:
       - name: Checkout
@@ -37,29 +38,25 @@ jobs:
         id: build
         run: .github/scripts/build.sh
 
-      - name: Prepare test reports
+      # Publish the Surefire JUnit results as a GitHub check run — a compact pass/fail table
+      # with drill-down into each failed test (same style as the venia integration checks and
+      # CircleCI's native test summary in core-cif-components).
+      - name: Publish test report
         if: always()
-        run: .github/scripts/prepare-test-reports.sh
+        uses: dorny/test-reporter@v3
+        with:
+          name: Tests
+          path: '**/target/surefire-reports/*.xml'
+          reporter: java-junit
+          fail-on-error: false
 
-      - name: Annotate test failures
-        if: always() && hashFiles('build-reports/test-annotations.txt') != ''
-        run: |
-          while IFS= read -r line || [ -n "$line" ]; do
-            echo "$line"
-          done < build-reports/test-annotations.txt
-
-      - name: Publish summary
-        if: always()
-        run: .github/scripts/publish-summary.sh
-
-      - name: Upload build-reports
-        id: reports
-        if: always() && hashFiles('build-reports/surefire-reports/**') != ''
+      - name: Upload surefire reports
+        if: always() && hashFiles('**/target/surefire-reports/**') != ''
         uses: actions/upload-artifact@v6
         with:
-          name: build-reports
-          path: build-reports/
-          if-no-files-found: error
+          name: surefire-reports
+          path: '**/target/surefire-reports/**'
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Upload coverage to Codecov
