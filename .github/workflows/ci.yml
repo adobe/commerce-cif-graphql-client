@@ -20,7 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: write
       checks: write
 
     steps:
@@ -40,9 +39,9 @@ jobs:
           mvn -v
           mvn -B clean install
 
-      # Publish the Surefire JUnit results as a "Tests" check run — but ONLY when a test fails
-      # (skip_success_summary + if: failure()), so a green run shows nothing. Same tool and
-      # settings as core-cif-components' ci.yml and the venia test jobs.
+      # On a failed build, publish a "Tests" check showing a table of the failed tests
+      # with their error message and stack trace. Runs only on failure, so a green build
+      # shows nothing. This is what surfaces WHAT failed and WHY, right in the UI.
       - name: Publish test results
         if: failure()
         uses: mikepenz/action-junit-report@v5
@@ -51,15 +50,6 @@ jobs:
           report_paths: '**/target/surefire-reports/TEST-*.xml'
           skip_success_summary: true
           fail_on_failure: false
-
-      - name: Upload surefire reports
-        if: always() && hashFiles('**/target/surefire-reports/**') != ''
-        uses: actions/upload-artifact@v6
-        with:
-          name: surefire-reports
-          path: '**/target/surefire-reports/**'
-          if-no-files-found: ignore
-          retention-days: 14
 
       - name: Upload coverage to Codecov
         if: success()
