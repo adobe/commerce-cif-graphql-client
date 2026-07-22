@@ -35,8 +35,10 @@ jobs:
           cache: maven
 
       - name: Build
-        id: build
-        run: .github/scripts/build.sh
+        run: |
+          java -version
+          mvn -v
+          mvn -B clean install
 
       # Publish the Surefire JUnit results as a "Tests" check run — but ONLY when a test fails
       # (skip_success_summary + if: failure()), so a green run shows nothing. Same tool and
