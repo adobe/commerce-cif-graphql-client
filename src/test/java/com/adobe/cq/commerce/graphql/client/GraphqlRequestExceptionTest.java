@@ -30,7 +30,7 @@ public class GraphqlRequestExceptionTest {
     private static final String INTERMEDIATE_CAUSE_MESSAGE = "Intermediate cause";
     private static final String ROOT_CAUSE_MESSAGE = "Root cause";
 
-    private static final long ZERO_DURATION = 1L;
+    private static final long ZERO_DURATION = 0L;
     private static final long SHORT_DURATION = 500L;
     private static final long MEDIUM_DURATION = 1000L;
     private static final long LONG_DURATION = 1500L;
