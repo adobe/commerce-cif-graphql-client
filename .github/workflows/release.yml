@@ -1,8 +1,8 @@
 name: release
 
-# Triggered only by release tags committed by 'mvn release:prepare'. Mirrors the CircleCI
-# 'build-and-release' workflow: a 'build' job validates the full build (compile + tests) and
-# the 'release' job only runs once 'build' has passed (needs: build).
+# Triggered only by release tags committed by 'mvn release:prepare'. A 'build' job validates
+# the full build (compile + tests) and the 'release' job only runs once 'build' has passed
+# (needs: build).
 on:
   push:
     tags:
