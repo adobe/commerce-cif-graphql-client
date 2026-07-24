@@ -55,7 +55,6 @@ jobs:
     name: release
     needs: build
     runs-on: ubuntu-latest
-    environment: maven-central
 
     steps:
       - name: Checkout
