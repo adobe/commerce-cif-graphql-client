@@ -17,12 +17,14 @@ package com.adobe.cq.commerce.graphql.client;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.AttributeType;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.osgi.service.metatype.annotations.Option;
 
 @ObjectClassDefinition(name = "CIF GraphQL Client Configuration Factory")
 public @interface GraphqlClientConfiguration {
 
     String CQ_GRAPHQL_CLIENT = "cq:graphqlClient";
     String DEFAULT_IDENTIFIER = "default";
+    String DEFAULT_TYPE = "magento-graphql";
 
     int MAX_HTTP_CONNECTIONS_DEFAULT = 20;
     boolean ACCEPT_SELF_SIGNED_CERTIFICATES = false;
@@ -41,6 +43,18 @@ public @interface GraphqlClientConfiguration {
         type = AttributeType.STRING,
         required = true)
     String identifier() default DEFAULT_IDENTIFIER;
+
+    @AttributeDefinition(
+        name = "GraphQL Service Type",
+        description = "The type of the graphql service used in this configuration.",
+        type = AttributeType.STRING,
+        options = {
+            @Option(label = "Magento GraphQL", value = DEFAULT_TYPE),
+            @Option(label = "Catalog Service", value = "catalog-service"),
+            @Option(label = "Commerce Optimizer", value = "commerce-optimizer")
+        },
+        required = true)
+    String type() default DEFAULT_TYPE;
 
     @AttributeDefinition(
         name = "GraphQL Service URL",
