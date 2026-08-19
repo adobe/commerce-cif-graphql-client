@@ -174,6 +174,80 @@ public class RequestOptionsTest {
     }
 
     @Test
+    public void testEqualsIgnoringNonCacheKeyHeader() {
+        RequestOptions opt1 = new RequestOptions();
+        opt1.withHttpMethod(HttpMethod.GET);
+        List<Header> headers1 = new ArrayList<>();
+        headers1.add(new BasicHeader("Store", "default"));
+        headers1.add(new BasicHeader("X-Adobe-Client-IP", "203.0.113.25"));
+        opt1.withHeaders(headers1);
+        opt1.withNonCacheKeyHeaderNames(Collections.singleton("X-Adobe-Client-IP"));
+
+        RequestOptions opt2 = new RequestOptions();
+        opt2.withHttpMethod(HttpMethod.GET);
+        List<Header> headers2 = new LinkedList<>();
+        headers2.add(new BasicHeader("Store", "default"));
+        headers2.add(new BasicHeader("X-Adobe-Client-IP", "198.51.100.10")); // different client IP
+        opt2.withHeaders(headers2);
+        opt2.withNonCacheKeyHeaderNames(Collections.singleton("X-Adobe-Client-IP"));
+
+        Assert.assertEquals(opt1.hashCode(), opt2.hashCode());
+        Assert.assertTrue(opt1.equals(opt2));
+
+        // The excluded header is still present on the outbound request
+        Assert.assertEquals("203.0.113.25", opt1.getHeaders().get(1).getValue());
+    }
+
+    @Test
+    public void testNotEqualsWhenNonCacheKeyHeaderNameMismatched() {
+        RequestOptions opt1 = new RequestOptions();
+        opt1.withHttpMethod(HttpMethod.GET);
+        List<Header> headers1 = new ArrayList<>();
+        headers1.add(new BasicHeader("Store", "default"));
+        headers1.add(new BasicHeader("X-Adobe-Client-IP", "203.0.113.25"));
+        opt1.withHeaders(headers1);
+        opt1.withNonCacheKeyHeaderNames(Collections.singleton("X-Adobe-Client-IP"));
+
+        RequestOptions opt2 = new RequestOptions();
+        opt2.withHttpMethod(HttpMethod.GET);
+        List<Header> headers2 = new LinkedList<>();
+        headers2.add(new BasicHeader("Store", "default"));
+        headers2.add(new BasicHeader("X-Adobe-Client-IP", "198.51.100.10")); // different client IP
+        opt2.withHeaders(headers2);
+        // No exclusion configured here: the header now participates in the cache key again
+
+        Assert.assertNotEquals(opt1.hashCode(), opt2.hashCode());
+        Assert.assertFalse(opt1.equals(opt2));
+    }
+
+    @Test
+    public void testEqualsIgnoringNonCacheKeyHeaderCaseInsensitive() {
+        RequestOptions opt1 = new RequestOptions();
+        List<Header> headers1 = new ArrayList<>();
+        headers1.add(new BasicHeader("X-Adobe-Client-IP", "203.0.113.25"));
+        opt1.withHeaders(headers1);
+        opt1.withNonCacheKeyHeaderNames(Collections.singleton("x-adobe-client-ip"));
+
+        RequestOptions opt2 = new RequestOptions();
+        List<Header> headers2 = new ArrayList<>();
+        headers2.add(new BasicHeader("X-Adobe-Client-IP", "198.51.100.10"));
+        opt2.withHeaders(headers2);
+        opt2.withNonCacheKeyHeaderNames(Collections.singleton("X-ADOBE-CLIENT-IP"));
+
+        Assert.assertEquals(opt1.hashCode(), opt2.hashCode());
+        Assert.assertTrue(opt1.equals(opt2));
+    }
+
+    @Test
+    public void testNullNonCacheKeyHeaderNamesClearsExclusion() {
+        RequestOptions opt = new RequestOptions();
+        opt.withNonCacheKeyHeaderNames(Collections.singleton("X-Adobe-Client-IP"));
+        opt.withNonCacheKeyHeaderNames(null);
+
+        Assert.assertEquals(Collections.emptySet(), opt.getNonCacheKeyHeaderNames());
+    }
+
+    @Test
     public void testNotEqualsDifferentHeaderNames() {
         RequestOptions opt1 = new RequestOptions();
         opt1.withHttpMethod(HttpMethod.GET);

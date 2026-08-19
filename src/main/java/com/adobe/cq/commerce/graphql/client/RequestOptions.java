@@ -14,9 +14,11 @@
 
 package com.adobe.cq.commerce.graphql.client;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -41,6 +43,7 @@ public class RequestOptions {
     private List<Header> headers;
     private HttpMethod httpMethod;
     private CachingStrategy cachingStrategy;
+    private Set<String> nonCacheKeyHeaderNames = Collections.emptySet();
 
     private Integer hash;
 
@@ -86,6 +89,33 @@ public class RequestOptions {
         return this;
     }
 
+    /**
+     * Marks the given header names (case-insensitive) as excluded from cache key computation in {@link #equals(Object)} and
+     * {@link #hashCode()}. Excluded headers are still sent on the outbound request, they just do not affect whether two requests
+     * are considered cache-equivalent. Use this for headers that carry per-request metadata (e.g. a forwarded end-user IP for
+     * audit/fraud purposes) that does not influence the GraphQL response, to avoid fragmenting the cache by that header's value.
+     *
+     * @param headerNames The header names to exclude from the cache key, or {@code null} to clear the exclusion.
+     * @return This RequestOptions object.
+     */
+    public RequestOptions withNonCacheKeyHeaderNames(Set<String> headerNames) {
+        this.nonCacheKeyHeaderNames = headerNames != null ? headerNames : Collections.emptySet();
+        return this;
+    }
+
+    public Set<String> getNonCacheKeyHeaderNames() {
+        return nonCacheKeyHeaderNames;
+    }
+
+    private List<Header> getCacheKeyHeaders() {
+        if (headers == null || nonCacheKeyHeaderNames.isEmpty()) {
+            return headers;
+        }
+        return headers.stream()
+            .filter(header -> nonCacheKeyHeaderNames.stream().noneMatch(name -> name.equalsIgnoreCase(header.getName())))
+            .collect(Collectors.toList());
+    }
+
     public Gson getGson() {
         return gson;
     }
@@ -115,24 +145,27 @@ public class RequestOptions {
             return false;
         }
 
-        if (CollectionUtils.isEmpty(headers) && CollectionUtils.isEmpty(that.headers)) {
+        List<Header> cacheKeyHeaders = getCacheKeyHeaders();
+        List<Header> thatCacheKeyHeaders = that.getCacheKeyHeaders();
+
+        if (CollectionUtils.isEmpty(cacheKeyHeaders) && CollectionUtils.isEmpty(thatCacheKeyHeaders)) {
             return true;
         }
-        if ((headers == null) ^ (that.headers == null)) { // one is null but not the other
+        if ((cacheKeyHeaders == null) ^ (thatCacheKeyHeaders == null)) { // one is null but not the other
             return false;
         }
-        if (headers.size() != that.headers.size()) {
+        if (cacheKeyHeaders.size() != thatCacheKeyHeaders.size()) {
             return false;
         }
 
         // We cannot use Objects.equals with lists because this checks object equality for all list elements
         // and elements must be in the same order.
 
-        List<Header> sortedHeaders = headers.stream()
+        List<Header> sortedHeaders = cacheKeyHeaders.stream()
             .sorted(HEADER_COMPARATOR)
             .collect(Collectors.toList());
 
-        List<Header> thatSortedHeaders = that.headers.stream()
+        List<Header> thatSortedHeaders = thatCacheKeyHeaders.stream()
             .sorted(HEADER_COMPARATOR)
             .collect(Collectors.toList());
 
@@ -156,12 +189,13 @@ public class RequestOptions {
         }
         HashCodeBuilder builder = new HashCodeBuilder();
         builder.append(httpMethod);
-        if (headers != null) {
-            headers.stream()
+        List<Header> cacheKeyHeaders = getCacheKeyHeaders();
+        if (cacheKeyHeaders != null) {
+            cacheKeyHeaders.stream()
                 .sorted(HEADER_COMPARATOR)
                 .forEach(h -> builder.append(h.getName()).append(h.getValue()));
         } else {
-            builder.append(headers);
+            builder.append(cacheKeyHeaders);
         }
         hash = builder.toHashCode();
         return hash.intValue();
