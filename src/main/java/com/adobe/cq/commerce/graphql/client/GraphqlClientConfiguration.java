@@ -132,6 +132,20 @@ public @interface GraphqlClientConfiguration {
     String[] cacheConfigurations();
 
     @AttributeDefinition(
+        name = "Cache key excluded headers, forwarded from the caller's request",
+        description = "Header names to forward as-is from the caller's incoming request onto this client's outbound request "
+            + "(e.g. a client IP header set by the CDN/dispatcher in front of the caller, for audit/fraud/rate-limiting purposes "
+            + "on the Commerce side), while excluding them from the GraphQL response cache key. A header is only forwarded if "
+            + "present on the incoming request, and only if no header of the same name is already set (e.g. by a statically "
+            + "configured custom header, which always takes precedence). Excluding them from the cache key means they are sent "
+            + "on every request without needlessly fragmenting the cache by their value, since they carry per-request metadata "
+            + "that does not influence the response. Applies to every caller of this client, configured once here rather than "
+            + "by each individual caller. Empty by default (no forwarding) - add e.g. 'X-Forwarded-For' to enable client IP "
+            + "forwarding once verified in a lower environment, before promoting the change to production.",
+        type = AttributeType.STRING)
+    String[] cacheKeyExcludedHeaders() default {};
+
+    @AttributeDefinition(
         name = "Enable Fault Tolerant Fallback",
         description = "Enable fault tolerant fallback mechanism when encountering 503 (Service Unavailable) and other service errors. "
             + "When enabled, the client will use resilient error handling with fallback strategies. When disabled, the existing error handling flow will be used.",

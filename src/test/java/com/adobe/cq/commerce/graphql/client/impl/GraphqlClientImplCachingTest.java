@@ -180,6 +180,38 @@ public class GraphqlClientImplCachingTest {
     }
 
     @Test
+    public void testCacheHitDespiteDifferentHeaderValueWhenExcludedByClientConfiguration() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setCacheConfigurations(MY_CACHE + ":true:100:5");
+        config.setCacheKeyExcludedHeaders("Some");
+        graphqlClient.activate(config, mock(BundleContext.class));
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+
+        RequestOptions requestOptions1 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Collections.singletonList(new BasicHeader("Some", "value1")));
+
+        RequestOptions requestOptions2 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Collections.singletonList(new BasicHeader("Some", "value2")));
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        GraphqlResponse<Data, Error> response = graphqlClient.execute(dummy, Data.class, Error.class, requestOptions1);
+        assertEquals("Some text", response.getData().text);
+
+        // Even though the header value differs, it's excluded from the cache key by the client's own configuration,
+        // so this second call is a cache hit, and the caller never had to handle the exclusion itself.
+        GraphqlResponse<Data, Error> response2 = graphqlClient.execute(dummy, Data.class, Error.class, requestOptions2);
+        assertEquals("Some text", response2.getData().text);
+
+        // HTTP client was only called once
+        Mockito.verify(httpClient).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+    }
+
+    @Test
     public void testDisabledCache() throws Exception {
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_DISABLED_CACHE)

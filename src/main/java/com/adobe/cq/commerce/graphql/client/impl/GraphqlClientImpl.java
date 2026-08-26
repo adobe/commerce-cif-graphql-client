@@ -19,14 +19,17 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLContext;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpResponse;
@@ -263,7 +266,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         Cache<CacheKey, GraphqlResponse<?, ?>> cache = toActiveCache(request, options);
         if (cache != null) {
-            CacheKey key = new CacheKey(request, options);
+            CacheKey key = new CacheKey(request, forCacheKey(options));
             try {
                 return (GraphqlResponse<T, U>) cache.get(key, () -> executeImpl(request, typeOfT, typeofU, options));
             } catch (ExecutionException e) {
@@ -271,6 +274,31 @@ public class GraphqlClientImpl implements GraphqlClient {
             }
         }
         return executeImpl(request, typeOfT, typeofU, options);
+    }
+
+    /**
+     * Builds a copy of {@code options} with any header named in this client's configured
+     * {@link GraphqlClientConfiguration#cacheKeyExcludedHeaders()} removed from its header list, for use only when
+     * computing the {@link CacheKey}. This lets a header carrying per-request metadata (e.g. a forwarded end-user
+     * IP) reach the backend on every call without fragmenting the response cache, without requiring every caller
+     * of this client to handle the exclusion itself. The original {@code options} instance (used for the actual
+     * outbound request, which still carries the header) is left untouched.
+     */
+    private RequestOptions forCacheKey(RequestOptions options) {
+        String[] excludedHeaderNames = configuration.cacheKeyExcludedHeaders();
+        if (options == null || options.getHeaders() == null || excludedHeaderNames == null || excludedHeaderNames.length == 0) {
+            return options;
+        }
+
+        List<Header> filteredHeaders = options.getHeaders().stream()
+            .filter(header -> Arrays.stream(excludedHeaderNames).noneMatch(name -> name.equalsIgnoreCase(header.getName())))
+            .collect(Collectors.toList());
+
+        return new RequestOptions()
+            .withGson(options.getGson())
+            .withHeaders(filteredHeaders)
+            .withHttpMethod(options.getHttpMethod())
+            .withCachingStrategy(options.getCachingStrategy());
     }
 
     @Override
