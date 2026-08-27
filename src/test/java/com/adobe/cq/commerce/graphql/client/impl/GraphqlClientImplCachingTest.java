@@ -207,8 +207,8 @@ public class GraphqlClientImplCachingTest {
         GraphqlResponse<Data, Error> response2 = graphqlClient.execute(dummy, Data.class, Error.class, requestOptions2);
         assertEquals("Some text", response2.getData().text);
 
-        // HTTP client was only called once
-        Mockito.verify(httpClient).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+        // The second call was served from the cache, so the backend was hit exactly once for both.
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 
     @Test
