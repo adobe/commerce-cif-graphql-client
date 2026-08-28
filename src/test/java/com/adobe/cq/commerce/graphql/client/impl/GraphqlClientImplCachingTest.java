@@ -18,14 +18,17 @@ import java.lang.reflect.Field;
 import java.util.Collections;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.osgi.services.HttpClientBuilderFactory;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.osgi.framework.BundleContext;
@@ -37,6 +40,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -183,7 +187,7 @@ public class GraphqlClientImplCachingTest {
     public void testCacheHitDespiteDifferentHeaderValueWhenExcludedByClientConfiguration() throws Exception {
         MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
         config.setCacheConfigurations(MY_CACHE + ":true:100:5");
-        config.setCacheKeyExcludedHeaders("Some");
+        config.setPassthroughHeaders("Some");
         graphqlClient.activate(config, mock(BundleContext.class));
 
         CachingStrategy cachingStrategy = new CachingStrategy()
@@ -209,6 +213,31 @@ public class GraphqlClientImplCachingTest {
 
         // The second call was served from the cache, so the backend was hit exactly once for both.
         Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testPassthroughHeaderExcludedFromCacheKeyIsStillSentToTheBackend() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setCacheConfigurations(MY_CACHE + ":true:100:5");
+        config.setPassthroughHeaders("Some");
+        graphqlClient.activate(config, mock(BundleContext.class));
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+        RequestOptions requestOptions = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Collections.singletonList(new BasicHeader("Some", "value1")));
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions);
+
+        // Excluding the header from the cache key must not drop it from the actual outbound request.
+        ArgumentCaptor<HttpUriRequest> requestCaptor = ArgumentCaptor.forClass(HttpUriRequest.class);
+        Mockito.verify(httpClient).execute(requestCaptor.capture(), Mockito.any(ResponseHandler.class));
+        Header sentHeader = requestCaptor.getValue().getFirstHeader("Some");
+        assertNotNull("Passthrough header should still be sent to the backend", sentHeader);
+        assertEquals("value1", sentHeader.getValue());
     }
 
     @Test

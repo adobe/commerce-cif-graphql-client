@@ -132,18 +132,18 @@ public @interface GraphqlClientConfiguration {
     String[] cacheConfigurations();
 
     @AttributeDefinition(
-        name = "Cache key excluded headers, forwarded from the caller's request",
-        description = "Header names to forward as-is from the caller's incoming request onto this client's outbound request "
-            + "(e.g. a client IP header set by the CDN/dispatcher in front of the caller, for audit/fraud/rate-limiting purposes "
-            + "on the Commerce side), while excluding them from the GraphQL response cache key. A header is only forwarded if "
-            + "present on the incoming request, and only if no header of the same name is already set (e.g. by a statically "
-            + "configured custom header, which always takes precedence). Excluding them from the cache key means they are sent "
-            + "on every request without needlessly fragmenting the cache by their value, since they carry per-request metadata "
-            + "that does not influence the response. Applies to every caller of this client, configured once here rather than "
-            + "by each individual caller. Empty by default (no forwarding) - add e.g. 'X-Forwarded-For' to enable client IP "
-            + "forwarding once verified in a lower environment, before promoting the change to production.",
+        name = "Passthrough headers (forwarded from the request, excluded from the cache key)",
+        description = "Header names that carry per-request metadata a caller may forward as-is from its incoming request onto "
+            + "this client's outbound request (e.g. a client IP header set by the CDN/dispatcher in front of the caller, for "
+            + "audit/fraud/rate-limiting purposes on the Commerce side). This client uses the list only to exclude these headers "
+            + "from the GraphQL response cache key, so a per-request value does not needlessly fragment the cache; it does not "
+            + "itself read the request - the actual forwarding is performed by the caller (e.g. the CIF MagentoGraphqlClient), "
+            + "which reads this same list. A header is only forwarded if present on the incoming request and not already set by a "
+            + "statically configured custom header, which always takes precedence. Applies to every caller of this client, "
+            + "configured once here rather than by each individual caller. Empty by default (no passthrough) - add e.g. "
+            + "'X-Forwarded-For' to enable, verify in a lower environment, then promote to production.",
         type = AttributeType.STRING)
-    String[] cacheKeyExcludedHeaders() default {};
+    String[] passthroughHeaders() default {};
 
     @AttributeDefinition(
         name = "Enable Fault Tolerant Fallback",

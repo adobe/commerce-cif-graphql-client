@@ -278,25 +278,28 @@ public class GraphqlClientImpl implements GraphqlClient {
 
     /**
      * Builds a copy of {@code options} with any header named in this client's configured
-     * {@link GraphqlClientConfiguration#cacheKeyExcludedHeaders()} removed from its header list, for use only when
+     * {@link GraphqlClientConfiguration#passthroughHeaders()} removed from its header list, for use only when
      * computing the {@link CacheKey}. This lets a header carrying per-request metadata (e.g. a forwarded end-user
      * IP) reach the backend on every call without fragmenting the response cache, without requiring every caller
      * of this client to handle the exclusion itself. The original {@code options} instance (used for the actual
      * outbound request, which still carries the header) is left untouched.
      */
     private RequestOptions forCacheKey(RequestOptions options) {
-        String[] excludedHeaderNames = configuration.cacheKeyExcludedHeaders();
+        String[] excludedHeaderNames = configuration.passthroughHeaders();
         if (options == null || options.getHeaders() == null || excludedHeaderNames == null || excludedHeaderNames.length == 0) {
             return options;
         }
 
         List<Header> filteredHeaders = options.getHeaders().stream()
-            .filter(header -> Arrays.stream(excludedHeaderNames).noneMatch(name -> name.equalsIgnoreCase(header.getName())))
+            .filter(header -> Arrays.stream(excludedHeaderNames)
+                .noneMatch(name -> StringUtils.equalsIgnoreCase(StringUtils.trim(name), header.getName())))
             .collect(Collectors.toList());
 
         return new RequestOptions()
             .withGson(options.getGson())
-            .withHeaders(filteredHeaders)
+            // Use null rather than an empty list so this matches the cache key of a request that never had any
+            // headers, since RequestOptions treats null and empty as equal in equals() but not in hashCode().
+            .withHeaders(filteredHeaders.isEmpty() ? null : filteredHeaders)
             .withHttpMethod(options.getHttpMethod())
             .withCachingStrategy(options.getCachingStrategy());
     }
