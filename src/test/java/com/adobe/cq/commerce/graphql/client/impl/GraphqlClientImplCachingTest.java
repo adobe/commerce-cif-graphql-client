@@ -241,6 +241,33 @@ public class GraphqlClientImplCachingTest {
     }
 
     @Test
+    public void testPassthroughHeaderMatchedIgnoringCaseAndWhitespace() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setCacheConfigurations(MY_CACHE + ":true:100:5");
+        // Configured name differs from the actual header "Some" in both case and surrounding whitespace.
+        config.setPassthroughHeaders("  SOME  ");
+        graphqlClient.activate(config, mock(BundleContext.class));
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+        RequestOptions requestOptions1 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Collections.singletonList(new BasicHeader("Some", "value1")));
+        RequestOptions requestOptions2 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Collections.singletonList(new BasicHeader("Some", "value2")));
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions1);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions2);
+
+        // The configured name only excludes "Some" from the cache key if it is trimmed and compared
+        // case-insensitively; if it does, both calls share a key and the backend is hit exactly once.
+        Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+    }
+
+    @Test
     public void testDisabledCache() throws Exception {
         CachingStrategy cachingStrategy = new CachingStrategy()
             .withCacheName(MY_DISABLED_CACHE)
