@@ -125,6 +125,7 @@
                         <exclude>**/*.md</exclude>
                         <exclude>.github/**</exclude>
                         <exclude>.claude/*</exclude>
+                        <exclude>.java-version</exclude>
                     </excludes>
                 </configuration>
                 <executions>

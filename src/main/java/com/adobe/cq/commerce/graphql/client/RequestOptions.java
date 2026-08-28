@@ -47,7 +47,7 @@ public class RequestOptions {
     /**
      * Sets the {@link Gson} instance that will be used to deserialise the JSON response. This should only be used when the JSON
      * response cannot be deserialised by a standard Gson instance, or when some custom deserialisation is needed.
-     * 
+     *
      * @param gson A custom {@link Gson} instance.
      * @return This RequestOptions object.
      */
@@ -59,7 +59,7 @@ public class RequestOptions {
     /**
      * Permits to define HTTP headers that will be sent with the GraphQL request.
      * See {@link BasicHeader} for an implementation of the Header interface.
-     * 
+     *
      * @param headers The HTTP headers.
      * @return This RequestOptions object.
      */
@@ -72,7 +72,7 @@ public class RequestOptions {
      * Sets the HTTP method used to send the request, only GET or POST are supported.
      * By default, the client sends a POST request. If GET is used, the underlying HTTP client
      * will automatically URL-Encode the GraphQL query, operation name, and variables.
-     * 
+     *
      * @param httpMethod The HTTP method.
      * @return This RequestOptions object.
      */

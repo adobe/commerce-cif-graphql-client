@@ -34,6 +34,7 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
     private int requestPoolTimeout = GraphqlClientConfiguration.DEFAULT_REQUESTPOOL_TIMEOUT;
     private String[] httpHeaders = new String[0];
     private String[] cacheConfigurations = new String[0];
+    private String[] passthroughHeaders = new String[0];
     private int connectionKeepAlive = GraphqlClientConfiguration.DEFAULT_CONNECTION_KEEP_ALIVE;
     private int connectionTtl = GraphqlClientConfiguration.DEFAULT_CONNECTION_TTL;
     private int serviceRanking = 0;
@@ -55,6 +56,8 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         requestPoolTimeout = configuration.requestPoolTimeout();
         httpHeaders = configuration.httpHeaders() != null ? configuration.httpHeaders() : this.httpHeaders;
         cacheConfigurations = configuration.cacheConfigurations() != null ? configuration.cacheConfigurations() : this.cacheConfigurations;
+        passthroughHeaders = configuration.passthroughHeaders() != null ? configuration.passthroughHeaders()
+            : this.passthroughHeaders;
         connectionKeepAlive = configuration.connectionKeepAlive();
         connectionTtl = configuration.connectionTtl();
         serviceRanking = configuration.service_ranking();
@@ -163,6 +166,15 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setCacheConfigurations(String... cacheConfigurations) {
         this.cacheConfigurations = cacheConfigurations;
+    }
+
+    @Override
+    public String[] passthroughHeaders() {
+        return passthroughHeaders;
+    }
+
+    public void setPassthroughHeaders(String... passthroughHeaders) {
+        this.passthroughHeaders = passthroughHeaders;
     }
 
     @Override

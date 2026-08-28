@@ -132,6 +132,20 @@ public @interface GraphqlClientConfiguration {
     String[] cacheConfigurations();
 
     @AttributeDefinition(
+        name = "Passthrough headers (forwarded from the request, excluded from the cache key)",
+        description = "Header names that carry per-request metadata a caller may forward as-is from its incoming request onto "
+            + "this client's outbound request (e.g. a client IP header set by the CDN/dispatcher in front of the caller, for "
+            + "audit/fraud/rate-limiting purposes on the Commerce side). This client uses the list only to exclude these headers "
+            + "from the GraphQL response cache key, so a per-request value does not needlessly fragment the cache; it does not "
+            + "itself read the request - the actual forwarding is performed by the caller (e.g. the CIF MagentoGraphqlClient), "
+            + "which reads this same list. A header is only forwarded if present on the incoming request and not already set by a "
+            + "statically configured custom header, which always takes precedence. Applies to every caller of this client, "
+            + "configured once here rather than by each individual caller. Empty by default (no passthrough) - add e.g. "
+            + "'X-Forwarded-For' to enable, verify in a lower environment, then promote to production.",
+        type = AttributeType.STRING)
+    String[] passthroughHeaders() default {};
+
+    @AttributeDefinition(
         name = "Enable Fault Tolerant Fallback",
         description = "Enable fault tolerant fallback mechanism when encountering 503 (Service Unavailable) and other service errors. "
             + "When enabled, the client will use resilient error handling with fallback strategies. When disabled, the existing error handling flow will be used.",
