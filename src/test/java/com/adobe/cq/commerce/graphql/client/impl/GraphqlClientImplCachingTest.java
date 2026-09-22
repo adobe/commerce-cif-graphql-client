@@ -15,6 +15,7 @@
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.Collections;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -265,6 +266,75 @@ public class GraphqlClientImplCachingTest {
         // The configured name only excludes "Some" from the cache key if it is trimmed and compared
         // case-insensitively; if it does, both calls share a key and the backend is hit exactly once.
         Mockito.verify(httpClient, Mockito.times(1)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testStoreHeaderCannotBeConfiguredAsPassthrough() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setCacheConfigurations(MY_CACHE + ":true:100:5");
+        // "Store" identifies which store a cache entry belongs to; excluding it would let two stores collide
+        // on one cache entry and break store-scoped cache invalidation, so the client must ignore this entry.
+        config.setPassthroughHeaders("Store", "X");
+        graphqlClient.activate(config, mock(BundleContext.class));
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+
+        // Only "X" differs between these two: if "Store" were actually excluded, they'd collide into one cache
+        // entry despite belonging to different stores.
+        RequestOptions requestOptions1 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Arrays.asList(new BasicHeader("Store", "store1"), new BasicHeader("X", "1")));
+        RequestOptions requestOptions2 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Arrays.asList(new BasicHeader("Store", "store2"), new BasicHeader("X", "2")));
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions1);
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions2);
+
+        // "Store" was not excluded, so the differing store values keep the requests as separate cache entries.
+        Mockito.verify(httpClient, Mockito.times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
+    }
+
+    @Test
+    public void testPassthroughHeaderExclusionIsScopedToConfiguredNameOnly() throws Exception {
+        MockGraphqlClientConfiguration config = new MockGraphqlClientConfiguration();
+        config.setCacheConfigurations(MY_CACHE + ":true:100:5");
+        config.setPassthroughHeaders("X");
+        graphqlClient.activate(config, mock(BundleContext.class));
+
+        CachingStrategy cachingStrategy = new CachingStrategy()
+            .withCacheName(MY_CACHE)
+            .withDataFetchingPolicy(DataFetchingPolicy.CACHE_FIRST);
+
+        // Passthrough header "X" differs but the cache-significant header "Store" is the same: cache hit.
+        RequestOptions requestOptions1 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Arrays.asList(new BasicHeader("Store", "x"), new BasicHeader("X", "1")));
+        RequestOptions requestOptions2 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Arrays.asList(new BasicHeader("Store", "x"), new BasicHeader("X", "2")));
+
+        // Same passthrough header value, but the cache-significant header "Store" differs: must still be a miss.
+        RequestOptions requestOptions3 = new RequestOptions()
+            .withCachingStrategy(cachingStrategy)
+            .withHeaders(Arrays.asList(new BasicHeader("Store", "y"), new BasicHeader("X", "1")));
+
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions1);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions2);
+
+        // requestOptions3 triggers a second, distinct backend call (different "Store"), so the mocked response
+        // entity's input stream, already drained by the first call, must be set up again.
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_OK);
+        graphqlClient.execute(dummy, Data.class, Error.class, requestOptions3);
+
+        // requestOptions1 and requestOptions2 share a cache entry (only the passthrough header differs), so the
+        // backend is hit once for both, plus once more for requestOptions3 (different "Store"): two calls total.
+        Mockito.verify(httpClient, Mockito.times(2)).execute(Mockito.any(), Mockito.any(ResponseHandler.class));
     }
 
     @Test

@@ -31,7 +31,9 @@ import com.google.gson.GsonBuilder;
 
 class CacheInvalidator {
     private static final Logger LOGGER = LoggerFactory.getLogger(CacheInvalidator.class);
-    private static final String STORE_HEADER_NAME = "Store";
+    // Package-visible: GraphqlClientImpl also needs this name to keep passthroughHeaders from excluding it,
+    // since that would break checkIfStorePresent() below (see GraphqlClientImpl#activate).
+    static final String STORE_HEADER_NAME = "Store";
     private Map<String, Cache<CacheKey, GraphqlResponse<?, ?>>> caches;
     private Gson gson;
 

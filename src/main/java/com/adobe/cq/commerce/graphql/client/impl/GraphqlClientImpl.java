@@ -17,10 +17,11 @@ import java.lang.reflect.Type;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -29,7 +30,6 @@ import javax.net.ssl.SSLContext;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpResponse;
@@ -92,6 +92,7 @@ public class GraphqlClientImpl implements GraphqlClient {
     private ServiceRegistration<?> registration;
 
     private CacheInvalidator cacheInvalidator;
+    private Set<String> passthroughHeaderNames = Collections.emptySet();
 
     @Activate
     public void activate(GraphqlClientConfiguration configuration, BundleContext bundleContext)
@@ -162,6 +163,23 @@ public class GraphqlClientImpl implements GraphqlClient {
                 LOGGER.warn("Configuration contains invalid HTTP headers, please review the configuration.");
                 this.configuration.setHttpHeaders(newHeaders);
             }
+        }
+
+        this.passthroughHeaderNames = Arrays.stream(this.configuration.passthroughHeaders())
+            .map(StringUtils::trim)
+            .map(StringUtils::lowerCase)
+            .collect(Collectors.toSet());
+
+        // The Store header identifies which store a cached entry belongs to (see CacheInvalidator#checkIfStorePresent).
+        // Excluding it from the cache key would let different stores collide on one cache entry, and would make
+        // store-scoped cache invalidation silently stop finding those entries. Never let it be configured away.
+        String storeHeaderName = StringUtils.lowerCase(CacheInvalidator.STORE_HEADER_NAME);
+        if (this.passthroughHeaderNames.remove(storeHeaderName)) {
+            LOGGER.warn(
+                "Configuration for '{}' lists the '{}' header in passthroughHeaders. Ignoring it: excluding it from the "
+                    + "cache key would let different stores' responses collide in the cache and would break store-scoped "
+                    + "cache invalidation.",
+                configuration.identifier(), CacheInvalidator.STORE_HEADER_NAME);
         }
 
         this.metrics = metricsRegistry != null
@@ -285,23 +303,10 @@ public class GraphqlClientImpl implements GraphqlClient {
      * outbound request, which still carries the header) is left untouched.
      */
     private RequestOptions forCacheKey(RequestOptions options) {
-        String[] excludedHeaderNames = configuration.passthroughHeaders();
-        if (options == null || options.getHeaders() == null || excludedHeaderNames == null || excludedHeaderNames.length == 0) {
-            return options;
+        if (options == null) {
+            return null;
         }
-
-        List<Header> filteredHeaders = options.getHeaders().stream()
-            .filter(header -> Arrays.stream(excludedHeaderNames)
-                .noneMatch(name -> StringUtils.equalsIgnoreCase(StringUtils.trim(name), header.getName())))
-            .collect(Collectors.toList());
-
-        return new RequestOptions()
-            .withGson(options.getGson())
-            // Use null rather than an empty list so this matches the cache key of a request that never had any
-            // headers, since RequestOptions treats null and empty as equal in equals() but not in hashCode().
-            .withHeaders(filteredHeaders.isEmpty() ? null : filteredHeaders)
-            .withHttpMethod(options.getHttpMethod())
-            .withCachingStrategy(options.getCachingStrategy());
+        return options.withoutHeaders(passthroughHeaderNames);
     }
 
     @Override
