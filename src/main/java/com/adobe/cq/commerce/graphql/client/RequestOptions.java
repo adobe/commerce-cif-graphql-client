@@ -17,7 +17,6 @@ package com.adobe.cq.commerce.graphql.client;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -164,28 +163,5 @@ public class RequestOptions {
         }
         hash = builder.toHashCode();
         return hash.intValue();
-    }
-
-    /**
-     * Returns a copy of this {@link RequestOptions} with any header whose name matches one of {@code excludedHeaderNames}
-     * (case-insensitively) removed from its header list. All other fields are copied as-is. This instance is left untouched.
-     *
-     * @param excludedHeaderNames The lower-cased, trimmed header names to remove.
-     * @return A new {@link RequestOptions} instance without the excluded headers.
-     */
-    public RequestOptions withoutHeaders(Set<String> excludedHeaderNames) {
-        if (CollectionUtils.isEmpty(headers) || excludedHeaderNames == null || excludedHeaderNames.isEmpty()) {
-            return this;
-        }
-
-        List<Header> filteredHeaders = headers.stream()
-            .filter(header -> !excludedHeaderNames.contains(StringUtils.lowerCase(header.getName())))
-            .collect(Collectors.toList());
-
-        return new RequestOptions()
-            .withGson(gson)
-            .withHeaders(filteredHeaders)
-            .withHttpMethod(httpMethod)
-            .withCachingStrategy(cachingStrategy);
     }
 }

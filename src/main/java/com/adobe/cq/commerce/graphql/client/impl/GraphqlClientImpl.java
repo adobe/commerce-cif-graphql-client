@@ -19,7 +19,9 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -30,6 +32,7 @@ import javax.net.ssl.SSLContext;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpResponse;
@@ -168,7 +171,7 @@ public class GraphqlClientImpl implements GraphqlClient {
         this.passthroughHeaderNames = Arrays.stream(this.configuration.passthroughHeaders())
             .map(StringUtils::trim)
             .map(StringUtils::lowerCase)
-            .collect(Collectors.toSet());
+            .collect(Collectors.toCollection(HashSet::new));
 
         // The Store header identifies which store a cached entry belongs to (see CacheInvalidator#checkIfStorePresent).
         // Excluding it from the cache key would let different stores collide on one cache entry, and would make
@@ -304,9 +307,24 @@ public class GraphqlClientImpl implements GraphqlClient {
      */
     private RequestOptions forCacheKey(RequestOptions options) {
         if (options == null) {
-            return null;
+            return options;
         }
-        return options.withoutHeaders(passthroughHeaderNames);
+        List<Header> headers = options.getHeaders();
+        if (headers == null || headers.isEmpty() || passthroughHeaderNames.isEmpty()) {
+            return options;
+        }
+
+        List<Header> filteredHeaders = headers.stream()
+            .filter(header -> !passthroughHeaderNames.contains(StringUtils.lowerCase(header.getName())))
+            .collect(Collectors.toList());
+
+        // Copy exactly the fields RequestOptions#equals/#hashCode consider (httpMethod and headers); the rest are
+        // carried over unchanged. Kept private here so this cache-key concern never leaks into the public API.
+        return new RequestOptions()
+            .withGson(options.getGson())
+            .withHeaders(filteredHeaders)
+            .withHttpMethod(options.getHttpMethod())
+            .withCachingStrategy(options.getCachingStrategy());
     }
 
     @Override
