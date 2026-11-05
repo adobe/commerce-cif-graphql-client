@@ -29,7 +29,7 @@ public class ServiceUnavailablePolicyTest {
     @Before
     public void setUp() {
         config = new Configuration.ServiceUnavailableConfig(3, 20000L, 180000L, 1.5, 1);
-        policy = new ServiceUnavailablePolicy(config);
+        policy = new ServiceUnavailablePolicy(config, "test");
     }
 
     @Test
@@ -53,7 +53,7 @@ public class ServiceUnavailablePolicyTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.ServiceUnavailableConfig testConfig = new Configuration.ServiceUnavailableConfig(5, 30000L, 300000L, 2.0, 2);
-        ServiceUnavailablePolicy testPolicy = new ServiceUnavailablePolicy(testConfig);
+        ServiceUnavailablePolicy testPolicy = new ServiceUnavailablePolicy(testConfig, "test");
 
         assertEquals("ServiceUnavailable", testPolicy.getPolicyName());
         assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException.class, testPolicy

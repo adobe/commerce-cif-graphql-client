@@ -14,6 +14,7 @@
 package com.adobe.cq.commerce.graphql.client.impl.circuitbreaker;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,10 +29,14 @@ public class SocketTimeoutPolicy implements Policy {
     private static final Logger LOGGER = LoggerFactory.getLogger(SocketTimeoutPolicy.class);
 
     private final Configuration.SocketTimeoutConfig config;
-    private int currentAttempt = 1;
+    // Shared by all request threads that trigger circuit breaker state transitions
+    private final AtomicInteger currentAttempt = new AtomicInteger(1);
 
-    public SocketTimeoutPolicy(Configuration.SocketTimeoutConfig config) {
+    private final String clientName;
+
+    public SocketTimeoutPolicy(Configuration.SocketTimeoutConfig config, String clientName) {
         this.config = config;
+        this.clientName = clientName;
     }
 
     @Override
@@ -39,23 +44,37 @@ public class SocketTimeoutPolicy implements Policy {
         return CircuitBreaker.builder()
             .handleIf(SocketTimeoutException.class::isInstance)
             .withFailureThreshold(config.getThreshold())
-            .withDelayFn(context -> {
-                long delay = (long) (config.getInitialDelayMs() * Math.pow(config.getDelayMultiplier(), (double) (currentAttempt - 1)));
-                long finalDelay = Math.min(delay, config.getMaxDelayMs());
-                LOGGER.info("Socket timeout error - Attempt {} - Progressive delay: {}ms", currentAttempt, finalDelay);
-                return Duration.ofMillis(finalDelay);
-            })
-            .onOpen(event -> LOGGER.warn("Socket timeout circuit breaker OPENED"))
-            .onHalfOpen(event -> {
-                currentAttempt++;
-                LOGGER.info("Socket timeout circuit breaker HALF-OPEN - Current attempt: {}", currentAttempt);
-            })
-            .onClose(event -> {
-                LOGGER.info("Socket timeout circuit breaker CLOSED");
-                currentAttempt = 1;
-            })
+            .withDelayFn(context -> Duration.ofMillis(calculateDelayMs()))
+            .onOpen(event -> LOGGER.warn("Socket timeout circuit breaker OPENED for {} (previous state: {}, failure threshold: {}). "
+                + "Requests fail fast without calling the backend until the next probe.", clientName, event.getPreviousState(),
+                config.getThreshold()))
+            .onHalfOpen(event -> onHalfOpen())
+            .onClose(event -> onClose())
             .withSuccessThreshold(config.getSuccessThreshold())
             .build();
+    }
+
+    long calculateDelayMs() {
+        int attempt = currentAttempt.get();
+        long delay = (long) (config.getInitialDelayMs() * Math.pow(config.getDelayMultiplier(), (double) (attempt - 1)));
+        long finalDelay = Math.min(delay, config.getMaxDelayMs());
+        LOGGER.info("Socket timeout circuit breaker for {} - attempt {} - progressive delay: {}ms", clientName, attempt, finalDelay);
+        return finalDelay;
+    }
+
+    void onHalfOpen() {
+        int attempt = currentAttempt.incrementAndGet();
+        LOGGER.info("Socket timeout circuit breaker HALF-OPEN for {} - allowing {} probe request(s), attempt {}", clientName,
+            config.getSuccessThreshold(), attempt);
+    }
+
+    void onClose() {
+        LOGGER.info("Socket timeout circuit breaker CLOSED for {} - backend recovered", clientName);
+        currentAttempt.set(1);
+    }
+
+    int getCurrentAttempt() {
+        return currentAttempt.get();
     }
 
     @Override

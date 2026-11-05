@@ -40,7 +40,7 @@ public class FaultTolerantExecutor extends DefaultExecutor {
 
     public FaultTolerantExecutor(HttpClient client, GraphqlClientMetrics metrics, GraphqlClientConfiguration configuration) {
         super(client, metrics, configuration);
-        this.circuitBreakerService = new CircuitBreakerService();
+        this.circuitBreakerService = new CircuitBreakerService(configuration);
     }
 
     @Override
@@ -54,10 +54,14 @@ public class FaultTolerantExecutor extends DefaultExecutor {
                 () -> executeHttpRequest(request, typeOfT, typeofU, options));
         } catch (CircuitBreakerOpenException e) {
             metrics.incrementRequestErrors();
+            LOGGER.debug("Request to {} rejected without calling the backend: the {} circuit breaker of {} is {}", configuration.url(),
+                circuitBreakerService.getPolicyName(e.getCircuitBreaker()), circuitBreakerService.getClientName(),
+                e.getCircuitBreaker().getState());
             throw new GraphqlRequestException("GraphQL service temporarily unavailable (circuit breaker open). Please try again later.",
                 calculateDuration(), e);
         } catch (FailsafeException e) {
             metrics.incrementRequestErrors();
+            LOGGER.warn("Unexpected failure while executing the GraphQL request to {}", configuration.url(), e);
             throw new GraphqlRequestException("Failed to execute GraphQL request: " + e.getMessage(), calculateDuration(), e);
         }
     }
@@ -86,10 +90,13 @@ public class FaultTolerantExecutor extends DefaultExecutor {
             });
         } catch (java.net.SocketTimeoutException e) {
             metrics.incrementRequestErrors();
+            LOGGER.warn("Read timeout after {}ms from endpoint {}: {}", calculateDuration(), configuration.url(), e.getMessage());
             throw new SocketTimeoutException("Read timeout occurred while sending GraphQL request",
                 "Timeout details: " + e.getMessage(), e, calculateDuration());
         } catch (IOException e) {
             metrics.incrementRequestErrors();
+            // e.g. connection refused, connect timeout or connection pool timeout: not counted by the circuit breakers
+            LOGGER.debug("Request to {} failed and is not counted by the circuit breakers: {}", configuration.url(), e.toString());
             throw new GraphqlRequestException("Failed to send GraphQL request", calculateDuration(), e);
         }
     }
