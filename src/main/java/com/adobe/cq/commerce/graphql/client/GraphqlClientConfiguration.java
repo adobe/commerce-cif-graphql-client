@@ -34,6 +34,10 @@ public @interface GraphqlClientConfiguration {
     int DEFAULT_CONNECTION_KEEP_ALIVE = -1;
     int DEFAULT_CONNECTION_TTL = -1;
 
+    String DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT = "3:20000:180000:1.5:1";
+    String DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE = "3:20000:180000:1.5:1";
+    String DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR = "3:10000:1";
+
     @AttributeDefinition(
         name = "GraphQL Service Identifier",
         description = "A unique identifier for this GraphQL client, used by the JCR resource property " + CQ_GRAPHQL_CLIENT
@@ -147,10 +151,54 @@ public @interface GraphqlClientConfiguration {
 
     @AttributeDefinition(
         name = "Enable Fault Tolerant Fallback",
-        description = "Enable fault tolerant fallback mechanism when encountering 503 (Service Unavailable) and other service errors. "
-            + "When enabled, the client will use resilient error handling with fallback strategies. When disabled, the existing error handling flow will be used.",
+        description = "Protects AEM when the GraphQL server is slow or failing. Three circuit breakers count consecutive failures of "
+            + "this client: socket (read) timeouts, HTTP 503 responses and other HTTP 5xx responses. When a breaker opens, requests "
+            + "fail immediately for a while instead of waiting for the server, so request threads are not blocked. Connection "
+            + "failures (connection refused, connection and request pool timeouts), HTTP 4xx responses and GraphQL errors in a "
+            + "successful response never open a breaker. Each breaker treats them, and the failures counted by the other breakers, "
+            + "as successes: they reset its consecutive-failure count and can close it when it is half-open. The circuit breaker state is kept per GraphQL client and per AEM instance. "
+            + "When disabled, the existing error handling is used and the circuit breaker settings below are ignored.",
         type = AttributeType.BOOLEAN)
     boolean enableFaultTolerantFallback() default false;
+
+    @AttributeDefinition(
+        name = "Circuit breaker: socket timeout",
+        description = "Only used when 'Enable Fault Tolerant Fallback' is enabled. Format "
+            + "FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD - "
+            + "FAILURE_THRESHOLD : consecutive socket (read) timeouts that open the breaker - "
+            + "INITIAL_DELAY_MS : time the breaker stays open the first time - "
+            + "MAX_DELAY_MS : maximum time the breaker stays open - "
+            + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
+            + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
+            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
+            + DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT,
+        type = AttributeType.STRING)
+    String circuitBreakerSocketTimeout() default DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT;
+
+    @AttributeDefinition(
+        name = "Circuit breaker: HTTP 503",
+        description = "Only used when 'Enable Fault Tolerant Fallback' is enabled. Format "
+            + "FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD - "
+            + "FAILURE_THRESHOLD : consecutive HTTP 503 (Service Unavailable) responses that open the breaker - "
+            + "INITIAL_DELAY_MS : time the breaker stays open the first time - "
+            + "MAX_DELAY_MS : maximum time the breaker stays open - "
+            + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
+            + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
+            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
+            + DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE,
+        type = AttributeType.STRING)
+    String circuitBreakerServiceUnavailable() default DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE;
+
+    @AttributeDefinition(
+        name = "Circuit breaker: other HTTP 5xx",
+        description = "Only used when 'Enable Fault Tolerant Fallback' is enabled. Format FAILURE_THRESHOLD:DELAY_MS:SUCCESS_THRESHOLD - "
+            + "FAILURE_THRESHOLD : consecutive HTTP 5xx responses other than 503 that open the breaker - "
+            + "DELAY_MS : time the breaker stays open - "
+            + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
+            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
+            + DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR,
+        type = AttributeType.STRING)
+    String circuitBreakerServerError() default DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR;
 
     @AttributeDefinition(
         name = "Ranking",

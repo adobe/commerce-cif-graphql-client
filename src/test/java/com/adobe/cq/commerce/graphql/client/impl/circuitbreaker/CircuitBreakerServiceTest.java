@@ -18,9 +18,11 @@ import java.io.IOException;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.MockitoAnnotations;
+
+import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tests for CircuitBreakerService with optimized coverage focusing on core functionality.
@@ -31,8 +33,8 @@ public class CircuitBreakerServiceTest {
 
     @Before
     public void setUp() {
-        MockitoAnnotations.initMocks(this);
-        circuitBreakerService = new CircuitBreakerService();
+        // Unset circuit breaker settings, so the defaults are used
+        circuitBreakerService = new CircuitBreakerService(mock(GraphqlClientConfiguration.class));
     }
 
     @Test
@@ -84,37 +86,6 @@ public class CircuitBreakerServiceTest {
             assertEquals("Socket timeout", e.getMessage());
             assertEquals("Connection timed out", e.getDetails());
             assertEquals(5000L, e.getDuration());
-        }
-    }
-
-    @Test
-    public void testServiceWithCustomConfiguration() {
-        // Test that CircuitBreakerService can be created with custom configuration
-        Configuration customConfig = new Configuration();
-        CircuitBreakerService service = new CircuitBreakerService(customConfig);
-        assertNotNull("CircuitBreakerService should be created with custom configuration", service);
-
-        // Test that it can execute successfully
-        try {
-            String result = service.executeWithPolicies("http://test.com", () -> "custom-test");
-            assertEquals("custom-test", result);
-        } catch (Exception e) {
-            fail("Should not throw exception for successful execution with custom config");
-        }
-    }
-
-    @Test
-    public void testServiceWithDefaultValues() {
-        // Test that CircuitBreakerService can be created with default values
-        CircuitBreakerService service = new CircuitBreakerService();
-        assertNotNull("CircuitBreakerService should be created with default values", service);
-
-        // Test that it can execute successfully
-        try {
-            String result = service.executeWithPolicies("http://test.com", () -> "test");
-            assertEquals("test", result);
-        } catch (Exception e) {
-            fail("Should not throw exception for successful execution");
         }
     }
 

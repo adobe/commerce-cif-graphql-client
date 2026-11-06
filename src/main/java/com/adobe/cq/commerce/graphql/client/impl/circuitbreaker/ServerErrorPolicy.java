@@ -29,8 +29,11 @@ public class ServerErrorPolicy implements Policy {
 
     private final Configuration.ServerErrorConfig config;
 
-    public ServerErrorPolicy(Configuration.ServerErrorConfig config) {
+    private final String clientName;
+
+    public ServerErrorPolicy(Configuration.ServerErrorConfig config, String clientName) {
         this.config = config;
+        this.clientName = clientName;
     }
 
     @Override
@@ -39,8 +42,13 @@ public class ServerErrorPolicy implements Policy {
             .handleIf(ServerErrorException.class::isInstance)
             .withFailureThreshold(config.getThreshold())
             .withDelay(Duration.ofMillis(config.getDelayMs()))
-            .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED"))
-            .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED"))
+            .onOpen(event -> LOGGER.warn("5xx circuit breaker OPENED for {} (previous state: {}, failure threshold: {}). "
+                + "Requests fail fast without calling the backend for {}ms.", clientName, event.getPreviousState(), config.getThreshold(),
+                config.getDelayMs()))
+            .onHalfOpen(event -> LOGGER.info("5xx circuit breaker HALF-OPEN for {} - allowing {} probe request(s)", clientName,
+                config.getSuccessThreshold()))
+            .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED for {} - the probe request(s) did not get an HTTP 5xx other than 503",
+                clientName))
             .withSuccessThreshold(config.getSuccessThreshold())
             .build();
     }
