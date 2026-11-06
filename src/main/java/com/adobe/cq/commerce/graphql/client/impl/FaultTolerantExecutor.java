@@ -43,6 +43,10 @@ public class FaultTolerantExecutor extends DefaultExecutor {
         this.circuitBreakerService = new CircuitBreakerService(configuration);
     }
 
+    CircuitBreakerService getCircuitBreakerService() {
+        return circuitBreakerService;
+    }
+
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
         requestStartTime = System.currentTimeMillis();

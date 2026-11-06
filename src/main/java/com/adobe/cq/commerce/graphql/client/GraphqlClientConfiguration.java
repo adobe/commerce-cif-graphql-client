@@ -170,7 +170,7 @@ public @interface GraphqlClientConfiguration {
             + "MAX_DELAY_MS : maximum time the breaker stays open - "
             + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default; a value with more parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT,
         type = AttributeType.STRING)
     String circuitBreakerSocketTimeout() default DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT;
@@ -184,7 +184,7 @@ public @interface GraphqlClientConfiguration {
             + "MAX_DELAY_MS : maximum time the breaker stays open - "
             + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default; a value with more parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE,
         type = AttributeType.STRING)
     String circuitBreakerServiceUnavailable() default DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE;
@@ -195,7 +195,7 @@ public @interface GraphqlClientConfiguration {
             + "FAILURE_THRESHOLD : consecutive HTTP 5xx responses other than 503 that open the breaker - "
             + "DELAY_MS : time the breaker stays open - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default; a value with more parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR,
         type = AttributeType.STRING)
     String circuitBreakerServerError() default DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR;

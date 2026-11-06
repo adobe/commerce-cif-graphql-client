@@ -52,6 +52,7 @@ import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutExc
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutPolicy;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import dev.failsafe.CircuitBreaker;
 import dev.failsafe.CircuitBreakerOpenException;
 
 import static org.junit.Assert.assertEquals;
@@ -68,18 +69,19 @@ import static org.mockito.Mockito.when;
  * 503, with HTTP 400 or with a GraphQL error.
  * <p>
  * Test settings: socket timeout {@value #SOCKET_TIMEOUT_MS} ms, failure threshold 2 for the socket timeout and HTTP 503
- * breakers, open delay {@value #OPEN_DELAY_MS} ms doubling up to 4 x that value. A request rejected by an open breaker must
- * fail within {@value #FAST_FAIL_MS} ms. To let a breaker become half-open, the tests wait for the open delay plus
- * {@value #WAIT_MARGIN_MS} ms. The margins leave room for slow CI machines; if the tests still become flaky, increase these
- * values together.
+ * breakers, open delay {@value #OPEN_DELAY_MS} ms doubling up to 4 x that value. The tests don't sleep for fixed times: they
+ * check the state of the breakers directly, and to let a breaker become half-open they poll until its remaining open delay
+ * is zero (at most {@value #AWAIT_TIMEOUT_MS} ms), so a slow CI machine only makes them slower.
  */
 public class CircuitBreakerIntegrationTest {
 
     private static final int SOCKET_TIMEOUT_MS = 500;
     private static final int SLOW_RESPONSE_MS = 3000;
     private static final long OPEN_DELAY_MS = 1000;
-    private static final long WAIT_MARGIN_MS = 300;
-    private static final long FAST_FAIL_MS = 250;
+    private static final long AWAIT_TIMEOUT_MS = 10000;
+    private static final long POLL_INTERVAL_MS = 20;
+    private static final String SOCKET_TIMEOUT = "SocketTimeout";
+    private static final String SERVICE_UNAVAILABLE = "ServiceUnavailable";
     private static final String RESPONSE = "{\"data\":{\"text\":\"ok\",\"count\":1}}";
     private static final String GRAPHQL_ERROR_RESPONSE = "{\"errors\":[{\"message\":\"Internal server error\"}]}";
     private static final Class<?>[] LOGGED_CLASSES = { FaultTolerantExecutor.class, CircuitBreakerService.class,
@@ -198,8 +200,8 @@ public class CircuitBreakerIntegrationTest {
         config.setSocketTimeout(SOCKET_TIMEOUT_MS);
         config.setConnectionTimeout(SOCKET_TIMEOUT_MS);
         config.setEnableFaultTolerantFallback(faultTolerant);
-        // FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER (success threshold not set, so the default 1 is used)
-        String progressive = "2:" + OPEN_DELAY_MS + ":" + OPEN_DELAY_MS * 4 + ":2.0";
+        // FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD
+        String progressive = "2:" + OPEN_DELAY_MS + ":" + OPEN_DELAY_MS * 4 + ":2.0:1";
         config.setCircuitBreakerSocketTimeout(progressive);
         config.setCircuitBreakerServiceUnavailable(progressive);
 
@@ -245,19 +247,39 @@ public class CircuitBreakerIntegrationTest {
         return graphqlClient.execute(new GraphqlRequest("{dummy}"), Data.class, Error.class);
     }
 
-    private long expectOpen() {
-        return expectOpen(client);
+    private void expectOpen() {
+        expectOpen(client);
     }
 
-    private static long expectOpen(GraphqlClientImpl graphqlClient) {
-        long start = System.nanoTime();
+    private static void expectOpen(GraphqlClientImpl graphqlClient) {
         try {
             execute(graphqlClient);
             fail("Expected the circuit breaker to be open");
         } catch (GraphqlRequestException e) {
             assertTrue("Unexpected cause: " + e.getCause(), e.getCause() instanceof CircuitBreakerOpenException);
         }
-        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+    }
+
+    private CircuitBreaker<?> breaker(String policyName) {
+        return ((FaultTolerantExecutor) client.executor).getCircuitBreakerService().getCircuitBreaker(policyName);
+    }
+
+    private void assertState(String policyName, CircuitBreaker.State expected) {
+        assertEquals(policyName + " circuit breaker state", expected, breaker(policyName).getState());
+    }
+
+    /**
+     * Waits until the open delay of the breaker has passed, so that the next request is let through as a half-open probe.
+     */
+    private void awaitOpenDelayElapsed(String policyName) throws InterruptedException {
+        assertState(policyName, CircuitBreaker.State.OPEN);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(AWAIT_TIMEOUT_MS);
+        while (!breaker(policyName).getRemainingDelay().isZero()) {
+            if (System.nanoTime() > deadline) {
+                fail(policyName + " circuit breaker still open after " + AWAIT_TIMEOUT_MS + " ms");
+            }
+            Thread.sleep(POLL_INTERVAL_MS);
+        }
     }
 
     /**
@@ -266,8 +288,8 @@ public class CircuitBreakerIntegrationTest {
      * <li>A first request succeeds.</li>
      * <li>The backend becomes slow. 2 requests each wait for the socket timeout and fail with {@link SocketTimeoutException}. This
      * reaches the failure threshold of 2 and opens the socket timeout breaker.</li>
-     * <li>5 more requests fail immediately (faster than {@value #FAST_FAIL_MS} ms) with {@link CircuitBreakerOpenException}. The
-     * server receives none of them.</li>
+     * <li>The breaker is open. 5 more requests fail immediately with {@link CircuitBreakerOpenException}. The server receives
+     * none of them.</li>
      * <li>The backend recovers. After the open delay the breaker is half-open, the probe request succeeds and closes the breaker,
      * and the next request is sent normally. The server receives exactly these 2 requests.</li>
      * </ol>
@@ -291,15 +313,17 @@ public class CircuitBreakerIntegrationTest {
         int hitsWhenOpened = hits.get();
 
         // open: requests fail immediately and do not reach the backend
+        assertState(SOCKET_TIMEOUT, CircuitBreaker.State.OPEN);
         for (int i = 0; i < 5; i++) {
-            assertTrue("Open breaker should fail fast", expectOpen() < FAST_FAIL_MS);
+            expectOpen();
         }
         assertEquals(hitsWhenOpened, hits.get());
 
         // backend recovers, the half-open probe succeeds and the breaker closes
         mode = Mode.OK;
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        awaitOpenDelayElapsed(SOCKET_TIMEOUT);
         assertEquals("ok", execute().getData().text);
+        assertState(SOCKET_TIMEOUT, CircuitBreaker.State.CLOSED);
         assertEquals("ok", execute().getData().text);
         assertEquals(hitsWhenOpened + 2, hits.get());
     }
@@ -312,8 +336,9 @@ public class CircuitBreakerIntegrationTest {
      * <li>The next request is rejected by the open breaker without calling the backend.</li>
      * <li>After the initial delay the breaker is half-open. The probe request still gets 503, so the breaker opens again, now for
      * initial delay x multiplier (2 x {@value #OPEN_DELAY_MS} ms).</li>
-     * <li>After waiting only one initial delay the breaker is still open. This proves that the delay increased.</li>
-     * <li>The backend recovers. After the rest of the longer delay the probe succeeds and the breaker closes.</li>
+     * <li>Right after it opens again, its remaining delay is longer than the initial delay. This proves that the delay
+     * increased.</li>
+     * <li>The backend recovers. After the longer delay the probe succeeds and the breaker closes.</li>
      * </ol>
      * Why: checks the progressive delay settings (initial delay, multiplier, max delay) end to end, not only the calculation.
      */
@@ -332,19 +357,22 @@ public class CircuitBreakerIntegrationTest {
         expectOpen();
 
         // the half-open probe still fails: the breaker opens again with a longer delay (2 x OPEN_DELAY_MS)
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        awaitOpenDelayElapsed(SERVICE_UNAVAILABLE);
         try {
             execute();
             fail("Expected HTTP 503 from the half-open probe");
         } catch (ServiceUnavailableException e) {
             assertEquals(503, e.getStatusCode());
         }
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        assertState(SERVICE_UNAVAILABLE, CircuitBreaker.State.OPEN);
+        long remainingMs = breaker(SERVICE_UNAVAILABLE).getRemainingDelay().toMillis();
+        assertTrue("Expected a delay longer than " + OPEN_DELAY_MS + " ms, remaining: " + remainingMs, remainingMs > OPEN_DELAY_MS);
         expectOpen();
 
         mode = Mode.OK;
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        awaitOpenDelayElapsed(SERVICE_UNAVAILABLE);
         assertEquals("ok", execute().getData().text);
+        assertState(SERVICE_UNAVAILABLE, CircuitBreaker.State.CLOSED);
     }
 
     /**
@@ -376,7 +404,7 @@ public class CircuitBreakerIntegrationTest {
      * connection failures are counted in the future, change this test.
      */
     @Test
-    public void testConnectionRefusedIsNotCounted() throws Exception {
+    public void testConnectionRefusedDoesNotOpenABreaker() throws Exception {
         int closedPort;
         try (ServerSocket socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             closedPort = socket.getLocalPort();
@@ -473,7 +501,7 @@ public class CircuitBreakerIntegrationTest {
         }
         expectOpen();
 
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        awaitOpenDelayElapsed(SERVICE_UNAVAILABLE);
         mode = Mode.SLOW;
         try {
             execute();
@@ -481,6 +509,7 @@ public class CircuitBreakerIntegrationTest {
         } catch (SocketTimeoutException e) {
             // expected
         }
+        assertState(SERVICE_UNAVAILABLE, CircuitBreaker.State.CLOSED);
         assertLogged(Level.INFO, "503 circuit breaker CLOSED for 'it'");
 
         mode = Mode.UNAVAILABLE;
@@ -538,7 +567,7 @@ public class CircuitBreakerIntegrationTest {
         int hitsWhenOpened = hits.get();
 
         // the backend is still slow when the breaker becomes half-open: concurrent requests must not all reach it
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        awaitOpenDelayElapsed(SOCKET_TIMEOUT);
         int requests = 5;
         ExecutorService callers = Executors.newFixedThreadPool(requests);
         CountDownLatch start = new CountDownLatch(1);
@@ -574,6 +603,7 @@ public class CircuitBreakerIntegrationTest {
         }
 
         // the failed probe opens the breaker again
+        assertState(SOCKET_TIMEOUT, CircuitBreaker.State.OPEN);
         expectOpen();
         assertLogged(Level.WARN, "Socket timeout circuit breaker OPENED for 'it'");
         assertLogged(Level.WARN, "previous state: HALF_OPEN");
@@ -625,7 +655,7 @@ public class CircuitBreakerIntegrationTest {
         assertLogged(Level.DEBUG, "circuit breaker states [ServiceUnavailable=CLOSED, ServerError=CLOSED, SocketTimeout=OPEN]");
 
         mode = Mode.OK;
-        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        awaitOpenDelayElapsed(SOCKET_TIMEOUT);
         assertEquals("ok", execute().getData().text);
         String clientName = "'it' (ranking 0, " + serverUrl() + ")";
         assertLogged(Level.INFO, "Socket timeout circuit breaker HALF-OPEN for " + clientName + " - allowing 1 probe request(s)");

@@ -104,7 +104,7 @@ public class FaultTolerantExecutorTest {
      */
     @Test
     public void testFailureThresholdFromOsgiConfiguration() throws Exception {
-        mockConfig.setCircuitBreakerServiceUnavailable("1:60000:60000");
+        mockConfig.setCircuitBreakerServiceUnavailable("1:60000:60000:1.5:1");
         graphqlClient.activate(mockConfig, mock(BundleContext.class));
         TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
 

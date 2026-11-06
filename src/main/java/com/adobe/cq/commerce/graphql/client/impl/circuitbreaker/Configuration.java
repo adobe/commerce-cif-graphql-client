@@ -60,8 +60,8 @@ class Configuration {
 
     /**
      * Creates a configuration backed by the OSGi configuration of a GraphQL client. Each circuit breaker is configured by one
-     * colon-separated value. Empty, missing or invalid parts are logged and replaced by their defaults. A value with more parts
-     * than its format is ignored completely.
+     * colon-separated value. Empty or invalid parts are logged and replaced by their defaults. A value with a different number
+     * of parts than its format is ignored completely.
      */
     Configuration(GraphqlClientConfiguration osgiConfiguration) {
         this.osgiConfiguration = osgiConfiguration;
@@ -167,8 +167,8 @@ class Configuration {
 
     /**
      * The parts of one colon-separated OSGi value, for example {@code 3:20000:180000:1.5:1}. Each part is parsed and validated
-     * on its own, so one invalid part does not reset the others. A value with too many parts was most likely copied from a
-     * property with another format, so it is ignored and all defaults are used.
+     * on its own, so one invalid part does not reset the others. A value with a different number of parts than the format was
+     * most likely copied from a property with another format, so it is ignored and all defaults are used.
      */
     private static final class Values {
         private final String property;
@@ -181,7 +181,7 @@ class Configuration {
             this.value = value;
             this.fields = format.split(":");
             String[] split = value == null || value.trim().isEmpty() ? new String[0] : value.trim().split(":", -1);
-            if (split.length > fields.length) {
+            if (split.length > 0 && split.length != fields.length) {
                 LOGGER.warn("Invalid value '{}' for {}, it has {} parts but the format {} has {}. Using the defaults for all parts.",
                     value, property, split.length, format, fields.length);
                 split = new String[0];

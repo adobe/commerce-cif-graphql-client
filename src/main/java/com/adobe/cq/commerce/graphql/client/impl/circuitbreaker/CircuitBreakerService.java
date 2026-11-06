@@ -114,6 +114,16 @@ public class CircuitBreakerService {
     }
 
     /**
+     * Returns the circuit breaker created by the given policy, for example to check its state.
+     *
+     * @param policyName a policy name, for example {@code "SocketTimeout"}
+     * @return the circuit breaker, or {@code null} if no policy has this name
+     */
+    public CircuitBreaker<?> getCircuitBreaker(String policyName) {
+        return circuitBreakers.stream().filter(breaker -> policyName.equals(policyNames.get(breaker))).findFirst().orElse(null);
+    }
+
+    /**
      * @return the name of the GraphQL client used in log messages
      */
     public String getClientName() {

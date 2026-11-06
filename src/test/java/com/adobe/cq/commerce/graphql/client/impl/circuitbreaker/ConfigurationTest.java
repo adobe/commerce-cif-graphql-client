@@ -68,14 +68,13 @@ public class ConfigurationTest {
     }
 
     /**
-     * Parts can be left out at the end or left empty in between, and spaces around parts are ignored. Missing parts use their
-     * default.
+     * Parts can be left empty, and spaces around parts are ignored. Empty parts use their default.
      * <p>
-     * Why: a customer who only wants a different failure threshold can set just {@code "5"}.
+     * Why: a customer who only wants a different failure threshold can set {@code "5::::"}.
      */
     @Test
-    public void testMissingAndEmptyPartsUseDefaults() {
-        Configuration configuration = new Configuration(mockConfiguration("5", "::60000", " 4 : 2000 : 2 "));
+    public void testEmptyPartsUseDefaults() {
+        Configuration configuration = new Configuration(mockConfiguration("5::::", "::60000::", " 4 : 2000 : 2 "));
 
         assertSocketTimeout(configuration.getSocketTimeoutConfig(), 5, 20000L, 180000L, 1.5, 1);
         assertServiceUnavailable(configuration.getServiceUnavailableConfig(), 3, 20000L, 60000L, 1.5, 1);
@@ -123,16 +122,15 @@ public class ConfigurationTest {
     }
 
     /**
-     * A value with fewer parts than its format uses the defaults for the missing parts. A 3-part 5xx value copied into the
-     * 5-part socket timeout property gives a fixed delay (the max delay is raised to the initial delay).
+     * A value with fewer parts than its format is ignored completely and all defaults are used, including the 3-part 5xx value
+     * copied into the 5-part socket timeout property.
+     * <p>
+     * Why: the parts of the two formats mean different things. Using the copied value would turn the 5xx success threshold into
+     * the max delay of the socket timeout breaker.
      */
     @Test
-    public void testValueWithFewerPartsUsesDefaultsForTheMissingParts() {
-        Configuration configuration = new Configuration(mockConfiguration(DEFAULT_FIXED, "5", "4:15000"));
-
-        assertSocketTimeout(configuration.getSocketTimeoutConfig(), 3, 10000L, 10000L, 1.5, 1);
-        assertServiceUnavailable(configuration.getServiceUnavailableConfig(), 5, 20000L, 180000L, 1.5, 1);
-        assertServerError(configuration.getServerErrorConfig(), 4, 15000L, 1);
+    public void testValueWithFewerPartsUsesDefaults() {
+        assertDefaults(new Configuration(mockConfiguration(DEFAULT_FIXED, "5", "4:15000")));
     }
 
     /**
@@ -157,13 +155,13 @@ public class ConfigurationTest {
 
     /**
      * An invalid max delay (0 or negative) is first replaced by the default (180000 ms). That is smaller than the configured
-     * initial delay (300000 ms), so the initial delay is used as the max delay. The same happens when the max delay is left out.
+     * initial delay (300000 ms), so the initial delay is used as the max delay. The same happens when the max delay is left empty.
      * <p>
      * Why: the max delay must never be smaller than the initial delay, also after an invalid or missing value was replaced.
      */
     @Test
     public void testInvalidMaxDelayWithLargeInitialDelayUsesInitialDelay() {
-        Configuration configuration = new Configuration(mockConfiguration("3:300000:0:1.5:1", "3:300000", DEFAULT_FIXED));
+        Configuration configuration = new Configuration(mockConfiguration("3:300000:0:1.5:1", "3:300000::1.5:1", DEFAULT_FIXED));
 
         assertEquals(300000L, configuration.getSocketTimeoutConfig().getMaxDelayMs());
         assertEquals(300000L, configuration.getServiceUnavailableConfig().getMaxDelayMs());

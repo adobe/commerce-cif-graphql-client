@@ -63,7 +63,7 @@ Starting with version `1.12.0`, each breaker is configured by one colon-separate
 * `circuitBreakerSocketTimeout` and `circuitBreakerServiceUnavailable`: `FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD`, default `3:20000:180000:1.5:1`. The open delay is multiplied by `DELAY_MULTIPLIER` each time the breaker opens again without closing in between, up to `MAX_DELAY_MS`.
 * `circuitBreakerServerError`: `FAILURE_THRESHOLD:DELAY_MS:SUCCESS_THRESHOLD`, default `3:10000:1`.
 
-Empty or invalid parts use their default and are logged at WARN. A value with more parts than its format is ignored completely, because the two formats are different. `SUCCESS_THRESHOLD` is at most 10, since a half-open breaker lets that many trial requests through at the same time.
+Every part must be present, but a part can be left empty, for example `5::::` to change only the failure threshold of the socket timeout breaker. Empty parts use their default; invalid parts use their default and are logged at WARN. A value with a different number of parts than its format is ignored completely and logged at WARN, because the two formats are different. `SUCCESS_THRESHOLD` is at most 10, since a half-open breaker lets that many trial requests through at the same time.
 
 Things to know before enabling it:
 * The state is kept per GraphQL client and per AEM instance (pod), so each publish instance opens its breakers on its own.
