@@ -110,16 +110,29 @@ public class ConfigurationTest {
     }
 
     /**
-     * Parts after the expected number of parts are ignored, the others are used.
+     * A value with more parts than its format is ignored completely and all defaults are used, including the 5-part 503 value
+     * copied into the 3-part 5xx property.
+     * <p>
+     * Why: the parts of the two formats mean different things. Using the first parts of a copied value would turn the max
+     * delay (180000) into the success threshold of the 5xx breaker.
      */
     @Test
-    public void testExtraPartsAreIgnored() {
-        Configuration configuration = new Configuration(mockConfiguration("5:1000:2000:2.0:2:99", "7:3000:90000:1.25:3:x:y",
-            "4:15000:2:extra"));
+    public void testValueWithTooManyPartsUsesDefaults() {
+        assertDefaults(new Configuration(mockConfiguration("5:1000:2000:2.0:2:99", "7:3000:90000:1.25:3:x:y",
+            DEFAULT_PROGRESSIVE)));
+    }
 
-        assertSocketTimeout(configuration.getSocketTimeoutConfig(), 5, 1000L, 2000L, 2.0, 2);
-        assertServiceUnavailable(configuration.getServiceUnavailableConfig(), 7, 3000L, 90000L, 1.25, 3);
-        assertServerError(configuration.getServerErrorConfig(), 4, 15000L, 2);
+    /**
+     * A value with fewer parts than its format uses the defaults for the missing parts. A 3-part 5xx value copied into the
+     * 5-part socket timeout property gives a fixed delay (the max delay is raised to the initial delay).
+     */
+    @Test
+    public void testValueWithFewerPartsUsesDefaultsForTheMissingParts() {
+        Configuration configuration = new Configuration(mockConfiguration(DEFAULT_FIXED, "5", "4:15000"));
+
+        assertSocketTimeout(configuration.getSocketTimeoutConfig(), 3, 10000L, 10000L, 1.5, 1);
+        assertServiceUnavailable(configuration.getServiceUnavailableConfig(), 5, 20000L, 180000L, 1.5, 1);
+        assertServerError(configuration.getServerErrorConfig(), 4, 15000L, 1);
     }
 
     /**
@@ -193,12 +206,13 @@ public class ConfigurationTest {
     }
 
     /**
-     * Very large values are capped: thresholds at {@link Configuration#MAX_THRESHOLD} and delays at
-     * {@link Configuration#MAX_DELAY_MS}. A threshold larger than the int range is capped too. A delay larger than the long range
-     * is not a valid number and uses the default.
+     * Very large values are capped: failure thresholds at {@link Configuration#MAX_THRESHOLD}, success thresholds at
+     * {@link Configuration#MAX_SUCCESS_THRESHOLD} and delays at {@link Configuration#MAX_DELAY_MS}. Numbers larger than the int
+     * or long range are capped too.
      * <p>
-     * Why: Failsafe reserves memory for each counted execution and converts delays to nanoseconds, so huge values used a lot of
-     * memory or overflowed.
+     * Why: Failsafe reserves memory for each counted execution, lets as many trial requests through as the success threshold
+     * when half-open, and converts delays to nanoseconds, so huge values used a lot of memory, flooded a recovering backend or
+     * overflowed.
      */
     @Test
     public void testTooLargeOsgiValuesAreCapped() {
@@ -209,9 +223,25 @@ public class ConfigurationTest {
 
         long maxDelay = Configuration.MAX_DELAY_MS;
         int maxThreshold = Configuration.MAX_THRESHOLD;
-        assertSocketTimeout(configuration.getSocketTimeoutConfig(), maxThreshold, maxDelay, maxDelay, 1.5, maxThreshold);
-        assertServiceUnavailable(configuration.getServiceUnavailableConfig(), maxThreshold, maxDelay, maxDelay, 1.5, maxThreshold);
-        assertServerError(configuration.getServerErrorConfig(), maxThreshold, 10000L, maxThreshold);
+        int maxSuccess = Configuration.MAX_SUCCESS_THRESHOLD;
+        assertSocketTimeout(configuration.getSocketTimeoutConfig(), maxThreshold, maxDelay, maxDelay, 1.5, maxSuccess);
+        assertServiceUnavailable(configuration.getServiceUnavailableConfig(), maxThreshold, maxDelay, maxDelay, 1.5, maxSuccess);
+        assertServerError(configuration.getServerErrorConfig(), maxThreshold, maxDelay, maxSuccess);
+    }
+
+    /**
+     * The success threshold is capped at {@link Configuration#MAX_SUCCESS_THRESHOLD}, while a failure threshold of the same size
+     * is kept.
+     */
+    @Test
+    public void testSuccessThresholdIsCappedLowerThanFailureThreshold() {
+        Configuration configuration = new Configuration(mockConfiguration("11:20000:180000:1.5:11", "11:20000:180000:1.5:10",
+            "11:10000:11"));
+
+        assertEquals(11, configuration.getSocketTimeoutConfig().getThreshold());
+        assertEquals(10, configuration.getSocketTimeoutConfig().getSuccessThreshold());
+        assertEquals(10, configuration.getServiceUnavailableConfig().getSuccessThreshold());
+        assertEquals(10, configuration.getServerErrorConfig().getSuccessThreshold());
     }
 
     /**

@@ -29,7 +29,8 @@ public class SocketTimeoutPolicy implements Policy {
     private static final Logger LOGGER = LoggerFactory.getLogger(SocketTimeoutPolicy.class);
 
     private final Configuration.SocketTimeoutConfig config;
-    // Shared by all request threads that trigger circuit breaker state transitions
+    // Shared by all request threads; AtomicInteger prevents lost updates. Failsafe computes the delay inside its lock but
+    // calls onHalfOpen after releasing it, so in a rare race a re-opened breaker may use a delay one step too short (harmless).
     private final AtomicInteger currentAttempt = new AtomicInteger(1);
 
     private final String clientName;
@@ -69,7 +70,7 @@ public class SocketTimeoutPolicy implements Policy {
     }
 
     void onClose() {
-        LOGGER.info("Socket timeout circuit breaker CLOSED for {} - backend recovered", clientName);
+        LOGGER.info("Socket timeout circuit breaker CLOSED for {} - the probe request(s) did not time out", clientName);
         currentAttempt.set(1);
     }
 

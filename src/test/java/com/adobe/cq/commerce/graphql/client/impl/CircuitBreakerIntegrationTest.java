@@ -47,6 +47,7 @@ import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
 import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.CircuitBreakerService;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailableException;
+import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServiceUnavailablePolicy;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException;
 import com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutPolicy;
 import com.sun.net.httpserver.HttpExchange;
@@ -68,19 +69,21 @@ import static org.mockito.Mockito.when;
  * <p>
  * Test settings: socket timeout {@value #SOCKET_TIMEOUT_MS} ms, failure threshold 2 for the socket timeout and HTTP 503
  * breakers, open delay {@value #OPEN_DELAY_MS} ms doubling up to 4 x that value. A request rejected by an open breaker must
- * fail within {@value #FAST_FAIL_MS} ms. The tests wait for the open delay plus 100 ms; if they become flaky on slow machines,
- * increase these values together.
+ * fail within {@value #FAST_FAIL_MS} ms. To let a breaker become half-open, the tests wait for the open delay plus
+ * {@value #WAIT_MARGIN_MS} ms. The margins leave room for slow CI machines; if the tests still become flaky, increase these
+ * values together.
  */
 public class CircuitBreakerIntegrationTest {
 
-    private static final int SOCKET_TIMEOUT_MS = 300;
-    private static final int SLOW_RESPONSE_MS = 2000;
-    private static final long OPEN_DELAY_MS = 500;
-    private static final long FAST_FAIL_MS = 200;
+    private static final int SOCKET_TIMEOUT_MS = 500;
+    private static final int SLOW_RESPONSE_MS = 3000;
+    private static final long OPEN_DELAY_MS = 1000;
+    private static final long WAIT_MARGIN_MS = 300;
+    private static final long FAST_FAIL_MS = 250;
     private static final String RESPONSE = "{\"data\":{\"text\":\"ok\",\"count\":1}}";
     private static final String GRAPHQL_ERROR_RESPONSE = "{\"errors\":[{\"message\":\"Internal server error\"}]}";
     private static final Class<?>[] LOGGED_CLASSES = { FaultTolerantExecutor.class, CircuitBreakerService.class,
-        SocketTimeoutPolicy.class };
+        SocketTimeoutPolicy.class, ServiceUnavailablePolicy.class };
 
     private enum Mode {
         OK,
@@ -295,7 +298,7 @@ public class CircuitBreakerIntegrationTest {
 
         // backend recovers, the half-open probe succeeds and the breaker closes
         mode = Mode.OK;
-        Thread.sleep(OPEN_DELAY_MS + 100);
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
         assertEquals("ok", execute().getData().text);
         assertEquals("ok", execute().getData().text);
         assertEquals(hitsWhenOpened + 2, hits.get());
@@ -329,18 +332,18 @@ public class CircuitBreakerIntegrationTest {
         expectOpen();
 
         // the half-open probe still fails: the breaker opens again with a longer delay (2 x OPEN_DELAY_MS)
-        Thread.sleep(OPEN_DELAY_MS + 100);
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
         try {
             execute();
             fail("Expected HTTP 503 from the half-open probe");
         } catch (ServiceUnavailableException e) {
             assertEquals(503, e.getStatusCode());
         }
-        Thread.sleep(OPEN_DELAY_MS + 100);
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
         expectOpen();
 
         mode = Mode.OK;
-        Thread.sleep(OPEN_DELAY_MS + 100);
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
         assertEquals("ok", execute().getData().text);
     }
 
@@ -366,8 +369,8 @@ public class CircuitBreakerIntegrationTest {
     }
 
     /**
-     * Connection failures are not counted. 5 requests to a port where nothing listens all fail with a connection error,
-     * but the breaker never opens. A DEBUG log says that the failure "is not counted by the circuit breakers".
+     * Connection failures never open a breaker. 5 requests to a port where nothing listens all fail with a connection error,
+     * but the breaker never opens. A DEBUG log says that the failure "does not open a circuit breaker and counts as a success".
      * <p>
      * Why: documents a known limitation. Only socket (read) timeouts, HTTP 503 and other HTTP 5xx responses are counted. If
      * connection failures are counted in the future, change this test.
@@ -388,7 +391,7 @@ public class CircuitBreakerIntegrationTest {
                 assertFalse("Connection failures must not open the breaker", e.getCause() instanceof CircuitBreakerOpenException);
             }
         }
-        assertLogged(Level.DEBUG, "is not counted by the circuit breakers");
+        assertLogged(Level.DEBUG, "does not open a circuit breaker and counts as a success for them");
     }
 
     /**
@@ -420,8 +423,8 @@ public class CircuitBreakerIntegrationTest {
      * between a socket timeout and 503 three times, so neither breaker sees 2 of its failures in a row. Neither breaker opens and
      * all 6 requests reach the server.
      * <p>
-     * Why: documents a known limitation (also described in the README). If the breakers start sharing a failure count, change
-     * this test.
+     * Why: documents a known limitation, also described in the README. If the breakers start sharing a failure count, change
+     * this test and the README.
      */
     @Test
     public void testAlternatingFailureTypesDoNotOpenAnyBreaker() throws Exception {
@@ -446,7 +449,52 @@ public class CircuitBreakerIntegrationTest {
     }
 
     /**
-     * Errors caused by the request, not by an unhealthy backend, are not counted: 5 HTTP 400 responses followed by 5 HTTP 200
+     * A failure that a half-open breaker doesn't handle closes it.
+     * <ol>
+     * <li>2 HTTP 503 responses open the service unavailable breaker.</li>
+     * <li>After the open delay the backend is slow. The probe request reaches the server and fails with a socket timeout, which
+     * the 503 breaker counts as a success: it closes and logs "CLOSED".</li>
+     * <li>The next HTTP 503 reaches the server again instead of being rejected.</li>
+     * </ol>
+     * Why: documents a known limitation (Failsafe records every outcome a breaker doesn't handle as a success), also described in
+     * the README. If unrelated failures stop resetting a breaker, change this test and the README.
+     */
+    @Test
+    public void testUnhandledFailureClosesHalfOpenBreaker() throws Exception {
+        client = activate(serverUrl(), true);
+        mode = Mode.UNAVAILABLE;
+        for (int i = 0; i < 2; i++) {
+            try {
+                execute();
+                fail("Expected HTTP 503");
+            } catch (ServiceUnavailableException e) {
+                // expected
+            }
+        }
+        expectOpen();
+
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
+        mode = Mode.SLOW;
+        try {
+            execute();
+            fail("Expected a socket timeout from the half-open probe");
+        } catch (SocketTimeoutException e) {
+            // expected
+        }
+        assertLogged(Level.INFO, "503 circuit breaker CLOSED for 'it'");
+
+        mode = Mode.UNAVAILABLE;
+        try {
+            execute();
+            fail("Expected HTTP 503 from the closed breaker");
+        } catch (ServiceUnavailableException e) {
+            // expected
+        }
+        assertEquals(4, hits.get());
+    }
+
+    /**
+     * Errors caused by the request, not by an unhealthy backend, never open a breaker: 5 HTTP 400 responses followed by 5 HTTP 200
      * responses that contain GraphQL errors. The breaker stays closed, all 10 requests reach the server and the GraphQL errors
      * are returned to the caller.
      * <p>
@@ -490,7 +538,7 @@ public class CircuitBreakerIntegrationTest {
         int hitsWhenOpened = hits.get();
 
         // the backend is still slow when the breaker becomes half-open: concurrent requests must not all reach it
-        Thread.sleep(OPEN_DELAY_MS + 100);
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
         int requests = 5;
         ExecutorService callers = Executors.newFixedThreadPool(requests);
         CountDownLatch start = new CountDownLatch(1);
@@ -560,8 +608,8 @@ public class CircuitBreakerIntegrationTest {
      * <li>DEBUG with the state of all breakers before each request,</li>
      * <li>INFO when the breaker becomes half-open and when it closes again.</li>
      * </ul>
-     * Why: these messages are described in the README and the troubleshooting guides. If you change a log message, update this
-     * test and those documents.
+     * Why: people search the logs for these messages when they troubleshoot a slow or failing backend. If you change a log
+     * message, update this test.
      */
     @Test
     public void testFailurePathsAreLogged() throws Exception {
@@ -577,10 +625,10 @@ public class CircuitBreakerIntegrationTest {
         assertLogged(Level.DEBUG, "circuit breaker states [ServiceUnavailable=CLOSED, ServerError=CLOSED, SocketTimeout=OPEN]");
 
         mode = Mode.OK;
-        Thread.sleep(OPEN_DELAY_MS + 100);
+        Thread.sleep(OPEN_DELAY_MS + WAIT_MARGIN_MS);
         assertEquals("ok", execute().getData().text);
         String clientName = "'it' (ranking 0, " + serverUrl() + ")";
         assertLogged(Level.INFO, "Socket timeout circuit breaker HALF-OPEN for " + clientName + " - allowing 1 probe request(s)");
-        assertLogged(Level.INFO, "Socket timeout circuit breaker CLOSED for " + clientName + " - backend recovered");
+        assertLogged(Level.INFO, "Socket timeout circuit breaker CLOSED for " + clientName + " - the probe request(s) did not time out");
     }
 }

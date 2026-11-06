@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntSupplier;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.junit.Test;
@@ -111,17 +112,17 @@ public class ProgressiveDelayPolicyConcurrencyTest {
             () -> new ServiceUnavailableException("Server error 503", "body"), policy::getCurrentAttempt);
     }
 
-    private static void assertProgressiveDelay(LongSupplierWithoutBoxing delay, Runnable onHalfOpen, Runnable onClose) {
-        assertEquals(1000L, delay.get());
+    private static void assertProgressiveDelay(LongSupplier delay, Runnable onHalfOpen, Runnable onClose) {
+        assertEquals(1000L, delay.getAsLong());
         onHalfOpen.run();
-        assertEquals(2000L, delay.get());
+        assertEquals(2000L, delay.getAsLong());
         onHalfOpen.run();
         // capped at the max delay
-        assertEquals(3000L, delay.get());
+        assertEquals(3000L, delay.getAsLong());
         onHalfOpen.run();
-        assertEquals(3000L, delay.get());
+        assertEquals(3000L, delay.getAsLong());
         onClose.run();
-        assertEquals(1000L, delay.get());
+        assertEquals(1000L, delay.getAsLong());
     }
 
     private static void assertConcurrentHalfOpenTransitions(Runnable onHalfOpen, IntSupplier currentAttempt) throws Exception {
@@ -179,10 +180,5 @@ public class ProgressiveDelayPolicyConcurrencyTest {
         assertEquals("ok", Failsafe.with(breaker).get(() -> "ok"));
         assertTrue(breaker.isClosed());
         assertEquals(1, currentAttempt.getAsInt());
-    }
-
-    @FunctionalInterface
-    private interface LongSupplierWithoutBoxing {
-        long get();
     }
 }

@@ -47,7 +47,8 @@ public class ServerErrorPolicy implements Policy {
                 config.getDelayMs()))
             .onHalfOpen(event -> LOGGER.info("5xx circuit breaker HALF-OPEN for {} - allowing {} probe request(s)", clientName,
                 config.getSuccessThreshold()))
-            .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED for {} - backend recovered", clientName))
+            .onClose(event -> LOGGER.info("5xx circuit breaker CLOSED for {} - the probe request(s) did not get an HTTP 5xx other than 503",
+                clientName))
             .withSuccessThreshold(config.getSuccessThreshold())
             .build();
     }

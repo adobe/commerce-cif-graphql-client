@@ -52,13 +52,16 @@ class Configuration {
 
     // Upper bounds for OSGi values
     static final int MAX_THRESHOLD = 1000;
+    // A half-open breaker lets this many trial requests through at the same time
+    static final int MAX_SUCCESS_THRESHOLD = 10;
     static final long MAX_DELAY_MS = TimeUnit.DAYS.toMillis(1);
 
     private final GraphqlClientConfiguration osgiConfiguration;
 
     /**
      * Creates a configuration backed by the OSGi configuration of a GraphQL client. Each circuit breaker is configured by one
-     * colon-separated value. Empty, missing or invalid parts are logged and replaced by their defaults.
+     * colon-separated value. Empty, missing or invalid parts are logged and replaced by their defaults. A value with more parts
+     * than its format is ignored completely.
      */
     Configuration(GraphqlClientConfiguration osgiConfiguration) {
         this.osgiConfiguration = osgiConfiguration;
@@ -76,7 +79,7 @@ class Configuration {
             initialDelay,
             values.maxDelay(2, initialDelay, DEFAULT_503_MAX_DELAY_MS),
             values.multiplier(3, DEFAULT_503_DELAY_MULTIPLIER),
-            values.threshold(4, DEFAULT_503_SUCCESS_THRESHOLD));
+            values.successThreshold(4, DEFAULT_503_SUCCESS_THRESHOLD));
     }
 
     /**
@@ -87,7 +90,7 @@ class Configuration {
         return new ServerErrorConfig(
             values.threshold(0, DEFAULT_5XX_THRESHOLD),
             values.delay(1, DEFAULT_5XX_DELAY_MS),
-            values.threshold(2, DEFAULT_5XX_SUCCESS_THRESHOLD));
+            values.successThreshold(2, DEFAULT_5XX_SUCCESS_THRESHOLD));
     }
 
     /**
@@ -101,20 +104,35 @@ class Configuration {
             initialDelay,
             values.maxDelay(2, initialDelay, DEFAULT_TIMEOUT_MAX_DELAY_MS),
             values.multiplier(3, DEFAULT_TIMEOUT_DELAY_MULTIPLIER),
-            values.threshold(4, DEFAULT_TIMEOUT_SUCCESS_THRESHOLD));
+            values.successThreshold(4, DEFAULT_TIMEOUT_SUCCESS_THRESHOLD));
     }
 
-    private static int positive(String name, int value, int defaultValue) {
+    private static int positive(String name, int value, int defaultValue, int max) {
         if (value < 1) {
             LOGGER.warn("Invalid value {} for {}, it must be at least 1. Using default: {}", value, name, defaultValue);
             return defaultValue;
         }
-        if (value > MAX_THRESHOLD) {
-            // Failsafe allocates state proportional to the threshold and allows as many trial requests when half-open
-            LOGGER.warn("Invalid value {} for {}, it must be at most {}. Using: {}", value, name, MAX_THRESHOLD, MAX_THRESHOLD);
-            return MAX_THRESHOLD;
+        if (value > max) {
+            // Failsafe allocates state proportional to the threshold
+            LOGGER.warn("Invalid value {} for {}, it must be at most {}. Using: {}", value, name, max, max);
+            return max;
         }
         return value;
+    }
+
+    /**
+     * Parses a whole number. A number outside the long range is returned as {@link Long#MAX_VALUE} or {@link Long#MIN_VALUE},
+     * so that it is capped like any other value that is too large or too small.
+     */
+    private static long parseLong(String part) {
+        try {
+            return Long.parseLong(part);
+        } catch (NumberFormatException e) {
+            if (part.matches("[+-]?\\d+")) {
+                return part.startsWith("-") ? Long.MIN_VALUE : Long.MAX_VALUE;
+            }
+            throw e;
+        }
     }
 
     private static long positive(String name, long value, long defaultValue) {
@@ -149,7 +167,8 @@ class Configuration {
 
     /**
      * The parts of one colon-separated OSGi value, for example {@code 3:20000:180000:1.5:1}. Each part is parsed and validated
-     * on its own, so one invalid part does not reset the others.
+     * on its own, so one invalid part does not reset the others. A value with too many parts was most likely copied from a
+     * property with another format, so it is ignored and all defaults are used.
      */
     private static final class Values {
         private final String property;
@@ -161,21 +180,31 @@ class Configuration {
             this.property = property;
             this.value = value;
             this.fields = format.split(":");
-            this.parts = value == null || value.trim().isEmpty() ? new String[0] : value.trim().split(":", -1);
-            if (parts.length > fields.length) {
-                LOGGER.warn("Invalid value '{}' for {}, it must have the format {}. Ignoring the parts after the first {}.", value,
-                    property, format, fields.length);
+            String[] split = value == null || value.trim().isEmpty() ? new String[0] : value.trim().split(":", -1);
+            if (split.length > fields.length) {
+                LOGGER.warn("Invalid value '{}' for {}, it has {} parts but the format {} has {}. Using the defaults for all parts.",
+                    value, property, split.length, format, fields.length);
+                split = new String[0];
             }
+            this.parts = split;
         }
 
         int threshold(int index, int defaultValue) {
+            return threshold(index, defaultValue, MAX_THRESHOLD);
+        }
+
+        int successThreshold(int index, int defaultValue) {
+            return threshold(index, defaultValue, MAX_SUCCESS_THRESHOLD);
+        }
+
+        private int threshold(int index, int defaultValue, int max) {
             String part = part(index);
             if (part.isEmpty()) {
                 return defaultValue;
             }
             try {
-                long parsed = Long.parseLong(part);
-                return positive(name(index), (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, parsed)), defaultValue);
+                long parsed = parseLong(part);
+                return positive(name(index), (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, parsed)), defaultValue, max);
             } catch (NumberFormatException e) {
                 return notANumber(index, part, defaultValue);
             }
@@ -187,7 +216,7 @@ class Configuration {
                 return defaultValue;
             }
             try {
-                return positive(name(index), Long.parseLong(part), defaultValue);
+                return positive(name(index), parseLong(part), defaultValue);
             } catch (NumberFormatException e) {
                 return notANumber(index, part, defaultValue);
             }
@@ -201,7 +230,7 @@ class Configuration {
             }
             long parsed;
             try {
-                parsed = Long.parseLong(part);
+                parsed = parseLong(part);
             } catch (NumberFormatException e) {
                 parsed = notANumber(index, part, defaultValue);
             }
@@ -229,7 +258,7 @@ class Configuration {
         }
 
         private <T> T notANumber(int index, String part, T defaultValue) {
-            LOGGER.warn("Invalid value '{}' for {} in '{}', it is not a number. Using default: {}", part, name(index), value,
+            LOGGER.warn("Invalid value '{}' for {} in '{}', it is not a valid number. Using default: {}", part, name(index), value,
                 defaultValue);
             return defaultValue;
         }
