@@ -29,7 +29,7 @@ public class SocketTimeoutPolicyTest {
     @Before
     public void setUp() {
         config = new Configuration.SocketTimeoutConfig(3, 20000L, 180000L, 1.5, 1);
-        policy = new SocketTimeoutPolicy(config);
+        policy = new SocketTimeoutPolicy(config, "test");
     }
 
     @Test
@@ -52,7 +52,7 @@ public class SocketTimeoutPolicyTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.SocketTimeoutConfig testConfig = new Configuration.SocketTimeoutConfig(5, 30000L, 300000L, 2.0, 2);
-        SocketTimeoutPolicy testPolicy = new SocketTimeoutPolicy(testConfig);
+        SocketTimeoutPolicy testPolicy = new SocketTimeoutPolicy(testConfig, "test");
 
         assertEquals("SocketTimeout", testPolicy.getPolicyName());
         assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.SocketTimeoutException.class, testPolicy

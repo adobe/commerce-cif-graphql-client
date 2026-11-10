@@ -17,6 +17,7 @@ import org.junit.Test;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlClientConfiguration;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -37,5 +38,37 @@ public class GraphqlClientConfigurationImplTest {
         assertNotNull(new GraphqlClientConfigurationImpl(mockConfig).cacheConfigurations());
         when(mockConfig.cacheConfigurations()).thenReturn(new String[] { "foo: bar" });
         assertNotNull(new GraphqlClientConfigurationImpl(mockConfig).cacheConfigurations());
+    }
+
+    /**
+     * The copy constructor copies the 3 circuit breaker settings.
+     * <p>
+     * Why: {@link GraphqlClientImpl} works on a copy of the OSGi configuration. A setting missing in the copy would silently use
+     * the default instead of the configured value.
+     */
+    @Test
+    public void testCopiesCircuitBreakerSettings() {
+        GraphqlClientConfiguration mockConfig = mock(GraphqlClientConfiguration.class);
+        when(mockConfig.circuitBreakerSocketTimeout()).thenReturn("4:1000:2000:2.5:2");
+        when(mockConfig.circuitBreakerServiceUnavailable()).thenReturn("5:3000:4000:1.25:3");
+        when(mockConfig.circuitBreakerServerError()).thenReturn("6:5000:4");
+
+        GraphqlClientConfigurationImpl copy = new GraphqlClientConfigurationImpl(mockConfig);
+
+        assertEquals("4:1000:2000:2.5:2", copy.circuitBreakerSocketTimeout());
+        assertEquals("5:3000:4000:1.25:3", copy.circuitBreakerServiceUnavailable());
+        assertEquals("6:5000:4", copy.circuitBreakerServerError());
+    }
+
+    /**
+     * A configuration created only from a URL (without OSGi) has the default circuit breaker values.
+     */
+    @Test
+    public void testCircuitBreakerDefaults() {
+        GraphqlClientConfigurationImpl config = new GraphqlClientConfigurationImpl("https://hostname/graphql");
+
+        assertEquals("3:20000:180000:1.5:1", config.circuitBreakerSocketTimeout());
+        assertEquals("3:20000:180000:1.5:1", config.circuitBreakerServiceUnavailable());
+        assertEquals("3:10000:1", config.circuitBreakerServerError());
     }
 }

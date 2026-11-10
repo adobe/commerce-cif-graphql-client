@@ -55,6 +55,22 @@ Because of the limitations of the AEM OSGi configuration console when defining m
 
 Note that even if it is enabled, a cache is only used if the `RequestOptions` set by the caller component/service defines the cache name and explicitly sets the `DataFetchingPolicy` to `CACHE_FIRST`. This ensures that the behavior of the client is backwards compatible (= caching is skipped by default). In addition, a caller can explicitly set the `DataFetchingPolicy` to `NETWORK_ONLY` to skip caching programmatically, even if caching is enabled in the OSGi configuration.
 
+### Circuit breaker (fault-tolerant fallback)
+
+Setting `enableFaultTolerantFallback` to `true` protects AEM when the GraphQL server is slow or failing. It is disabled by default. Three circuit breakers count consecutive failures of the client: socket (read) timeouts, HTTP 503 responses and other HTTP 5xx responses. When a breaker opens, requests fail immediately with a `GraphqlRequestException` instead of waiting for the server, so AEM request threads are not blocked. After a delay, the breaker lets a trial request through: if it succeeds the breaker closes, otherwise it opens again.
+
+Starting with version `1.12.0`, each breaker is configured by one colon-separated value:
+* `circuitBreakerSocketTimeout` and `circuitBreakerServiceUnavailable`: `FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD`, default `3:20000:180000:1.5:1`. The open delay is multiplied by `DELAY_MULTIPLIER` each time the breaker opens again without closing in between, up to `MAX_DELAY_MS`.
+* `circuitBreakerServerError`: `FAILURE_THRESHOLD:DELAY_MS:SUCCESS_THRESHOLD`, default `3:10000:1`.
+
+Every part must be present, but a part can be left empty, for example `5::::` to change only the failure threshold of the socket timeout breaker. Empty parts use their default. Invalid parts (not a number, below 1, or a `DELAY_MULTIPLIER` below 1.0) use their default and are logged at WARN. A value with a different number of parts than its format is ignored completely and logged at WARN, because the two formats are different. Values that are too large are capped and logged at WARN: `FAILURE_THRESHOLD` at 1000, `SUCCESS_THRESHOLD` at 10 (a half-open breaker lets that many trial requests through at the same time) and the delays at 86400000 (1 day). A `MAX_DELAY_MS` smaller than `INITIAL_DELAY_MS` is raised to `INITIAL_DELAY_MS`.
+
+Things to know before enabling it:
+* The state is kept per GraphQL client and per AEM instance (pod), so each publish instance opens its breakers on its own.
+* Connection failures (connection refused, connection and request pool timeouts), HTTP 4xx responses and GraphQL errors never open a breaker. Each breaker treats them, and the failures counted by the other breakers, as successes: they reset its consecutive-failure count and can close it when it is half-open. For example, a backend that alternates between timeouts and HTTP 503 never opens either breaker, and a half-open HTTP 503 breaker closes when its trial request times out.
+* While a breaker is open, components render without commerce data. Make sure that such degraded pages are not cached by the dispatcher or the CDN, for example by returning an error status for them.
+* State changes are logged at WARN (open) and INFO (half-open, closed) by the `com.adobe.cq.commerce.graphql.client.impl.circuitbreaker` package. Rejected requests are logged at DEBUG by `FaultTolerantExecutor`.
+
 ## Releases to Maven Central
 
 Releases are triggered by manually running `mvn release:prepare release:clean` on the `master` branch. This automatically pushes a commit with a release git tag like `graphql-client-x.y.z.` which triggers a dedicated `GitHub Actions` build that performs the deployment of the artifact to Maven Central.

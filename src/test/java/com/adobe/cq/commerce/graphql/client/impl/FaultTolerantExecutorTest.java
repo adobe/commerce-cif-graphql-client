@@ -87,8 +87,43 @@ public class FaultTolerantExecutorTest {
         mockConfig = new MockGraphqlClientConfiguration();
         mockConfig.setIdentifier("mockIdentifier");
         mockConfig.setEnableFaultTolerantFallback(true);
+        // Small delays so that the tests can wait for the circuit breakers to become half-open
+        mockConfig.setCircuitBreakerServiceUnavailable("3:10:500:1.2:1");
+        mockConfig.setCircuitBreakerServerError("3:10:1");
+        mockConfig.setCircuitBreakerSocketTimeout("3:10:500:1.2:1");
 
         graphqlClient.activate(mockConfig, mock(BundleContext.class));
+    }
+
+    /**
+     * The failure threshold set in the OSGi configuration is used by the running client. With the HTTP 503 threshold set to 1
+     * and a 60 s delay, the first 503 opens the breaker and the second request is rejected without an HTTP call (the HTTP client
+     * is called only once).
+     * <p>
+     * Why: proves that the OSGi settings reach the client, not only the {@code Configuration} class.
+     */
+    @Test
+    public void testFailureThresholdFromOsgiConfiguration() throws Exception {
+        mockConfig.setCircuitBreakerServiceUnavailable("1:60000:60000:1.5:1");
+        graphqlClient.activate(mockConfig, mock(BundleContext.class));
+        TestUtils.setupHttpResponse("sample-graphql-response.json", httpClient, HttpStatus.SC_SERVICE_UNAVAILABLE);
+
+        try {
+            graphqlClient.execute(dummy, Data.class, Error.class);
+            fail("Expected ServiceUnavailableException");
+        } catch (ServiceUnavailableException e) {
+            assertEquals(503, e.getStatusCode());
+        }
+
+        // a single failure opens the circuit breaker, the second request is rejected without calling the backend
+        try {
+            graphqlClient.execute(dummy, Data.class, Error.class);
+            fail("Expected GraphqlRequestException");
+        } catch (GraphqlRequestException e) {
+            assertTrue(e.getCause() instanceof CircuitBreakerOpenException);
+        }
+
+        verify(httpClient, times(1)).execute(any(HttpUriRequest.class), any(ResponseHandler.class));
     }
 
     @Test
