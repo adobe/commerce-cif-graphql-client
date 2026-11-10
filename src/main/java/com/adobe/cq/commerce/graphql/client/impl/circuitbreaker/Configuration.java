@@ -60,8 +60,8 @@ class Configuration {
 
     /**
      * Creates a configuration backed by the OSGi configuration of a GraphQL client. Each circuit breaker is configured by one
-     * colon-separated value. Empty or invalid parts are logged and replaced by their defaults. A value with a different number
-     * of parts than its format is ignored completely.
+     * colon-separated value. Empty parts silently use their defaults. Invalid parts are logged and use their defaults, and parts
+     * that are too large are logged and capped. A value with a different number of parts than its format is ignored completely.
      */
     Configuration(GraphqlClientConfiguration osgiConfiguration) {
         this.osgiConfiguration = osgiConfiguration;

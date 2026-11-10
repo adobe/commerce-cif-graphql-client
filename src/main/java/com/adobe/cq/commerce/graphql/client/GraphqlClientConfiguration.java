@@ -165,12 +165,12 @@ public @interface GraphqlClientConfiguration {
         name = "Circuit breaker: socket timeout",
         description = "Only used when 'Enable Fault Tolerant Fallback' is enabled. Format "
             + "FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD - "
-            + "FAILURE_THRESHOLD : consecutive socket (read) timeouts that open the breaker - "
-            + "INITIAL_DELAY_MS : time the breaker stays open the first time - "
-            + "MAX_DELAY_MS : maximum time the breaker stays open - "
+            + "FAILURE_THRESHOLD : consecutive socket (read) timeouts that open the breaker, at most 1000 - "
+            + "INITIAL_DELAY_MS : time the breaker stays open the first time, at most 86400000 (1 day) - "
+            + "MAX_DELAY_MS : maximum time the breaker stays open, at most 86400000 (1 day), raised to INITIAL_DELAY_MS if smaller - "
             + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default and values above these maximums are capped; a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT,
         type = AttributeType.STRING)
     String circuitBreakerSocketTimeout() default DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT;
@@ -179,12 +179,12 @@ public @interface GraphqlClientConfiguration {
         name = "Circuit breaker: HTTP 503",
         description = "Only used when 'Enable Fault Tolerant Fallback' is enabled. Format "
             + "FAILURE_THRESHOLD:INITIAL_DELAY_MS:MAX_DELAY_MS:DELAY_MULTIPLIER:SUCCESS_THRESHOLD - "
-            + "FAILURE_THRESHOLD : consecutive HTTP 503 (Service Unavailable) responses that open the breaker - "
-            + "INITIAL_DELAY_MS : time the breaker stays open the first time - "
-            + "MAX_DELAY_MS : maximum time the breaker stays open - "
+            + "FAILURE_THRESHOLD : consecutive HTTP 503 (Service Unavailable) responses that open the breaker, at most 1000 - "
+            + "INITIAL_DELAY_MS : time the breaker stays open the first time, at most 86400000 (1 day) - "
+            + "MAX_DELAY_MS : maximum time the breaker stays open, at most 86400000 (1 day), raised to INITIAL_DELAY_MS if smaller - "
             + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default and values above these maximums are capped; a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE,
         type = AttributeType.STRING)
     String circuitBreakerServiceUnavailable() default DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE;
@@ -192,10 +192,10 @@ public @interface GraphqlClientConfiguration {
     @AttributeDefinition(
         name = "Circuit breaker: other HTTP 5xx",
         description = "Only used when 'Enable Fault Tolerant Fallback' is enabled. Format FAILURE_THRESHOLD:DELAY_MS:SUCCESS_THRESHOLD - "
-            + "FAILURE_THRESHOLD : consecutive HTTP 5xx responses other than 503 that open the breaker - "
-            + "DELAY_MS : time the breaker stays open - "
+            + "FAILURE_THRESHOLD : consecutive HTTP 5xx responses other than 503 that open the breaker, at most 1000 - "
+            + "DELAY_MS : time the breaker stays open, at most 86400000 (1 day) - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default; a value with a different number of parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default and values above these maximums are capped; a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR,
         type = AttributeType.STRING)
     String circuitBreakerServerError() default DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR;
