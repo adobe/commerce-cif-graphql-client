@@ -39,6 +39,9 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
     private int connectionTtl = GraphqlClientConfiguration.DEFAULT_CONNECTION_TTL;
     private int serviceRanking = 0;
     private boolean enableFaultTolerantFallback = false;
+    private String circuitBreakerSocketTimeout = GraphqlClientConfiguration.DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT;
+    private String circuitBreakerServiceUnavailable = GraphqlClientConfiguration.DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE;
+    private String circuitBreakerServerError = GraphqlClientConfiguration.DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR;
 
     GraphqlClientConfigurationImpl(String url) {
         this.url = url;
@@ -62,6 +65,9 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
         connectionTtl = configuration.connectionTtl();
         serviceRanking = configuration.service_ranking();
         enableFaultTolerantFallback = configuration.enableFaultTolerantFallback();
+        circuitBreakerSocketTimeout = configuration.circuitBreakerSocketTimeout();
+        circuitBreakerServiceUnavailable = configuration.circuitBreakerServiceUnavailable();
+        circuitBreakerServerError = configuration.circuitBreakerServerError();
     }
 
     @Override
@@ -211,5 +217,32 @@ class GraphqlClientConfigurationImpl implements Annotation, GraphqlClientConfigu
 
     public void setEnableFaultTolerantFallback(boolean enableFaultTolerantFallback) {
         this.enableFaultTolerantFallback = enableFaultTolerantFallback;
+    }
+
+    @Override
+    public String circuitBreakerSocketTimeout() {
+        return circuitBreakerSocketTimeout;
+    }
+
+    public void setCircuitBreakerSocketTimeout(String circuitBreakerSocketTimeout) {
+        this.circuitBreakerSocketTimeout = circuitBreakerSocketTimeout;
+    }
+
+    @Override
+    public String circuitBreakerServiceUnavailable() {
+        return circuitBreakerServiceUnavailable;
+    }
+
+    public void setCircuitBreakerServiceUnavailable(String circuitBreakerServiceUnavailable) {
+        this.circuitBreakerServiceUnavailable = circuitBreakerServiceUnavailable;
+    }
+
+    @Override
+    public String circuitBreakerServerError() {
+        return circuitBreakerServerError;
+    }
+
+    public void setCircuitBreakerServerError(String circuitBreakerServerError) {
+        this.circuitBreakerServerError = circuitBreakerServerError;
     }
 }

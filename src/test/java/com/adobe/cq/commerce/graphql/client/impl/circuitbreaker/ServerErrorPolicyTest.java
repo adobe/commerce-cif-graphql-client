@@ -29,7 +29,7 @@ public class ServerErrorPolicyTest {
     @Before
     public void setUp() {
         config = new Configuration.ServerErrorConfig(3, 10000L, 1);
-        policy = new ServerErrorPolicy(config);
+        policy = new ServerErrorPolicy(config, "test");
     }
 
     @Test
@@ -52,7 +52,7 @@ public class ServerErrorPolicyTest {
     public void testPolicyConfiguration() {
         // Test that the policy correctly uses its configuration
         Configuration.ServerErrorConfig testConfig = new Configuration.ServerErrorConfig(5, 15000L, 2);
-        ServerErrorPolicy testPolicy = new ServerErrorPolicy(testConfig);
+        ServerErrorPolicy testPolicy = new ServerErrorPolicy(testConfig, "test");
 
         assertEquals("ServerError", testPolicy.getPolicyName());
         assertEquals(com.adobe.cq.commerce.graphql.client.impl.circuitbreaker.ServerErrorException.class, testPolicy

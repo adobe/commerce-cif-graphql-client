@@ -41,8 +41,6 @@ public class DefaultExecutor implements RequestExecutor {
     protected final GraphqlClientMetrics metrics;
     protected final GraphqlClientConfiguration configuration;
     protected final Gson gson;
-    protected Supplier<Long> stopTimer;
-    protected long requestStartTime;
 
     public DefaultExecutor(HttpClient client, GraphqlClientMetrics metrics, GraphqlClientConfiguration configuration) {
         this.client = client;
@@ -52,37 +50,56 @@ public class DefaultExecutor implements RequestExecutor {
     }
 
     /**
-     * Calculates the duration in milliseconds using simple timestamp difference.
-     * This method is independent of metrics implementation and suitable for all scenarios.
-     * 
-     * @return duration in milliseconds since request start, or 0 if start time not set
+     * Start time and metrics timer of one request. The executor is shared by all concurrent requests of a client, so these are
+     * created per request instead of being stored in fields of the executor.
      */
-    protected long calculateDuration() {
-        return requestStartTime > 0 ? System.currentTimeMillis() - requestStartTime : 0;
+    static final class RequestTimer {
+        private final long startTime;
+        private final Supplier<Long> stopTimer;
+
+        RequestTimer(GraphqlClientMetrics metrics) {
+            this.startTime = System.currentTimeMillis();
+            this.stopTimer = metrics.startRequestDurationTimer();
+        }
+
+        /**
+         * @return duration in milliseconds since the request started
+         */
+        long duration() {
+            return System.currentTimeMillis() - startTime;
+        }
+
+        /**
+         * Stops the request duration metric timer.
+         *
+         * @return the measured duration, or null if the metric is not available
+         */
+        Long stop() {
+            return stopTimer.get();
+        }
     }
 
     @Override
     public <T, U> GraphqlResponse<T, U> execute(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options) {
-        requestStartTime = System.currentTimeMillis();
-        stopTimer = metrics.startRequestDurationTimer();
+        RequestTimer timer = new RequestTimer(metrics);
         try {
             return client.execute(buildRequest(request, options), httpResponse -> {
                 StatusLine statusLine = httpResponse.getStatusLine();
                 if (HttpStatus.SC_OK == statusLine.getStatusCode()) {
-                    return handleValidResponse(request, typeOfT, typeofU, options, httpResponse);
+                    return handleValidResponse(request, typeOfT, typeofU, options, httpResponse, timer);
                 } else {
-                    throw handleErrorResponse(statusLine);
+                    throw handleErrorResponse(statusLine, timer);
                 }
             });
         } catch (IOException e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to send GraphQL request", calculateDuration(), e);
+            throw new GraphqlRequestException("Failed to send GraphQL request", timer.duration(), e);
         }
     }
 
-    private GraphqlRequestException handleErrorResponse(StatusLine statusLine) {
+    private GraphqlRequestException handleErrorResponse(StatusLine statusLine, RequestTimer timer) {
         metrics.incrementRequestErrors(statusLine.getStatusCode());
-        throw new GraphqlRequestException("GraphQL query failed with response code " + statusLine.getStatusCode(), calculateDuration());
+        throw new GraphqlRequestException("GraphQL query failed with response code " + statusLine.getStatusCode(), timer.duration());
     }
 
     @Override
@@ -97,18 +114,18 @@ public class DefaultExecutor implements RequestExecutor {
     }
 
     protected <T, U> GraphqlResponse<T, U> handleValidResponse(GraphqlRequest request, Type typeOfT, Type typeofU, RequestOptions options,
-        HttpResponse httpResponse) {
+        HttpResponse httpResponse, RequestTimer timer) {
         HttpEntity entity = httpResponse.getEntity();
         String json;
         try {
             json = EntityUtils.toString(entity, StandardCharsets.UTF_8);
-            Long executionTime = stopTimer.get();
+            Long executionTime = timer.stop();
             if (executionTime != null) {
                 LOGGER.debug("Executed in {}ms", executionTime);
             }
         } catch (Exception e) {
             metrics.incrementRequestErrors();
-            throw new GraphqlRequestException("Failed to read HTTP response content", calculateDuration(), e);
+            throw new GraphqlRequestException("Failed to read HTTP response content", timer.duration(), e);
         }
 
         Gson gson = (options != null && options.getGson() != null) ? options.getGson() : this.gson;
@@ -116,14 +133,14 @@ public class DefaultExecutor implements RequestExecutor {
         GraphqlResponse<T, U> response = gson.fromJson(json, type);
 
         // Set duration on response
-        response.setDuration(calculateDuration());
+        response.setDuration(timer.duration());
 
         // We log GraphQL errors because they might otherwise get "silently" unnoticed
         if (response.getErrors() != null) {
             Type listErrorsType = TypeToken.getParameterized(List.class, typeofU).getType();
             String errors = gson.toJson(response.getErrors(), listErrorsType);
             LOGGER.warn("GraphQL request {} returned some errors after {}ms: {}",
-                request.getQuery(), calculateDuration(), errors);
+                request.getQuery(), timer.duration(), errors);
         }
 
         return response;
