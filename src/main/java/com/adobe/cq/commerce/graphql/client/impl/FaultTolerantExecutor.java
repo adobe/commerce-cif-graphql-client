@@ -43,6 +43,7 @@ public class FaultTolerantExecutor extends DefaultExecutor {
         this.circuitBreakerService = new CircuitBreakerService(configuration);
     }
 
+    // Visible for testing
     CircuitBreakerService getCircuitBreakerService() {
         return circuitBreakerService;
     }

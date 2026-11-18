@@ -156,7 +156,8 @@ public @interface GraphqlClientConfiguration {
             + "fail immediately for a while instead of waiting for the server, so request threads are not blocked. Connection "
             + "failures (connection refused, connection and request pool timeouts), HTTP 4xx responses and GraphQL errors in a "
             + "successful response never open a breaker. Each breaker treats them, and the failures counted by the other breakers, "
-            + "as successes: they reset its consecutive-failure count and can close it when it is half-open. The circuit breaker state is kept per GraphQL client and per AEM instance. "
+            + "as successes: they reset its consecutive-failure count and can close it when it is half-open. "
+            + "The circuit breaker state is kept per GraphQL client and per AEM instance. "
             + "When disabled, the existing error handling is used and the circuit breaker settings below are ignored.",
         type = AttributeType.BOOLEAN)
     boolean enableFaultTolerantFallback() default false;
@@ -170,7 +171,8 @@ public @interface GraphqlClientConfiguration {
             + "MAX_DELAY_MS : maximum time the breaker stays open, at most 86400000 (1 day), raised to INITIAL_DELAY_MS if smaller - "
             + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default and values above these maximums are capped; a value with a different number of parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default and values above these maximums are capped; "
+            + "a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT,
         type = AttributeType.STRING)
     String circuitBreakerSocketTimeout() default DEFAULT_CIRCUIT_BREAKER_SOCKET_TIMEOUT;
@@ -184,7 +186,8 @@ public @interface GraphqlClientConfiguration {
             + "MAX_DELAY_MS : maximum time the breaker stays open, at most 86400000 (1 day), raised to INITIAL_DELAY_MS if smaller - "
             + "DELAY_MULTIPLIER : factor applied to the open time each time the breaker re-opens without closing in between - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default and values above these maximums are capped; a value with a different number of parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default and values above these maximums are capped; "
+            + "a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE,
         type = AttributeType.STRING)
     String circuitBreakerServiceUnavailable() default DEFAULT_CIRCUIT_BREAKER_SERVICE_UNAVAILABLE;
@@ -195,7 +198,8 @@ public @interface GraphqlClientConfiguration {
             + "FAILURE_THRESHOLD : consecutive HTTP 5xx responses other than 503 that open the breaker, at most 1000 - "
             + "DELAY_MS : time the breaker stays open, at most 86400000 (1 day) - "
             + "SUCCESS_THRESHOLD : successful trial requests needed to close the breaker again, at most 10. "
-            + "Empty or invalid parts use their default and values above these maximums are capped; a value with a different number of parts than this format is ignored. Defaults to "
+            + "Empty or invalid parts use their default and values above these maximums are capped; "
+            + "a value with a different number of parts than this format is ignored. Defaults to "
             + DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR,
         type = AttributeType.STRING)
     String circuitBreakerServerError() default DEFAULT_CIRCUIT_BREAKER_SERVER_ERROR;

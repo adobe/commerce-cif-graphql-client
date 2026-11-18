@@ -119,6 +119,7 @@ public class CircuitBreakerService {
      * @param policyName a policy name, for example {@code "SocketTimeout"}
      * @return the circuit breaker, or {@code null} if no policy has this name
      */
+    // Visible for testing
     public CircuitBreaker<?> getCircuitBreaker(String policyName) {
         return circuitBreakers.stream().filter(breaker -> policyName.equals(policyNames.get(breaker))).findFirst().orElse(null);
     }
