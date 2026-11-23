@@ -15,10 +15,22 @@
 package com.adobe.cq.commerce.graphql.client.impl;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
+import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.message.BasicHttpResponse;
+import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -26,6 +38,7 @@ import org.mockito.MockitoAnnotations;
 
 import com.adobe.cq.commerce.graphql.client.GraphqlRequest;
 import com.adobe.cq.commerce.graphql.client.GraphqlRequestException;
+import com.adobe.cq.commerce.graphql.client.GraphqlResponse;
 import com.adobe.cq.commerce.graphql.client.HttpMethod;
 import com.adobe.cq.commerce.graphql.client.RequestOptions;
 
@@ -64,26 +77,64 @@ public class DefaultExecutorTest {
     }
 
     @Test
-    public void testCalculateDurationWhenStartTimeNotSet() {
-        // Test calculateDuration when requestStartTime is 0 (not set)
-        DefaultExecutor testExecutor = new DefaultExecutor(httpClient, metrics, configuration);
-        long duration = testExecutor.calculateDuration();
-        assertEquals("Duration should be 0 when start time not set", 0L, duration);
+    public void testRequestTimer() throws Exception {
+        DefaultExecutor.RequestTimer timer = new DefaultExecutor.RequestTimer(metrics);
+        Thread.sleep(5);
+        assertTrue("Duration should be at least 5 ms", timer.duration() >= 5);
+        assertEquals(Long.valueOf(100L), timer.stop());
     }
 
+    /**
+     * Two requests overlap on the same executor: request A is still waiting for the backend when request B starts and ends.
+     * Each request reports its own duration and stops its own metrics timer.
+     * <p>
+     * Why: the executor is shared by all concurrent requests of a client. When the start time and the metrics timer were fields
+     * of the executor, request B overwrote them, so request A reported B's duration and stopped B's timer instead of its own.
+     */
     @Test
-    public void testCalculateDurationWhenStartTimeSet() throws Exception {
-        // Test calculateDuration when requestStartTime is set
-        long startTime = System.currentTimeMillis();
+    public void testOverlappingRequestsKeepTheirOwnTiming() throws Exception {
+        assertOverlappingRequestsKeepTheirOwnTiming(executor);
+    }
 
-        // Use reflection to set the requestStartTime
-        java.lang.reflect.Field field = DefaultExecutor.class.getDeclaredField("requestStartTime");
-        field.setAccessible(true);
-        field.setLong(executor, startTime);
+    /**
+     * Same as {@link #testOverlappingRequestsKeepTheirOwnTiming()}, for the executor used when the circuit breakers are enabled.
+     */
+    @Test
+    public void testOverlappingRequestsKeepTheirOwnTimingWithFaultTolerantExecutor() throws Exception {
+        assertOverlappingRequestsKeepTheirOwnTiming(new FaultTolerantExecutor(httpClient, metrics, new MockGraphqlClientConfiguration()));
+    }
 
-        Thread.sleep(1); // Ensure some time passes
-        long duration = executor.calculateDuration();
-        assertTrue("Duration should be greater than 0", duration > 0);
+    @SuppressWarnings("unchecked")
+    private void assertOverlappingRequestsKeepTheirOwnTiming(DefaultExecutor testExecutor) throws Exception {
+        Supplier<Long> stopTimerA = mock(Supplier.class);
+        Supplier<Long> stopTimerB = mock(Supplier.class);
+        when(metrics.startRequestDurationTimer()).thenReturn(stopTimerA, stopTimerB);
+
+        List<GraphqlResponse<Object, Object>> responsesB = new ArrayList<>();
+        AtomicBoolean firstCall = new AtomicBoolean(true);
+        when(httpClient.execute(any(HttpUriRequest.class), any(ResponseHandler.class))).thenAnswer(invocation -> {
+            if (firstCall.getAndSet(false)) {
+                // request A waits for the backend while request B runs from start to end
+                Thread.sleep(200);
+                responsesB.add(testExecutor.execute(new GraphqlRequest("{b}"), Object.class, Object.class, null));
+            }
+            ResponseHandler<?> handler = (ResponseHandler<?>) invocation.getArguments()[1];
+            return handler.handleResponse(okResponse());
+        });
+
+        GraphqlResponse<Object, Object> responseA = testExecutor.execute(new GraphqlRequest("{a}"), Object.class, Object.class, null);
+
+        assertTrue("Request A should take at least 200 ms, was " + responseA.getDuration(), responseA.getDuration() >= 200);
+        assertTrue("Request B should not include the wait of A, was " + responsesB.get(0).getDuration(),
+            responsesB.get(0).getDuration() < 200);
+        verify(stopTimerA, times(1)).get();
+        verify(stopTimerB, times(1)).get();
+    }
+
+    private static HttpResponse okResponse() {
+        HttpResponse response = new BasicHttpResponse(new BasicStatusLine(HttpVersion.HTTP_1_1, HttpStatus.SC_OK, "OK"));
+        response.setEntity(new StringEntity("{\"data\":{}}", StandardCharsets.UTF_8));
+        return response;
     }
 
     @Test
@@ -164,9 +215,9 @@ public class DefaultExecutorTest {
         try {
             // Use reflection to call private method
             java.lang.reflect.Method method = DefaultExecutor.class.getDeclaredMethod("handleErrorResponse",
-                org.apache.http.StatusLine.class);
+                org.apache.http.StatusLine.class, DefaultExecutor.RequestTimer.class);
             method.setAccessible(true);
-            method.invoke(executor, statusLine);
+            method.invoke(executor, statusLine, new DefaultExecutor.RequestTimer(metrics));
             fail("Expected GraphqlRequestException");
         } catch (Exception e) {
             assertTrue("Should wrap in GraphqlRequestException", e.getCause() instanceof GraphqlRequestException);
